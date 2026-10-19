@@ -4,6 +4,7 @@ import { useState } from "react";
 import { backendUrl, getText } from "../../api/client";
 import { tc } from "../../api/tc";
 import { Fold } from "../../ui/Fold";
+import { Lightbox, LightboxItem } from "../../ui/Lightbox";
 import { Notice, Page, Row, Section, useUi } from "../../ui/kit";
 import cc3200Pcb from "./img/3200-pcb.webp";
 import cc3200Preview from "./img/3200-pcb-preview.webp";
@@ -48,6 +49,7 @@ export function SetupPage() {
     const [mac, setMac] = useState("");
     const [vendor, setVendor] = useState<string | null>(null);
     const [lookupFailed, setLookupFailed] = useState(false);
+    const [zoom, setZoom] = useState<LightboxItem | null>(null);
     const macValid = /^([0-9a-f]{2}[:-]?){5}[0-9a-f]{2}$/i.test(mac.trim());
     const matching = vendor ? chipsOfVendor(vendor) : [];
 
@@ -101,9 +103,9 @@ export function SetupPage() {
                 <div className="setup-chips">
                     {CHIPS.filter((c) => matching.length === 0 || matching.includes(c.id)).map((c) => (
                         <div key={c.id} className="setup-chip">
-                            <a href={c.full} target="_blank" rel="noopener">
+                            <button type="button" className="setup-chip-pic" onClick={() => setZoom({ src: c.full, alt: c.name })}>
                                 <img src={c.preview} alt={c.name} loading="lazy" />
-                            </a>
+                            </button>
                             <div>
                                 <strong>{c.name}</strong>
                                 <p className="small muted">{st(c.text)}</p>
@@ -133,6 +135,7 @@ export function SetupPage() {
                 <WifiGuide />
                 <Row icon={<Radio size={17} />} title={st("showBoxes")} sub={st("showBoxesHint")} to="/" />
             </Section>
+            {zoom && <Lightbox items={[zoom]} index={0} onClose={() => setZoom(null)} />}
         </Page>
     );
 }

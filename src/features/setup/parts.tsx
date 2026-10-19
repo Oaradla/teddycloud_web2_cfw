@@ -2,6 +2,7 @@ import { Check, Copy, ExternalLink } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { Notice } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
+import { Lightbox, LightboxItem } from "../../ui/Lightbox";
 import { st, stList } from "./texts";
 
 /** a command or file content with a copy button */
@@ -31,15 +32,17 @@ export function Code({ children }: { children: string }) {
 }
 
 /** pictures side by side, each opens full size */
-export function Pics({ items }: { items: { src: string; alt: string }[] }) {
+export function Pics({ items }: { items: LightboxItem[] }) {
+    const [open, setOpen] = useState<number | null>(null);
     return (
         <div className="setup-pics">
-            {items.map((p) => (
-                <a key={p.src} href={p.src} target="_blank" rel="noopener">
+            {items.map((p, i) => (
+                <button key={p.src} type="button" onClick={() => setOpen(i)}>
                     <img src={p.src} alt={p.alt} loading="lazy" />
                     <span>{p.alt}</span>
-                </a>
+                </button>
             ))}
+            {open !== null && <Lightbox items={items} index={open} onClose={() => setOpen(null)} />}
         </div>
     );
 }
