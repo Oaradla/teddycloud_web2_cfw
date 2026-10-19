@@ -10,9 +10,14 @@ const hasAlpha = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     return false;
 };
 
+const encode = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
 /**
- * A smaller copy of a picture: at most MAX_EDGE pixels on the long edge, PNG when it has
- * transparency (figures cut out), else JPEG. The original comes back when it is small already.
+ * A smaller copy of a picture: at most MAX_EDGE pixels on the long edge, as WebP where the browser
+ * writes it (a fraction of PNG for cut-out figures, smaller than JPEG for photos; transparency
+ * stays). Browsers without a WebP encoder (Safari) write PNG when it has transparency, else JPEG.
+ * The original comes back when it is small already.
  */
 export async function shrinkImage(input: Blob, name: string): Promise<File> {
     const bitmap = await createImageBitmap(input);
@@ -26,13 +31,18 @@ export async function shrinkImage(input: Blob, name: string): Promise<File> {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
-    const png = hasAlpha(ctx, w, h);
-    const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("could not encode the picture"))), png ? "image/png" : "image/jpeg", 0.86),
-    );
+    // a browser that cannot write WebP returns PNG instead
+    const webp = await encode(canvas, "image/webp", 0.82);
+    let blob = webp?.type === "image/webp" ? webp : null;
+    if (!blob) {
+        const png = hasAlpha(ctx, w, h);
+        blob = await encode(canvas, png ? "image/png" : "image/jpeg", 0.86);
+    }
+    if (!blob) throw new Error("could not encode the picture");
     const base = name.replace(/\.[^.]+$/, "");
     if (scale === 1 && blob.size >= input.size) return new File([input], name, { type: input.type });
-    return new File([blob], `${base}.${png ? "png" : "jpg"}`, { type: blob.type });
+    const ext = { "image/webp": "webp", "image/png": "png", "image/jpeg": "jpg" }[blob.type] ?? "img";
+    return new File([blob], `${base}.${ext}`, { type: blob.type });
 }
 
 /** size of a file of teddyCloud from the response header, without loading it */
