@@ -1,14 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { strToU8, zipSync } from "fflate";
-import { ListPlus, Pencil, Plus, Printer, Scissors, Trash2 } from "lucide-react";
+import { CheckSquare, FolderPlus, ListPlus, Pencil, Plus, Printer, Scissors, Square, Trash2 } from "lucide-react";
 import { CSSProperties, useEffect, useState } from "react";
 import { tc } from "../../api/tc";
 import type { TonieInfo } from "../../api/types";
-import { picUrl, tagInfo } from "../../lib/format";
+import { isTaf, isTap, picUrl, tagInfo } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { getPref, setPref } from "../../lib/prefs";
 import { useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
+import { useSelection } from "../../ui/useSelection";
+import { LibraryPicker } from "../library/LibraryPicker";
 import { TonieImage } from "../../ui/TonieImage";
 import { Empty, Page, Row, SearchField, Section, Segmented, SwitchRow, useUi } from "../../ui/kit";
 
@@ -208,15 +210,30 @@ export function StudioPage() {
     useEffect(() => setPref("studio.settings", JSON.stringify(s)), [s]);
     const set = (patch: Partial<StudioSettings>) => setS((prev) => ({ ...prev, ...patch }));
 
-    const addMine = () => {
+    /** adds pictures and titles not in the list yet (one per model, or per title without one) */
+    const [pickFolder, setPickFolder] = useState(false);
+    const addInfos = (infos: TonieInfo[]) => {
+        const key = (x: { model?: string; series?: string; episode?: string }) => x.model || `${x.series}${x.episode}`;
         const known = new Set(items.map((i) => i.model || i.title + i.episode));
-        const mine = (tags.data ?? [])
-            .filter((tag) => tag.type !== "system")
-            .map((tag) => tagInfo(tag))
-            .filter((info) => (info.series || info.episode) && !known.has(info.model || info.series + info.episode))
-            .filter((info, i, list) => list.findIndex((x) => (x.model || x.series + x.episode) === (info.model || info.series + info.episode)) === i);
-        setItems((prev) => [...prev, ...mine.map((info) => itemOf(info))]);
-        ui.toast("ok", t("studioAdded", { n: mine.length }));
+        const fresh = infos
+            .filter((info) => (info.series || info.episode) && !known.has(key(info)))
+            .filter((info, i, list) => list.findIndex((x) => key(x) === key(info)) === i);
+        setItems((prev) => [...prev, ...fresh.map((info) => itemOf(info))]);
+        ui.toast(fresh.length ? "ok" : "info", t("studioAdded", { n: fresh.length }));
+    };
+
+    /** my tonies, without system ones and those hidden */
+    const addMine = () => addInfos((tags.data ?? []).filter((tag) => tag.type !== "system" && !tag.hide).map((tag) => tagInfo(tag)));
+
+    /** every TAF and playlist with a title in a library folder and the folders below, hidden ones left out */
+    const addFolder = async (folder: string) => {
+        const files = await ui.run(() => tc.walkTree(folder));
+        if (!files) return;
+        addInfos(
+            files
+                .filter(({ entry }) => !entry.isDir && !entry.hide && (isTaf(entry.name) || isTap(entry.name)) && entry.tonieInfo)
+                .map(({ entry }) => entry.tonieInfo!),
+        );
     };
 
     return (
@@ -249,6 +266,7 @@ export function StudioPage() {
                     >
                         <Row icon={<Plus size={17} />} title={t("studioAdd")} accent onClick={() => setAdding(true)} chevron={false} />
                         <Row icon={<ListPlus size={17} />} title={t("studioAddMine")} onClick={addMine} chevron={false} disabled={!tags.data} />
+                        <Row icon={<FolderPlus size={17} />} title={t("studioAddFolder")} onClick={() => setPickFolder(true)} chevron={false} />
                         {items.map((item) => (
                             <Row
                                 key={item.id}
@@ -285,7 +303,17 @@ export function StudioPage() {
                     )}
                 </div>
             </div>
-            <AddSheet open={adding} onClose={() => setAdding(false)} onAdd={(info) => setItems((prev) => [...prev, itemOf(info)])} />
+            <AddSheet open={adding} onClose={() => setAdding(false)} onAdd={addInfos} />
+            <LibraryPicker
+                open={pickFolder}
+                onClose={() => setPickFolder(false)}
+                folderMode
+                title={t("studioAddFolder")}
+                onPick={(folder) => {
+                    setPickFolder(false);
+                    addFolder(folder);
+                }}
+            />
             <EditSheet
                 item={editing}
                 onClose={() => setEditing(null)}
@@ -454,8 +482,7 @@ function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
     );
 }
 
-function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (info: TonieInfo) => void }) {
-    const ui = useUi();
+function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (infos: TonieInfo[]) => void }) {
     const [query, setQuery] = useState("");
     const [debounced, setDebounced] = useState("");
     useEffect(() => {
@@ -463,23 +490,48 @@ function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void
         return () => window.clearTimeout(timer);
     }, [query]);
     const search = useQuery({ queryKey: ["tonieSearch", debounced], queryFn: () => tc.searchTonies(debounced), enabled: open && debounced.length >= 2 });
+    const results = (search.data ?? []).slice(0, 60);
+    const ids = results.map((_, i) => String(i));
+    // a click adds one; Shift (range) or Ctrl/Cmd (single) selects several, a long press on touch screens too
+    const sel = useSelection((id) => onAdd([results[Number(id)]]), ids);
+    useEffect(() => sel.clear(), [debounced, open]);
+    const addSelected = () => {
+        onAdd(ids.filter((id) => sel.selected.has(id)).map((id) => results[Number(id)]));
+        sel.clear();
+    };
     return (
-        <Sheet open={open} onClose={onClose} title={t("studioAdd")} full>
+        <Sheet
+            open={open}
+            onClose={onClose}
+            title={t("studioAdd")}
+            full
+            footer={
+                sel.selected.size > 0 ? (
+                    <>
+                        <button className="btn" onClick={sel.clear}>
+                            {t("cancel")}
+                        </button>
+                        <button className="btn primary" onClick={addSelected}>
+                            {t("studioAddSelected", { n: sel.selected.size })}
+                        </button>
+                    </>
+                ) : undefined
+            }
+        >
             <SearchField value={query} onChange={setQuery} placeholder={t("studioSearch")} autoFocus />
+            {results.length > 0 && <div className="small muted mt">{t("studioMultiHint")}</div>}
             <div className="list mt">
-                {(search.data ?? []).slice(0, 60).map((info, i) => (
-                    <Row
-                        key={`${info.model}-${i}`}
-                        leading={<TonieImage src={info.picture} size={40} />}
-                        title={info.series}
-                        sub={[info.episode, info.model].filter(Boolean).join(" · ")}
-                        onClick={() => {
-                            onAdd(info);
-                            ui.toast("ok", t("studioAdded", { n: 1 }));
-                        }}
-                        chevron={false}
-                        right={<Plus size={18} />}
-                    />
+                {results.map((info, i) => (
+                    <div key={`${info.model}-${i}`} className="row-wrap" role="button" tabIndex={0} {...sel.itemProps(String(i))}>
+                        <Row
+                            className={sel.selected.has(String(i)) ? "checked" : ""}
+                            leading={<TonieImage src={info.picture} size={40} />}
+                            title={info.series}
+                            sub={[info.episode, info.model].filter(Boolean).join(" · ")}
+                            chevron={false}
+                            right={sel.selected.has(String(i)) ? <CheckSquare size={18} /> : sel.selecting ? <Square size={18} /> : <Plus size={18} />}
+                        />
+                    </div>
                 ))}
             </div>
         </Sheet>

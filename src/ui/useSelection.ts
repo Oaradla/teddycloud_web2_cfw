@@ -88,7 +88,7 @@ export function useSelection(onOpen: (id: string) => void, order: string[] = [])
                 // shift click selects ranges, like in a file manager
                 window.getSelection()?.removeAllRanges();
                 toggle(id, true);
-            } else if (selecting) toggle(id);
+            } else if (e.ctrlKey || e.metaKey || selecting) toggle(id);
             else onOpen(id);
         },
         onKeyDown: (e: React.KeyboardEvent) => {
