@@ -1,4 +1,4 @@
-import { BookOpen, ChevronDown, ChevronRight, Wrench } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, HardDrive, Wrench } from "lucide-react";
 import { Fragment, useState } from "react";
 import { t, type Key } from "../../lib/i18n";
 import { Row, Section } from "../../ui/kit";
@@ -53,6 +53,13 @@ export function InstallGuide({ open: initiallyOpen }: { open: boolean }) {
                 <div style={{ padding: "4px 16px 12px" }}>
                     <h3 className="guide-chip">{t("guideCc3200")}</h3>
                     <Steps chip="cc3200" />
+                    <p className="small">
+                        {t("guideCardZip")}{" "}
+                        <a className="btn small" href="#/setup/cc3200?way=card">
+                            <HardDrive size={15} />
+                            {t("guideCardZipLink")}
+                        </a>
+                    </p>
                     <h3 className="guide-chip">{t("guideEsp32")}</h3>
                     <Steps chip="esp32" />
                 </div>

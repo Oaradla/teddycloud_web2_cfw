@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { unzipSync, zipSync } from "fflate";
-import { useEffect, useRef, useState } from "react";
+import { zipSync } from "fflate";
+import { useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import { Notice, Segmented, useUi } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
 import nwpBootloaderUrl from "./cc3200/rbtl3100s.dll?url";
 import { Cc3200 } from "./cc3200/protocol";
+import { Cc3200Card, packageFiles, saveZip } from "./Cc3200Card";
 import { StatusLine, Steps, UartHint, Warnings, useBusyGuard } from "./parts";
 import { st } from "./texts";
 
@@ -25,21 +26,6 @@ const macOfCertificate = (der: Uint8Array): string => {
     return "";
 };
 
-const save = (data: Uint8Array, name: string) => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([data as BlobPart], { type: "application/zip" }));
-    a.download = name;
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-};
-
-/** the files of a release package below prefix, without it */
-const packageFiles = (pkg: Uint8Array, prefix: string) => {
-    const out: Record<string, Uint8Array> = {};
-    for (const [name, data] of Object.entries(unzipSync(pkg))) if (name.startsWith(prefix) && !name.endsWith("/")) out[name.slice(prefix.length)] = data;
-    return out;
-};
-
 /**
  * A CC3200 box set up from the browser: backup, certificates and CA, the SD bootloader's preloader,
  * and the card content, all from the release package teddyCloud keeps. The box stays connected
@@ -48,7 +34,6 @@ const packageFiles = (pkg: Uint8Array, prefix: string) => {
 export function Cc3200Browser() {
     const ui = useUi();
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, retry: false });
-    const apiPort = useQuery({ queryKey: ["setting", "core.server.https_api_port"], queryFn: () => tc.getSetting("core.server.https_api_port") });
     const releases = (firmware.data?.images ?? []).filter((i) => i.package && i.platform !== "esp32").sort((a, b) => b.build - a.build);
     const [build, setBuild] = useState<number | null>(null);
     const release = releases.find((r) => r.build === build) ?? releases[0];
@@ -70,15 +55,6 @@ export function Cc3200Browser() {
     const [mac, setMac] = useState("");
     const [certsDone, setCertsDone] = useState(false);
     const [bootloaderDone, setBootloaderDone] = useState(false);
-    const [host, setHost] = useState(window.location.hostname);
-    const [hostEdited, setHostEdited] = useState(false);
-    // the address the other boxes use: the web address may be a reverse proxy the box cannot use
-    const boxHost = useQuery({ queryKey: ["cfwBoxHost"], queryFn: tc.cfwBoxHost, retry: false });
-    const seenHost = boxHost.data?.host.replace(/:\d+$/, "") ?? "";
-    useEffect(() => {
-        if (seenHost && !hostEdited) setHost(seenHost);
-    }, [seenHost, hostEdited]);
-    const [port, setPort] = useState("");
 
     useBusyGuard(busy);
     const addLog = (line: string) => setLog((l) => [...l.slice(-300), line]);
@@ -136,7 +112,7 @@ export function Cc3200Browser() {
         const b = backup.current!;
         const entries: Record<string, Uint8Array> = { "backup.bin": b.flash };
         for (const [name, data] of b.files) entries[`ExtractedFromBox${name.startsWith("/") ? "" : "/"}${name}`] = data;
-        save(zipSync(entries, { level: 0 }), `toniebox-${mac || "cc3200"}-backup.zip`);
+        saveZip(zipSync(entries, { level: 0 }), `toniebox-${mac || "cc3200"}-backup.zip`);
         setBackupSaved(true);
     };
 
@@ -182,22 +158,14 @@ export function Cc3200Browser() {
             return st("cc3200BootloaderDone");
         });
 
-    const card = () =>
-        run(async () => {
-            const files = packageFiles(await tc.cfwPackage(release!.build), "cc3200/card/");
-            const lines = [`host=${host.trim()}`];
-            const boxPort = (port || apiPort.data || "443").trim();
-            if (boxPort !== "443") lines.push(`port=${boxPort}`);
-            lines.push("ca=c2.der");
-            files["cfw/config.txt"] = new TextEncoder().encode(lines.join("\n") + "\n");
-            save(zipSync(files, { level: 0 }), `toniebox-${mac || "cc3200"}-sdcard.zip`);
-            if (box.current) {
-                await box.current.close();
-                box.current = null;
-                setConnected(false);
-            }
-            return st("cc3200CardSaved");
-        });
+    /** after the card content: the box is done with the serial port */
+    const closeBox = async () => {
+        if (box.current) {
+            await box.current.close();
+            box.current = null;
+            setConnected(false);
+        }
+    };
 
     if (!("serial" in navigator)) return <Notice>{st("esp32NoSerial")}</Notice>;
     if (window.location.protocol !== "https:") return <Notice>{st("esp32Https")}</Notice>;
@@ -275,26 +243,7 @@ export function Cc3200Browser() {
             </button>
         </>,
         <>
-            <p>{st("cc3200CardText")}</p>
-            <div className="field">
-                <label>{st("hostname")}</label>
-                <input
-                    className="input"
-                    value={host}
-                    onChange={(e) => {
-                        setHost(e.target.value);
-                        setHostEdited(true);
-                    }}
-                />
-                <div className="hint">{seenHost ? st("cc3200HostSeen", { host: seenHost }) : st("cc3200HostHint")}</div>
-            </div>
-            <div className="field">
-                <label>{st("port")}</label>
-                <input className="input" inputMode="numeric" value={port || apiPort.data || "443"} onChange={(e) => setPort(e.target.value)} style={{ maxWidth: 140 }} />
-            </div>
-            <button className="btn primary" disabled={busy || !host.trim()} onClick={card}>
-                {st("cc3200CardDownload")}
-            </button>
+            <Cc3200Card build={release?.build} mac={mac} onSaved={closeBox} />
             <Notice info>{st("showBoxesHint")}</Notice>
         </>,
     ];

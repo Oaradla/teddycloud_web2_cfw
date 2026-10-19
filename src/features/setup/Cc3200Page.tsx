@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Notice, Page, Segmented } from "../../ui/kit";
 import { Cc3200Browser } from "./Cc3200Browser";
+import { Cc3200Card } from "./Cc3200Card";
 import debugPort from "./img/cc3200-debugport.webp";
 import tagConnector from "./img/cc3200-tagconnector.webp";
 import wires from "./img/cc3200-wiresastagconnector.webp";
@@ -14,8 +16,9 @@ import { st } from "./texts";
 
 /** the CC3200 box: backup, HackieboxNG bootloader, certificates and the patches that point it to teddyCloud */
 export function Cc3200Page() {
-    const [way, setWay] = useState<"browser" | "manual">(
-        "serial" in navigator ? "browser" : "manual",
+    const [params] = useSearchParams();
+    const [way, setWay] = useState<"browser" | "manual" | "card">(
+        params.get("way") === "card" ? "card" : "serial" in navigator ? "browser" : "manual",
     );
     const [step, setStep] = useState(0);
     const [hw, setHw] = useState<"uart" | "esp32c3">("uart");
@@ -178,11 +181,18 @@ export function Cc3200Page() {
                     options={[
                         { value: "browser", label: st("cc3200WayBrowser") },
                         { value: "manual", label: st("cc3200WayManual") },
+                        { value: "card", label: st("cc3200WayCard") },
                     ]}
                 />
             </div>
             {way === "browser" ? (
                 <Cc3200Browser />
+            ) : way === "card" ? (
+                <>
+                    <p>{st("cc3200CardOnlyText")}</p>
+                    <Notice>{st("cc3200CardOnlyCfg")}</Notice>
+                    <Cc3200Card />
+                </>
             ) : (
                 <Steps
                     titles={[
