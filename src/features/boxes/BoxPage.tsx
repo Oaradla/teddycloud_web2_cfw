@@ -17,14 +17,15 @@ import {
     Speaker,
     Volume2,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { tc } from "../../api/tc";
 import type { SettingOption } from "../../api/types";
 import { ago, contentTitle, dateTime, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
-import { keys, useAllTags, useBoxes, useBoxImage, useBoxState, useBoxesDiffer, useCfwBox, useSettings } from "../../lib/queries";
+import { keys, useAllTags, useBoxes, useBoxImage, useBoxModels, useBoxState, useBoxesDiffer, useCfwBox, useSettings } from "../../lib/queries";
+import { BoxModelSheet } from "./BoxModelSheet";
 import { usePlayer } from "../../player/Player";
 import { ErrorBox, Loading, Page, Row, Section, useUi } from "../../ui/kit";
 import { FigurePic } from "../../ui/FigurePic";
@@ -45,6 +46,8 @@ export function BoxPage() {
     const state = useBoxState(id);
     const cfw = useCfwBox(id);
     const img = useBoxImage(box);
+    const models = useBoxModels();
+    const [modelOpen, setModelOpen] = useState(false);
     const tags = useAllTags();
     const settings = useSettings(id);
     const boxesDiffer = useBoxesDiffer();
@@ -221,7 +224,13 @@ export function BoxPage() {
 
             <Section title={t("info")}>
                 <Row icon={<Info size={17} />} title={t("boxId")} value={<span className="mono selectable">{box.ID}</span>} />
-                {box.boxModel && <Row icon={<Radio size={17} />} title={t("model")} value={box.boxModel} />}
+                <Row
+                    icon={img ? <img src={img} alt="" className="row-model-img" /> : <Radio size={17} />}
+                    title={t("boxModel")}
+                    value={models.data?.find((m) => m.id === box.boxModel)?.name ?? t("boxModelNone")}
+                    onClick={() => setModelOpen(true)}
+                    chevron
+                />
                 {s?.ip && <Row icon={<Settings2 size={17} />} title={t("ipAddress")} value={<span className="mono selectable">{s.ip}</span>} />}
                 {cfw?.isCfw && (
                     <Row
@@ -232,6 +241,7 @@ export function BoxPage() {
                 )}
                 {s?.lastSeen ? <Row icon={<RefreshCw size={17} />} title={t("lastContact")} value={dateTime(s.lastSeen)} /> : null}
             </Section>
+            <BoxModelSheet box={box} open={modelOpen} onClose={() => setModelOpen(false)} />
         </Page>
     );
 }

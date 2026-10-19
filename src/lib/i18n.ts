@@ -76,6 +76,8 @@ const dict = {
     ],
     boxSetup: ["Box einrichten", "Set up a box"],
     boxNotFound: ["Box nicht gefunden", "Box not found"],
+    boxModel: ["Aussehen der Box", "Look of the box"],
+    boxModelNone: ["Kein Bild", "No picture"],
     renameBox: ["Box umbenennen", "Rename box"],
     boxSettings: ["Box-Einstellungen", "Box settings"],
     boxSettingsHint: [
