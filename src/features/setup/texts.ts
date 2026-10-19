@@ -58,7 +58,7 @@ const T = {
     ],
     caDownloadC2: ["CA-Ersatz als c2.der (CC3200)", "CA replacement as c2.der (CC3200)"],
     caDownloadCa: ["CA-Ersatz als ca.der (CC3235, ESP32)", "CA replacement as ca.der (CC3235, ESP32)"],
-    caDownloadHint: ["Das Zertifikat dieses teddyCloud, das die Box statt der Boxine-CA prüft", "The certificate of this teddyCloud the box checks instead of the Boxine CA"],
+    caDownloadHint: ["Das Zertifikat dieser teddyCloud, das die Box statt der Boxine-CA prüft", "The certificate of this teddyCloud the box checks instead of the Boxine CA"],
     tb2: ["Toniebox 2", "Toniebox 2"],
     tb2Text: [
         "Für die Toniebox 2 gibt es noch keinen Weg; daran wird gearbeitet (Forum, Telegram).",
@@ -330,7 +330,7 @@ const T = {
     cc3200Mac: ["MAC der Box", "MAC of the box"],
     cc3200MacHint: ["Aus dem Box-Zertifikat gelesen; sonst von der Unterseite der Box abschreiben.", "Read from the box certificate; otherwise copy it from the bottom of the box."],
     cc3200Certs: ["Zertifikate und CA", "Certificates and CA"],
-    cc3200CertsText: ["Legt die Zertifikate der Box in teddyCloud ab (unter ihrer MAC, als Standard nur wo keine sind) und schreibt die CA dieses teddyCloud als /cert/c2.der auf die Box. Die Original-CA bleibt für die Original-Firmware.", "Stores the box's certificates in teddyCloud (under its MAC, as the defaults only where there are none) and writes this teddyCloud's CA as /cert/c2.der to the box. The original CA stays for the original firmware."],
+    cc3200CertsText: ["Legt die Zertifikate der Box in teddyCloud ab (unter ihrer MAC, als Standard nur wo keine sind) und schreibt die CA dieser teddyCloud als /cert/c2.der auf die Box. Die Original-CA bleibt für die Original-Firmware.", "Stores the box's certificates in teddyCloud (under its MAC, as the defaults only where there are none) and writes this teddyCloud's CA as /cert/c2.der to the box. The original CA stays for the original firmware."],
     cc3200CertsRun: ["Zertifikate ablegen und CA schreiben", "Store certificates and write the CA"],
     cc3200CertsDone: ["Zertifikate abgelegt, CA geschrieben", "Certificates stored, CA written"],
     cc3200Bootloader: ["Bootloader", "Bootloader"],
