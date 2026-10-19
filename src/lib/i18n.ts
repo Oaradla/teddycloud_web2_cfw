@@ -586,6 +586,8 @@ const dict = {
     boxSetupHint: ["Box mit teddyCloud verbinden, Flashen, Chip bestimmen", "Connect a box to teddyCloud, flashing, find out the chip"],
     communityHint: ["FAQ, Änderungen, Mitwirkende", "FAQ, changes, contributors"],
     communityTitle: ["Community", "Community"],
+    studioPage: ["Seite {n} von {of} · {per} Etiketten pro Blatt", "Page {n} of {of} · {per} labels per sheet"],
+    studioCutSvg: ["Schnittlinien als SVG (Lasercutter)", "Cut lines as SVG (laser cutter)"],
     studioPrint: ["Drucken", "Print"],
     studioTonies: ["Tonies ({n})", "Tonies ({n})"],
     studioAdd: ["Tonie hinzufügen", "Add tonie"],

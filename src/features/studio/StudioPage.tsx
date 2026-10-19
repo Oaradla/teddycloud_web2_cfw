@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { ListPlus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { strToU8, zipSync } from "fflate";
+import { ListPlus, Pencil, Plus, Printer, Scissors, Trash2 } from "lucide-react";
 import { CSSProperties, useEffect, useState } from "react";
 import { tc } from "../../api/tc";
 import type { TonieInfo } from "../../api/types";
@@ -104,7 +105,8 @@ const itemOf = (info: TonieInfo, id = `${info.model || info.series}-${Date.now()
 /** the styles of the printed sheet, also used by the preview (styles.css repeats them for the screen) */
 const PRINT_CSS = `
 body { margin: 0; font-family: system-ui, sans-serif; }
-.studio-paper { display: flex; flex-wrap: wrap; align-content: flex-start; box-sizing: border-box; background: #fff; color: #000; }
+.studio-paper { display: grid; align-content: start; justify-content: start; box-sizing: border-box; overflow: hidden; background: #fff; color: #000; break-after: page; page-break-after: always; }
+.studio-paper:last-child { break-after: auto; page-break-after: auto; }
 .studio-label { display: flex; align-items: center; justify-content: center; flex-direction: column; overflow: hidden; box-sizing: border-box; text-align: center; line-height: 1.2; padding: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .studio-label:not(.text) { padding: 0; }
 .studio-label img { object-fit: cover; flex-shrink: 0; }
@@ -113,14 +115,14 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 
 /** prints the sheet alone in a hidden frame, so nothing else of the page takes room on paper */
 const printSheet = (paper: StudioSettings["paper"]) => {
-    const sheet = document.querySelector(".studio-paper");
-    if (!sheet) return;
+    const pages = [...document.querySelectorAll(".studio-paper")];
+    if (!pages.length) return;
     const frame = document.createElement("iframe");
     frame.style.cssText = "position:fixed;width:0;height:0;border:0;right:0;bottom:0";
     document.body.appendChild(frame);
     const doc = frame.contentDocument!;
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper}; margin: 0; }${PRINT_CSS}</style></head><body>${sheet.outerHTML}</body></html>`);
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper} portrait; margin: 0; }${PRINT_CSS}</style></head><body>${pages.map((p) => p.outerHTML).join("")}</body></html>`);
     doc.close();
     const images = [...doc.images];
     Promise.all(images.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => (img.onload = img.onerror = r))))).then(() => {
@@ -128,6 +130,54 @@ const printSheet = (paper: StudioSettings["paper"]) => {
         frame.contentWindow?.print();
         window.setTimeout(() => frame.remove(), 1000);
     });
+};
+
+/** labels per item: picture and/or text */
+const labelsPerItem = (s: StudioSettings) => (s.mode === "both" ? 2 : 1);
+
+const fmt = (n: number) => Number(n.toFixed(3)).toString();
+
+/**
+ * the cut lines of one sheet for a laser cutter, in millimetres: layer "Blatt" with the outline of
+ * the paper to place it, layer "Schnitt" with a circle or rounded rectangle at every printed label
+ */
+const cutSvg = (s: StudioSettings, count: number) => {
+    const { pw, ph, w, h, cols } = sheetGrid(s);
+    const shapes = Array.from({ length: count }, (_, i) => {
+        const x = s.marginLeft + (i % cols) * (w + s.gapX);
+        const y = s.marginTop + Math.floor(i / cols) * (h + s.gapY);
+        return s.shape === "round"
+            ? `<circle cx="${fmt(x + w / 2)}" cy="${fmt(y + h / 2)}" r="${fmt(w / 2)}"/>`
+            : `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}" rx="2" ry="2"/>`;
+    });
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${pw}mm" height="${ph}mm" viewBox="0 0 ${pw} ${ph}">
+  <g id="blatt" inkscape:groupmode="layer" inkscape:label="Blatt" fill="none" stroke="#0000ff" stroke-width="0.1">
+    <rect x="0" y="0" width="${pw}" height="${ph}"/>
+  </g>
+  <g id="schnitt" inkscape:groupmode="layer" inkscape:label="Schnitt" fill="none" stroke="#ff0000" stroke-width="0.1">
+    ${shapes.join("\n    ")}
+  </g>
+</svg>
+`;
+};
+
+/** the cut lines of every sheet: one SVG, or a zip with one per sheet */
+const downloadCut = (s: StudioSettings, items: number) => {
+    const { cols, rows } = sheetGrid(s);
+    const per = cols * rows;
+    const total = items * labelsPerItem(s);
+    const sheets = Array.from({ length: Math.max(1, Math.ceil(total / per)) }, (_, i) => cutSvg(s, Math.min(per, total - i * per)));
+    const name = `teddystudio-${s.paper.toLowerCase()}-${s.shape === "round" ? `${s.diameter}mm` : `${s.width}x${s.height}mm`}`;
+    const blob =
+        sheets.length === 1
+            ? new Blob([sheets[0]], { type: "image/svg+xml" })
+            : new Blob([zipSync(Object.fromEntries(sheets.map((svg, i) => [`${name}-blatt${i + 1}.svg`, strToU8(svg)])), { level: 6 }) as BlobPart], { type: "application/zip" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = sheets.length === 1 ? `${name}.svg` : `${name}.zip`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
 /** black or white, whichever reads better on the background */
@@ -167,9 +217,14 @@ export function StudioPage() {
             subtitle={t("teddyStudioHint")}
             back="/more"
             right={
-                <button className="icon-btn" onClick={() => printSheet(s.paper)} disabled={!items.length} aria-label={t("studioPrint")} title={t("studioPrint")}>
-                    <Printer size={20} />
-                </button>
+                <>
+                    <button className="icon-btn" onClick={() => downloadCut(s, items.length)} disabled={!items.length} aria-label={t("studioCutSvg")} title={t("studioCutSvg")}>
+                        <Scissors size={20} />
+                    </button>
+                    <button className="icon-btn" onClick={() => printSheet(s.paper)} disabled={!items.length} aria-label={t("studioPrint")} title={t("studioPrint")}>
+                        <Printer size={20} />
+                    </button>
+                </>
             }
         >
             <div className="studio">
@@ -310,11 +365,22 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
     );
 }
 
-/** the printed sheet; on screen a scaled preview, in print the only thing on the page */
-function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
+/**
+ * how many labels fit on a sheet: columns and rows between the margins (the right and bottom
+ * margin taken as the left and top one), at least one of each
+ */
+const sheetGrid = (s: StudioSettings) => {
     const [pw, ph] = PAPER_MM[s.paper];
     const w = s.shape === "round" ? s.diameter : s.width;
     const h = s.shape === "round" ? s.diameter : s.height;
+    const cols = Math.max(1, Math.floor((pw - 2 * s.marginLeft + s.gapX + 0.01) / (w + s.gapX)));
+    const rows = Math.max(1, Math.floor((ph - 2 * s.marginTop + s.gapY + 0.01) / (h + s.gapY)));
+    return { pw, ph, w, h, cols, rows };
+};
+
+/** the printed sheets, one per page of the paper size; on screen a scaled preview of each */
+function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
+    const { pw, ph, w, h, cols, rows } = sheetGrid(s);
     const label: CSSProperties = {
         width: `${w}mm`,
         height: `${h}mm`,
@@ -324,39 +390,59 @@ function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
         border: s.border ? "0.2mm solid #999" : "none",
         fontSize: `${s.fontSize}pt`,
     };
-    return (
-        <>
-            <div className="studio-paper" style={{ width: `${pw}mm`, minHeight: `${ph}mm`, padding: `${s.marginTop}mm 0 0 ${s.marginLeft}mm`, gap: `${s.gapY}mm ${s.gapX}mm` }}>
-                {items.flatMap((item) => [
-                    s.mode !== "text" && (
-                        <div key={`${item.id}-i`} className="studio-label" style={label}>
-                            <img
-                                src={picUrl(item.pic)}
-                                alt=""
-                                style={{ width: `calc(100% + ${2 * s.bleed}mm)`, height: `calc(100% + ${2 * s.bleed}mm)`, margin: `-${s.bleed}mm`, transform: `scale(${s.imageScale / 100})` }}
-                            />
-                        </div>
-                    ),
-                    s.mode !== "image" && (
-                        <div key={`${item.id}-t`} className="studio-label text" style={label}>
-                            {s.text === "tracks" && item.tracks.length ? (
-                                <ol>
-                                    {item.tracks.map((tr, i) => (
-                                        <li key={i}>{tr}</li>
-                                    ))}
-                                </ol>
-                            ) : (
-                                <div>
-                                    <strong>{item.title}</strong>
-                                    {item.episode && <div>{item.episode}</div>}
-                                </div>
-                            )}
-                            {s.showModel && item.model && <small>{item.model}</small>}
-                        </div>
-                    ),
-                ])}
+    const labels = items.flatMap((item) => [
+        s.mode !== "text" && (
+            <div key={`${item.id}-i`} className="studio-label" style={label}>
+                <img
+                    src={picUrl(item.pic)}
+                    alt=""
+                    style={{ width: `calc(100% + ${2 * s.bleed}mm)`, height: `calc(100% + ${2 * s.bleed}mm)`, margin: `-${s.bleed}mm`, transform: `scale(${s.imageScale / 100})` }}
+                />
             </div>
-        </>
+        ),
+        s.mode !== "image" && (
+            <div key={`${item.id}-t`} className="studio-label text" style={label}>
+                {s.text === "tracks" && item.tracks.length ? (
+                    <ol>
+                        {item.tracks.map((tr, i) => (
+                            <li key={i}>{tr}</li>
+                        ))}
+                    </ol>
+                ) : (
+                    <div>
+                        <strong>{item.title}</strong>
+                        {item.episode && <div>{item.episode}</div>}
+                    </div>
+                )}
+                {s.showModel && item.model && <small>{item.model}</small>}
+            </div>
+        ),
+    ]).filter(Boolean);
+    const perPage = cols * rows;
+    const pages = Array.from({ length: Math.max(1, Math.ceil(labels.length / perPage)) }, (_, i) => labels.slice(i * perPage, (i + 1) * perPage));
+    return (
+        <div className="studio-pages">
+            {pages.map((page, i) => (
+                <div key={i} className="studio-page">
+                    <div
+                        className="studio-paper"
+                        style={{
+                            width: `${pw}mm`,
+                            height: `${ph}mm`,
+                            padding: `${s.marginTop}mm 0 0 ${s.marginLeft}mm`,
+                            gridTemplateColumns: `repeat(${cols}, ${w}mm)`,
+                            gridAutoRows: `${h}mm`,
+                            gap: `${s.gapY}mm ${s.gapX}mm`,
+                        }}
+                    >
+                        {page}
+                    </div>
+                    <div className="studio-page-no small muted">
+                        {t("studioPage", { n: i + 1, of: pages.length, per: perPage })}
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }
 

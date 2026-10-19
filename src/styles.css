@@ -2269,6 +2269,7 @@ input[type="range"].slider::-moz-range-thumb {
     .studio-preview {
         position: sticky;
         top: 70px;
+        max-height: calc(100dvh - 90px);
     }
 }
 .studio-settings {
@@ -2305,12 +2306,23 @@ input[type="range"].slider::-moz-range-thumb {
     padding: 12px;
 }
 .studio-paper {
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
+    display: grid;
+    align-content: start;
+    justify-content: start;
     box-sizing: border-box;
+    overflow: hidden;
     background: #fff;
     color: #000;
+}
+.studio-pages {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.studio-page-no {
+    text-align: center;
+    margin-top: 4px;
 }
 @media screen {
     .studio-paper {
