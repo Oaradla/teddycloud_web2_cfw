@@ -293,6 +293,8 @@ export const tc = {
             ...extra,
         }),
     cfwFirmware: () => getJson<CfwFirmware>("/api/cfw/firmware"),
+    /** the name or address under which the boxes reach this server (Host header of the last box request; empty if none yet) */
+    cfwBoxHost: () => getJson<{ host: string; apiPort: number }>("/api/cfw/boxHost"),
     /** the release package kept with a CC3200 image, for setting up a box in the browser */
     cfwPackage: async (build: number): Promise<Uint8Array> => {
         const r = await request(`/api/cfw/firmware/package${q({ build })}`);

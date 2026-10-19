@@ -72,6 +72,13 @@ export function Cc3200Browser() {
     const [certsDone, setCertsDone] = useState(false);
     const [bootloaderDone, setBootloaderDone] = useState(false);
     const [host, setHost] = useState(window.location.hostname);
+    const [hostEdited, setHostEdited] = useState(false);
+    // the address the other boxes use: the web address may be a reverse proxy the box cannot use
+    const boxHost = useQuery({ queryKey: ["cfwBoxHost"], queryFn: tc.cfwBoxHost, retry: false });
+    const seenHost = boxHost.data?.host.replace(/:\d+$/, "") ?? "";
+    useEffect(() => {
+        if (seenHost && !hostEdited) setHost(seenHost);
+    }, [seenHost, hostEdited]);
     const [port, setPort] = useState("");
 
     // while something runs on the box, a reload or closing the tab would break it off
@@ -282,7 +289,15 @@ export function Cc3200Browser() {
             <p>{st("cc3200CardText")}</p>
             <div className="field">
                 <label>{st("hostname")}</label>
-                <input className="input" value={host} onChange={(e) => setHost(e.target.value)} />
+                <input
+                    className="input"
+                    value={host}
+                    onChange={(e) => {
+                        setHost(e.target.value);
+                        setHostEdited(true);
+                    }}
+                />
+                <div className="hint">{seenHost ? st("cc3200HostSeen", { host: seenHost }) : st("cc3200HostHint")}</div>
             </div>
             <div className="field">
                 <label>{st("port")}</label>

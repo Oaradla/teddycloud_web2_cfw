@@ -340,6 +340,8 @@ const T = {
     statusDone: ["Fertig", "Done"],
     statusFailed: ["Fehlgeschlagen", "Failed"],
     cc3200CardSaved: ["Karteninhalt heruntergeladen", "Card content downloaded"],
+    cc3200HostHint: ["Name oder IP, unter der die Box teddyCloud direkt erreicht, auf dem Box-Port. Nicht die Adresse eines Reverse-Proxys: Die Box prüft das Zertifikat von teddyCloud.", "Name or IP under which the box reaches teddyCloud directly, on the box port. Not the address of a reverse proxy: the box checks teddyCloud's certificate."],
+    cc3200HostSeen: ["Vorgeschlagen: {host}, darüber erreichen die anderen Boxen teddyCloud. Nicht die Adresse eines Reverse-Proxys.", "Suggested: {host}, the other boxes reach teddyCloud through it. Not the address of a reverse proxy."],
     cc3200Mac: ["MAC der Box", "MAC of the box"],
     cc3200MacHint: ["Aus dem Box-Zertifikat gelesen; sonst von der Unterseite der Box abschreiben.", "Read from the box certificate; otherwise copy it from the bottom of the box."],
     cc3200Certs: ["Zertifikate und CA", "Certificates and CA"],
