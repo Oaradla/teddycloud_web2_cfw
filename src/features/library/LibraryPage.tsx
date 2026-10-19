@@ -43,6 +43,7 @@ import { TagPicker } from "../tonies/TagPicker";
 import { DownloadSheet } from "./DownloadSheet";
 import { FileDetailsSheet } from "./FileDetailsSheet";
 import { PlaylistEditor, PlaylistStart } from "./PlaylistEditor";
+import { Lightbox, LightboxItem } from "../../ui/Lightbox";
 import { useSelection } from "../../ui/useSelection";
 import { LibraryPicker } from "./LibraryPicker";
 
@@ -64,6 +65,7 @@ export function LibraryPage() {
     usePrefetchSubfolders(path, files.data);
     const [filter, setFilter] = useState("");
     const [sort, setSort] = useState<Sort>(() => getPref("lib.sort", "name") as Sort);
+    const [zoom, setZoom] = useState<LightboxItem | null>(null);
     const [dir, setDir] = useState<Dir>(() => getPref("lib.dir", "asc") as Dir);
     const [view, setView] = useState<View>(() => getPref("lib.view", "list") as View);
     const [show, setShow] = useState<Show>("all");
@@ -109,7 +111,9 @@ export function LibraryPage() {
             })
             .filter((x) => !f || `${x.name} ${x.tonieInfo?.series ?? ""} ${x.tonieInfo?.episode ?? ""}`.toLowerCase().includes(f))
             .sort((a, b) => {
-                if (a.isDir !== b.isDir) return Number(b.isDir) - Number(a.isDir);
+                // playlists first (a folder's playlist is what one looks for), then folders, then files
+                const rank = (x: FileEntry) => (!x.isDir && isTap(x.name) ? 0 : x.isDir ? 1 : 2);
+                if (rank(a) !== rank(b)) return rank(a) - rank(b);
                 let r = 0;
                 if (sort === "date") r = a.date - b.date;
                 else if (sort === "size") r = a.size - b.size;
@@ -207,7 +211,8 @@ export function LibraryPage() {
     const open = (x: FileEntry) => {
         const p = joinPath(path, x.name);
         if (x.isDir) return go(p);
-        if (isImage(x.name)) return window.open(backendUrl(libraryFileUrl(p, false)), "_blank");
+        if (isImage(x.name)) return setZoom({ src: backendUrl(libraryFileUrl(p, false)), alt: x.name });
+        if (isTap(x.name)) return setPlaylist({ edit: p });
         setDetails(x);
     };
 
@@ -538,6 +543,7 @@ export function LibraryPage() {
                 </div>
             )}
             <PlaylistEditor start={playlist} onClose={() => setPlaylist(null)} />
+            {zoom && <Lightbox items={[zoom]} index={0} onClose={() => setZoom(null)} />}
             <TagPicker
                 open={assignFor !== null}
                 onClose={() => setAssignFor(null)}
