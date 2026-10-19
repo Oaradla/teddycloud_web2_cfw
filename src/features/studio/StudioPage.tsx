@@ -162,20 +162,28 @@ const cutSvg = (s: StudioSettings, count: number) => {
 `;
 };
 
-/** the cut lines of every sheet: one SVG, or a zip with one per sheet */
+/**
+ * the cut lines: one SVG for a full sheet (the same for all full ones) and, when the last sheet is
+ * not full, one for it; both together as a zip
+ */
 const downloadCut = (s: StudioSettings, items: number) => {
     const { cols, rows } = sheetGrid(s);
     const per = cols * rows;
     const total = items * labelsPerItem(s);
-    const sheets = Array.from({ length: Math.max(1, Math.ceil(total / per)) }, (_, i) => cutSvg(s, Math.min(per, total - i * per)));
+    const full = Math.floor(total / per);
+    const rest = total % per;
     const name = `teddystudio-${s.paper.toLowerCase()}-${s.shape === "round" ? `${s.diameter}mm` : `${s.width}x${s.height}mm`}`;
+    const files: Record<string, string> = {};
+    if (full) files[`${name}-voll-${full}x.svg`] = cutSvg(s, per);
+    if (rest) files[`${name}-rest-${rest}.svg`] = cutSvg(s, rest);
+    const names = Object.keys(files);
     const blob =
-        sheets.length === 1
-            ? new Blob([sheets[0]], { type: "image/svg+xml" })
-            : new Blob([zipSync(Object.fromEntries(sheets.map((svg, i) => [`${name}-blatt${i + 1}.svg`, strToU8(svg)])), { level: 6 }) as BlobPart], { type: "application/zip" });
+        names.length === 1
+            ? new Blob([files[names[0]]], { type: "image/svg+xml" })
+            : new Blob([zipSync(Object.fromEntries(names.map((n) => [n, strToU8(files[n])])), { level: 6 }) as BlobPart], { type: "application/zip" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = sheets.length === 1 ? `${name}.svg` : `${name}.zip`;
+    a.download = names.length === 1 ? names[0] : `${name}.zip`;
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
