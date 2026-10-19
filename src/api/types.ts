@@ -83,6 +83,8 @@ export interface FileEntry {
     listened?: boolean;
     tafHeader?: TafHeader;
     tonieInfo?: TonieInfo;
+    /** a folder: the one picture of the playlists and TAFs in it */
+    folderPicture?: string;
 }
 
 /** plugin.json of a teddyCloud plugin (data/www/plugins/<pluginId>/) */

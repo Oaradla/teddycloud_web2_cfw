@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     ArrowRightLeft,
     Check,
@@ -24,6 +24,7 @@ import {
     Upload,
     Wand2,
     X,
+    Scissors,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -66,6 +67,7 @@ export function LibraryPage() {
     const [filter, setFilter] = useState("");
     const [sort, setSort] = useState<Sort>(() => getPref("lib.sort", "name") as Sort);
     const [zoom, setZoom] = useState<LightboxItem | null>(null);
+    const canSplit = useQuery({ queryKey: ["hasTapBuild"], queryFn: tc.hasTapBuild, staleTime: Infinity });
     const [dir, setDir] = useState<Dir>(() => getPref("lib.dir", "asc") as Dir);
     const [view, setView] = useState<View>(() => getPref("lib.view", "list") as View);
     const [show, setShow] = useState<Show>("all");
@@ -216,6 +218,20 @@ export function LibraryPage() {
         setDetails(x);
     };
 
+    /** every chapter as a TAF of its own and a playlist, in a folder named like the TAF; the TAF moves there too */
+    const split = async (x: FileEntry) => {
+        const ok = await ui.confirm({
+            title: t("splitTaf"),
+            text: t("splitTafText", { n: x.tafHeader?.trackSeconds?.length ?? 0 }),
+            confirm: t("splitTafRun"),
+        });
+        if (!ok) return;
+        ui.toast("info", t("splitting"));
+        const r = await ui.run(() => tc.splitTaf(joinPath(path, x.name), []), t("splitDone"));
+        refresh();
+        if (r) go("/" + r.folder);
+    };
+
     const actions = (x: FileEntry) => {
         const p = joinPath(path, x.name);
         const playable = isTaf(x.name) || isAudio(x.name);
@@ -225,6 +241,12 @@ export function LibraryPage() {
             { label: t("play"), icon: <Play size={17} />, onSelect: () => player.play(filePlayItem(p, x)), hidden: !playable },
             { label: t("assignToTonie"), icon: <Disc3 size={17} />, onSelect: () => setAssignFor(p), hidden: !tonieFile },
             { label: t("editPlaylist"), icon: <ListMusic size={17} />, onSelect: () => setPlaylist({ edit: p }), hidden: !isTap(x.name) },
+            {
+                label: t("splitTaf"),
+                icon: <Scissors size={17} />,
+                onSelect: () => split(x),
+                hidden: !isTaf(x.name) || !canSplit.data || (x.tafHeader?.trackSeconds?.length ?? 0) < 2,
+            },
             {
                 label: x.tonieInfo?.series ? t("changeCover") : t("setCover"),
                 icon: <ImagePlus size={17} />,
@@ -248,6 +270,8 @@ export function LibraryPage() {
         if (isAudio(x.name)) return <FileAudio size={size} />;
         return <FileIcon size={size} />;
     };
+    /** the cover of a file, or the one picture of what is in a folder */
+    const picture = (x: FileEntry) => x.tonieInfo?.picture || x.folderPicture;
     const kind = (x: FileEntry) => (x.isDir ? "folder" : isTaf(x.name) || isTap(x.name) ? "taf" : "");
     const sub = (x: FileEntry) =>
         x.isDir
@@ -461,9 +485,10 @@ export function LibraryPage() {
                                 leading={
                                     <>
                                     {sel.selecting && checkbox(x.name)}
-                                    {x.tonieInfo?.picture ? (
-                                        <span className="file-icon">
-                                            <img src={backendUrl(x.tonieInfo.picture)} alt="" loading="lazy" />
+                                    {picture(x) ? (
+                                        <span className={`file-icon ${x.isDir ? "folder-pic" : ""}`}>
+                                            <img src={backendUrl(picture(x)!)} alt="" loading="lazy" />
+                                            {x.isDir && <Folder size={13} className="folder-badge" />}
                                         </span>
                                     ) : (
                                         <span className={`file-icon ${kind(x)}`}>{icon(x)}</span>
@@ -508,7 +533,8 @@ export function LibraryPage() {
                         >
                             {checkbox(x.name)}
                             <div className={`pic ${kind(x)}`}>
-                                {x.tonieInfo?.picture ? <img src={backendUrl(x.tonieInfo.picture)} alt="" loading="lazy" /> : icon(x, 44)}
+                                {picture(x) ? <img src={backendUrl(picture(x)!)} alt="" loading="lazy" /> : icon(x, 44)}
+                                {x.isDir && picture(x) && <Folder size={16} className="folder-badge" />}
                             </div>
                             <div className="meta">
                                 <div className="name">{fileTitle(x, names)}</div>

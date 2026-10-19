@@ -203,7 +203,7 @@ export const tc = {
         const r = await request("/api/tafSplit?special=library", { method: "POST", headers: { "Content-Type": "text/plain" }, body });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
-        return data as { folder: string; tap: string; chapters: number };
+        return data as { folder: string; tap: string; chapters: number; original?: string };
     },
 
     /* ---------- settings ---------- */

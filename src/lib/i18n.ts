@@ -504,6 +504,14 @@ const dict = {
     createIt: ["Anlegen", "Create"],
     newPlaylist: ["Neue Playlist", "New playlist"],
     editPlaylist: ["Playlist bearbeiten", "Edit playlist"],
+    splitTaf: ["In Kapitel aufteilen", "Split into chapters"],
+    splitTafText: [
+        "Jedes der {n} Kapitel wird eine eigene TAF, dazu eine Playlist, die das Album wieder zusammensetzt. Alles kommt in einen neuen Ordner mit dem Namen der TAF; die TAF selbst wandert mit hinein, verknüpfte Tonies behalten sie. Cover und Titel gelten für die Playlist weiter.",
+        "Each of the {n} chapters becomes a TAF of its own, with a playlist that puts the album together again. Everything goes into a new folder named like the TAF; the TAF itself moves there too, linked tonies keep it. Cover and titles carry on for the playlist.",
+    ],
+    splitTafRun: ["Aufteilen", "Split"],
+    splitting: ["Teile auf …", "Splitting …"],
+    splitDone: ["Aufgeteilt", "Split"],
     playlistSaved: ["Playlist gespeichert", "Playlist saved"],
     playlistIntro: [
         "Eine Playlist fügt mehrere Titel der Bibliothek zu einer Tonie-Datei zusammen. TAF-Dateien werden ohne Qualitätsverlust aneinandergehängt.",
@@ -712,6 +720,8 @@ const dict = {
     guide_cc3200_5: ["Den Server in `/cfw/config.txt` eintragen: `host={host}` (bei Bedarf auch `port=`). Das lässt sich später auch auf der Setup-Seite der Box ändern.", "Enter the server in `/cfw/config.txt`: `host={host}` (and `port=` if needed). It can be changed later on the setup page of the box too."],
     guide_cc3200_6: ["In `/revvox/boot/ngCfg.json` unter `general` `\"activeImg\": \"cfw1\"` und `\"stateFile\": \"/revvox/boot/ngstate.bin\"` setzen. Die Original-Firmware bleibt erhalten: Mit dem vorherigen `activeImg` (meist `\"ofw1\"`) startet die Box wieder wie vorher.", "In `/revvox/boot/ngCfg.json` set `\"activeImg\": \"cfw1\"` and `\"stateFile\": \"/revvox/boot/ngstate.bin\"` under `general`. The original firmware stays: with the previous `activeImg` (usually `\"ofw1\"`) the box starts as before."],
     guide_cc3200_7: ["Karte wieder einsetzen und die Box starten. Sie meldet sich mit der Custom-Firmware bei teddyCloud und erscheint hier unter „Boxen“. Alle weiteren Updates kommen über diese Seite.", "Put the card back and start the box. It reports to teddyCloud with the custom firmware and shows up here under \"Boxes\". All further updates come through this page."],
+    guideCardZip: ["Die Schritte 3 bis 6 erledigt auch ein fertiger SD-Karten-Inhalt (Bootloader, Firmware, Setup-Seite, Server):", "A ready SD card content does steps 3 to 6 too (bootloader, firmware, setup page, server):"],
+    guideCardZipLink: ["SD-Karten-Zip erstellen", "Make the SD card zip"],
     guide_esp32_1: ["Die Box muss mit der für teddyCloud gepatchten Original-Firmware laufen (siehe „Box einrichten“ unten, ESP32). Bewahre den dabei erstellten Flash-Dump gut auf.", "The box must run the original firmware patched for teddyCloud (see \"Set up a box\" below, ESP32). Keep the flash dump made there in a safe place."],
     guide_esp32_2: ["Lade den Flash-Dump der Original-Firmware in die Bibliothek (die Patches für teddyCloud stehen beim Upload). Damit kann die Box später jederzeit zur Original-Firmware zurück.", "Load the flash dump of the original firmware into the library (the patches for teddyCloud are explained at the upload). With it the box can go back to the original firmware at any time."],
     guide_esp32_3: ["Lade das Release-Paket der Custom-Firmware (`toniebox-cfw-….zip`) in die Bibliothek.", "Load the release package of the custom firmware (`toniebox-cfw-….zip`) into the library."],

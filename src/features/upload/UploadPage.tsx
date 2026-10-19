@@ -67,7 +67,7 @@ export function UploadPage() {
         });
     };
 
-    const saveAlbum = async (tafPath: string, title: string, titles: string[], picture: File | null) => {
+    const saveAlbum = async (tafPath: string, title: string, titles: string[], picture: File | null, tapPath?: string) => {
         const dir = parentPath(tafPath);
         await qc.invalidateQueries({ queryKey: ["files", dir] });
         const entry = (await tc.files(dir)).find((f) => f.name === baseName(tafPath));
@@ -87,10 +87,14 @@ export function UploadPage() {
         }
         const models = await tc.customModels().catch(() => []);
         const model = newModelId(title, new Set(models.map((m) => m.model.toLowerCase())));
+        // the playlist too, by its own audio id: the album TAF is only built from it and may go
+        const tap = tapPath ? await tc.readTap(tapPath).catch(() => null) : null;
+        const ids = [String(header.audioId)];
+        if (tap?.audio_id && String(tap.audio_id) !== ids[0]) ids.push(String(tap.audio_id));
         await tc.upsertModel({
             model,
-            audio_id: [String(header.audioId)],
-            hash: [header.sha1Hash],
+            audio_id: ids,
+            hash: ids.map(() => header.sha1Hash),
             title: title.trim(),
             series: title.trim(),
             episodes: "",
@@ -148,7 +152,7 @@ export function UploadPage() {
                 if (cover || items.length > 1) {
                     step(t("savingCover"), 1);
                     try {
-                        await saveAlbum(result.taf, job.name, titles, cover);
+                        await saveAlbum(result.taf, job.name, titles, cover, result.source.endsWith(".tap") ? result.source : undefined);
                     } catch (e) {
                         ui.toast("error", t("coverFailed"), String((e as Error).message));
                     }
