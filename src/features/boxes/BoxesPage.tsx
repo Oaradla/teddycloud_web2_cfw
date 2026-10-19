@@ -1,16 +1,20 @@
-import { BatteryCharging, BatteryLow, BatteryMedium, Gamepad2, Radio, Settings2 } from "lucide-react";
+import { BatteryCharging, BatteryLow, BatteryMedium, Gamepad2, Lock, Nfc, Power, Radio, RotateCcw, Settings2, Tag } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { tc } from "../../api/tc";
 import type { Box, CfwBox } from "../../api/types";
 import { CFW_CAP } from "../../api/types";
 import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { useAllTags, useBoxes, useBoxImage, useBoxState, useCfwBox } from "../../lib/queries";
-import { Empty, ErrorBox, Page } from "../../ui/kit";
+import { Fold } from "../../ui/Fold";
+import { Empty, ErrorBox, Page, Section } from "../../ui/kit";
 import { FigurePic } from "../../ui/FigurePic";
 import { TonieImage } from "../../ui/TonieImage";
 
 export function BoxesPage() {
     const boxes = useBoxes();
+    const cfwEnabled = useQuery({ queryKey: ["cfwEnabled"], queryFn: tc.cfwEnabled });
     return (
         <Page title={t("boxes")}>
             {boxes.isLoading && <BoxSkeleton />}
@@ -30,7 +34,34 @@ export function BoxesPage() {
             <div className="grid-boxes">
                 {boxes.data?.map((box) => <BoxCard key={box.ID} box={box} />)}
             </div>
+            {cfwEnabled.data === "true" && <CfwControls />}
         </Page>
+    );
+}
+
+/** how a box with the custom firmware is used beyond the original, the upside-down slap open on top */
+function CfwControls() {
+    const p = (text: string) => <p style={{ margin: 0 }}>{text}</p>;
+    return (
+        <div className="mt">
+            <Section title={t("cfwControls")} footer={t("cfwControlsIntro")}>
+                <Fold title={t("cfwControlsRestart")} icon={<RotateCcw size={17} />} open>
+                    {p(t("cfwControlsRestartText"))}
+                </Fold>
+                <Fold title={t("cfwControlsBothEars")} icon={<Power size={17} />}>
+                    {p(t("cfwControlsBothEarsText"))}
+                </Fold>
+                <Fold title={t("cfwControlsAnyTag")} icon={<Nfc size={17} />}>
+                    {p(t("cfwControlsAnyTagText"))}
+                </Fold>
+                <Fold title={t("cfwControlsEvent")} icon={<Tag size={17} />}>
+                    {p(t("cfwControlsEventText"))}
+                </Fold>
+                <Fold title={t("cfwControlsLocks")} icon={<Lock size={17} />}>
+                    {p(t("cfwControlsLocksText"))}
+                </Fold>
+            </Section>
+        </div>
     );
 }
 
