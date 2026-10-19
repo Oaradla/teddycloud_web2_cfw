@@ -68,12 +68,13 @@ export function Warnings({ factoryReset }: { factoryReset: "cc3200" | "other" })
 }
 
 /** steps of a guide: the bar on top, back and next below */
-export function Steps({ titles, step, setStep, children, last }: { titles: string[]; step: number; setStep: (n: number) => void; children: ReactNode; last?: ReactNode }) {
+/** the steps of a guide; while busy (something runs on the box) no step can be changed */
+export function Steps({ titles, step, setStep, children, last, busy = false }: { titles: string[]; step: number; setStep: (n: number) => void; children: ReactNode; last?: ReactNode; busy?: boolean }) {
     return (
         <>
             <div className="setup-steps" role="tablist">
                 {titles.map((title, i) => (
-                    <button key={title} role="tab" aria-selected={i === step} className={i === step ? "active" : i < step ? "done" : ""} onClick={() => setStep(i)}>
+                    <button key={title} role="tab" aria-selected={i === step} className={i === step ? "active" : i < step ? "done" : ""} disabled={busy && i !== step} onClick={() => setStep(i)}>
                         <span>{i + 1}</span>
                         {title}
                     </button>
@@ -81,11 +82,11 @@ export function Steps({ titles, step, setStep, children, last }: { titles: strin
             </div>
             <div className="setup-step">{children}</div>
             <div className="btn-row mt">
-                <button className="btn" disabled={step === 0} onClick={() => setStep(step - 1)}>
+                <button className="btn" disabled={busy || step === 0} onClick={() => setStep(step - 1)}>
                     {st("back")}
                 </button>
                 {step < titles.length - 1 ? (
-                    <button className="btn primary" onClick={() => setStep(step + 1)}>
+                    <button className="btn primary" disabled={busy} onClick={() => setStep(step + 1)}>
                         {st("next")}
                     </button>
                 ) : (

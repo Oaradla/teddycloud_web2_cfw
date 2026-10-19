@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { unzipSync, zipSync } from "fflate";
-import { useRef, useState } from "react";
+import { CheckCircle2, Circle, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import { Notice, Segmented, useUi } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
@@ -61,6 +62,7 @@ export function Cc3200Browser() {
     const [connected, setConnected] = useState(false);
     const [busy, setBusy] = useState(false);
     const [status, setStatus] = useState("");
+    const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
     const [progress, setProgress] = useState(0);
     const [log, setLog] = useState<string[]>([]);
     const backup = useRef<{ flash: Uint8Array; files: Map<string, Uint8Array> } | null>(null);
@@ -72,15 +74,30 @@ export function Cc3200Browser() {
     const [host, setHost] = useState(window.location.hostname);
     const [port, setPort] = useState("");
 
+    // while something runs on the box, a reload or closing the tab would break it off
+    useEffect(() => {
+        if (!busy) return;
+        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+        window.addEventListener("beforeunload", warn);
+        document.documentElement.classList.add("no-pull");
+        return () => {
+            window.removeEventListener("beforeunload", warn);
+            document.documentElement.classList.remove("no-pull");
+        };
+    }, [busy]);
     const addLog = (line: string) => setLog((l) => [...l.slice(-300), line]);
-    const run = async (what: () => Promise<void>) => {
+    /** runs one action on the box; what it returns is shown as done, nothing (e.g. cancelled) keeps the last result */
+    const run = async (what: () => Promise<string | void>) => {
         setBusy(true);
+        setResult(null);
         try {
-            await what();
+            const done = await what();
+            if (done) setResult({ ok: true, text: done });
         } catch (e) {
             const message = (e as Error).message;
             addLog(`error: ${message}`);
             ui.toast("error", message);
+            setResult({ ok: false, text: message });
         } finally {
             setBusy(false);
             setStatus("");
@@ -114,7 +131,9 @@ export function Cc3200Browser() {
             const client = all.files.get("/cert/client.der");
             const found = client ? macOfCertificate(client) : "";
             setMac(found);
-            addLog(st("cc3200BackupDone", { files: all.files.size, kb: Math.round(flash.length / 1024), mac: found || "?" }));
+            const done = st("cc3200BackupDone", { files: all.files.size, kb: Math.round(flash.length / 1024), mac: found || "?" });
+            addLog(done);
+            return done;
         });
 
     const downloadBackup = () => {
@@ -137,6 +156,7 @@ export function Cc3200Browser() {
             addLog("/cert/c2.der written");
             setCertsDone(true);
             ui.toast("ok", st("cc3200CertsDone"));
+            return st("cc3200CertsDone");
         });
 
     const bootloader = () =>
@@ -152,7 +172,7 @@ export function Cc3200Browser() {
                 if (current && equal(current, preloader)) {
                     ui.toast("ok", st("cc3200BootloaderUpToDate"));
                     setBootloaderDone(true);
-                    return;
+                    return st("cc3200BootloaderUpToDate");
                 }
             } else {
                 if (!current) throw new Error("/sys/mcuimg.bin was not in the backup");
@@ -163,6 +183,7 @@ export function Cc3200Browser() {
             addLog("preloader written to /sys/mcuimg.bin");
             setBootloaderDone(true);
             ui.toast("ok", st("cc3200BootloaderDone"));
+            return st("cc3200BootloaderDone");
         });
 
     const card = () =>
@@ -179,6 +200,7 @@ export function Cc3200Browser() {
                 box.current = null;
                 setConnected(false);
             }
+            return st("cc3200CardSaved");
         });
 
     if (!("serial" in navigator)) return <Notice>{st("esp32NoSerial")}</Notice>;
@@ -297,6 +319,7 @@ export function Cc3200Browser() {
             <Steps
                 titles={[st("esp32S1"), st("cc3200Connect"), st("cc3200Certs"), st("cc3200Bootloader"), st("cc3200Card")]}
                 step={step}
+                busy={busy}
                 setStep={(n) => (n <= step ? setStep(n) : goTo(n))}
                 last={
                     <a className="btn primary" href="#/">
@@ -305,16 +328,23 @@ export function Cc3200Browser() {
                 }
             >
                 {steps[step]}
-                {status && (
-                    <div className="setup-status">
-                        {status}
-                        {progress > 0 && (
-                            <div className="progress">
-                                <div style={{ width: `${Math.round(progress * 100)}%` }} />
-                            </div>
-                        )}
+                <div className={`setup-status state ${busy ? "busy" : result ? (result.ok ? "ok" : "error") : ""}`} role="status" aria-live="polite">
+                    <div className="setup-status-line">
+                        {busy ? <span className="spinner small" /> : result ? result.ok ? <CheckCircle2 size={18} /> : <XCircle size={18} /> : <Circle size={18} />}
+                        <span>
+                            {busy
+                                ? `${st("statusRunning")}: ${status || st("statusWorking")}${progress > 0 ? ` (${Math.round(progress * 100)} %)` : ""}`
+                                : result
+                                  ? `${result.ok ? st("statusDone") : st("statusFailed")}: ${result.text}`
+                                  : st("statusIdle")}
+                        </span>
                     </div>
-                )}
+                    {busy && progress > 0 && (
+                        <div className="progress">
+                            <div style={{ width: `${Math.round(progress * 100)}%` }} />
+                        </div>
+                    )}
+                </div>
             </Steps>
             <div className="list mt">
                 <Fold title={`${st("log")} · ${connected ? "●" : st("cc3200NotConnected")}`}>

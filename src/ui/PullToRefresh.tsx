@@ -7,6 +7,7 @@ const MAX = 110;
 
 /** a touch that belongs to something else: a sheet with its own swipe, a slider, a scrolled list */
 function claimed(target: EventTarget | null): boolean {
+    if (document.documentElement.classList.contains("no-pull")) return true; // something must not be broken off
     for (let el = target instanceof Element ? target : null; el; el = el.parentElement) {
         if (el.matches(".sheet, .backdrop, .lightbox, input, textarea, select, [data-no-pull]")) return true;
         if (el.scrollTop > 0) return true;

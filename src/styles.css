@@ -2505,6 +2505,24 @@ input[type="range"].slider::-moz-range-thumb {
 .setup-status.error {
     color: var(--danger);
 }
+.setup-status.state {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-sunken);
+    color: var(--fg-2);
+}
+.setup-status.state.busy {
+    color: var(--fg);
+    background: var(--accent-soft);
+}
+.setup-status.state.ok {
+    color: var(--ok, var(--fg));
+}
+.setup-status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 .setup-status .progress {
     height: 6px;
     background: var(--bg-sunken);
