@@ -1,4 +1,4 @@
-import { BatteryCharging, BatteryLow, BatteryMedium, ChevronDown, ChevronRight, Gamepad2, Info, Radio, Settings2 } from "lucide-react";
+import { BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, ChevronDown, ChevronRight, Gamepad2, Info, Radio, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
@@ -80,19 +80,40 @@ const BoxSkeleton = () => (
     </div>
 );
 
+/** "2 h 10 min" */
+export const durationText = (minutes: number) => {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
+};
+
 export const batteryInfo = (cfw?: CfwBox) => {
     if (!cfw?.showBattery || !cfw.battery || !(cfw.capabilities & CFW_CAP.battery)) return null;
     const b = cfw.battery;
     if (b.implausible) return null;
+    const volts = `${(b.mv / 1000).toFixed(2).replace(".", ",")} V`;
+    // on the charger the box measures the charger, not the battery: no charge then
+    const percent = b.station ? undefined : b.percent;
     const icon = b.station ? (
         <BatteryCharging size={15} />
-    ) : b.low || b.critical ? (
+    ) : b.low || b.critical || (percent !== undefined && percent < 25) ? (
         <BatteryLow size={15} />
+    ) : percent !== undefined && percent >= 70 ? (
+        <BatteryFull size={15} />
     ) : (
         <BatteryMedium size={15} />
     );
-    const cls = b.critical ? "danger" : b.low ? "warn" : b.station ? "ok" : "";
-    return { icon, cls, text: `${(b.mv / 1000).toFixed(2)} V`, station: b.station };
+    const cls = b.critical ? "danger" : b.low || (percent !== undefined && percent < 15) ? "warn" : b.station ? "ok" : "";
+    return {
+        icon,
+        cls,
+        text: b.station ? t("charging") : percent !== undefined ? `${percent} %` : volts,
+        volts,
+        percent,
+        remaining: !b.station && b.remainingMin ? durationText(b.remainingMin) : undefined,
+        learned: Boolean(b.learned),
+        station: b.station,
+    };
 };
 
 export const remoteAvailable = (cfw?: CfwBox) =>
@@ -123,7 +144,7 @@ function BoxCard({ box }: { box: Box }) {
                             </span>
                             {!online && s?.lastSeen ? <span>{ago(s.lastSeen)}</span> : null}
                             {battery && (
-                                <span className={`badge ${battery.cls}`}>
+                                <span className={`badge ${battery.cls}`} title={battery.volts}>
                                     {battery.icon}
                                     {battery.text}
                                 </span>

@@ -158,6 +158,12 @@ export interface CfwBattery {
     implausible: boolean;
     reason: number;
     time: number;
+    /** charge from the voltage, 0-100; missing on the charger */
+    percent?: number;
+    /** playing time left at the volume of the report, once the box's capacity is learned */
+    remainingMin?: number;
+    /** the charge curve comes from a discharge of this box, not the defaults */
+    learned?: boolean;
 }
 
 export type CfwChannel = "none" | "release" | "beta" | "alpha";

@@ -128,10 +128,9 @@ export function BoxPage() {
                             {online ? t("online") : t("offline")}
                         </span>
                         {battery && (
-                            <span className={`badge ${battery.cls}`}>
+                            <span className={`badge ${battery.cls}`} title={battery.volts}>
                                 {battery.icon}
                                 {battery.text}
-                                {battery.station ? ` · ${t("charging")}` : ""}
                             </span>
                         )}
                         {cfw?.isCfw && <span className="badge accent">CFW</span>}
@@ -223,6 +222,22 @@ export function BoxPage() {
             </Section>
 
             <Section title={t("info")}>
+                {battery && (
+                    <Row
+                        icon={battery.icon}
+                        title={t("battery")}
+                        value={battery.percent !== undefined ? `${battery.percent} % · ${battery.volts}` : battery.station ? `${t("charging")} · ${battery.volts}` : battery.volts}
+                        sub={
+                            battery.station
+                                ? t("batteryCharging")
+                                : battery.remaining
+                                  ? t("batteryRemaining", { time: battery.remaining })
+                                  : battery.percent !== undefined && !battery.learned
+                                    ? t("batteryLearning")
+                                    : undefined
+                        }
+                    />
+                )}
                 <Row icon={<Info size={17} />} title={t("boxId")} value={<span className="mono selectable">{box.ID}</span>} />
                 <Row
                     icon={img ? <img src={img} alt="" className="row-model-img" /> : <Radio size={17} />}

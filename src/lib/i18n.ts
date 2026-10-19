@@ -68,6 +68,10 @@ const dict = {
     onTheBox: ["Steht auf der Box", "On the box"],
     lastTonie: ["Zuletzt aufgelegt", "Last placed"],
     charging: ["lädt", "charging"],
+    battery: ["Akku", "Battery"],
+    batteryCharging: ["Auf dem Ladegerät misst die Box die Ladespannung, nicht den Akku.", "On the charger the box measures the charging voltage, not the battery."],
+    batteryRemaining: ["Noch etwa {time} Spielzeit bei der aktuellen Lautstärke", "About {time} of playing time left at the current volume"],
+    batteryLearning: ["Geschätzt; genauer, sobald die Box einmal von voll bis zur Akkuwarnung gelaufen ist", "Estimated; more exact once the box has run from full to the battery warning"],
     remote: ["Fernbedienung", "Remote control"],
     noBoxes: ["Noch keine Box verbunden", "No box connected yet"],
     noBoxesText: [
