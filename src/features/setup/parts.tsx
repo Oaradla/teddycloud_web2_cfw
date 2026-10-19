@@ -1,5 +1,5 @@
-import { Check, Copy, ExternalLink } from "lucide-react";
-import { ReactNode, useState } from "react";
+import { Check, CheckCircle2, Circle, Copy, ExternalLink, XCircle } from "lucide-react";
+import { ReactNode, useEffect, useState } from "react";
 import { Notice } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
 import { Lightbox, LightboxItem } from "../../ui/Lightbox";
@@ -134,5 +134,46 @@ uci set dhcp.@host[-1].tag="teddycloud"
 uci commit dhcp
 /etc/init.d/dnsmasq restart`}</Code>
         </Fold>
+    );
+}
+
+/** while something runs on the box: a reload, closing the tab or pull to reload would break it off */
+export function useBusyGuard(busy: boolean) {
+    useEffect(() => {
+        if (!busy) return;
+        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+        window.addEventListener("beforeunload", warn);
+        document.documentElement.classList.add("no-pull");
+        return () => {
+            window.removeEventListener("beforeunload", warn);
+            document.documentElement.classList.remove("no-pull");
+        };
+    }, [busy]);
+}
+
+/**
+ * always there below a step: something runs (what, how far), the last action is done or failed,
+ * or nothing runs
+ */
+export function StatusLine({ busy, text, progress = 0, result }: { busy: boolean; text?: string; progress?: number; result: { ok: boolean; text: string } | null }) {
+    const percent = Math.round(Math.min(1, Math.max(0, progress)) * 100);
+    return (
+        <div className={`setup-status state ${busy ? "busy" : result ? (result.ok ? "ok" : "error") : ""}`} role="status" aria-live="polite">
+            <div className="setup-status-line">
+                {busy ? <span className="spinner small" /> : result ? result.ok ? <CheckCircle2 size={18} /> : <XCircle size={18} /> : <Circle size={18} />}
+                <span>
+                    {busy
+                        ? `${st("statusRunning")}: ${text || st("statusWorking")}${percent > 0 ? ` (${percent} %)` : ""}`
+                        : result
+                          ? `${result.ok ? st("statusDone") : st("statusFailed")}: ${result.text}`
+                          : st("statusIdle")}
+                </span>
+            </div>
+            {busy && percent > 0 && (
+                <div className="progress">
+                    <div style={{ width: `${percent}%` }} />
+                </div>
+            )}
+        </div>
     );
 }

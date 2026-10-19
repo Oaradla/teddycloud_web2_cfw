@@ -1,13 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { unzipSync, zipSync } from "fflate";
-import { CheckCircle2, Circle, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import { Notice, Segmented, useUi } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
 import nwpBootloaderUrl from "./cc3200/rbtl3100s.dll?url";
 import { Cc3200 } from "./cc3200/protocol";
-import { Steps, UartHint, Warnings } from "./parts";
+import { StatusLine, Steps, UartHint, Warnings, useBusyGuard } from "./parts";
 import { st } from "./texts";
 
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -81,17 +80,7 @@ export function Cc3200Browser() {
     }, [seenHost, hostEdited]);
     const [port, setPort] = useState("");
 
-    // while something runs on the box, a reload or closing the tab would break it off
-    useEffect(() => {
-        if (!busy) return;
-        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-        window.addEventListener("beforeunload", warn);
-        document.documentElement.classList.add("no-pull");
-        return () => {
-            window.removeEventListener("beforeunload", warn);
-            document.documentElement.classList.remove("no-pull");
-        };
-    }, [busy]);
+    useBusyGuard(busy);
     const addLog = (line: string) => setLog((l) => [...l.slice(-300), line]);
     /** runs one action on the box; what it returns is shown as done, nothing (e.g. cancelled) keeps the last result */
     const run = async (what: () => Promise<string | void>) => {
@@ -343,23 +332,7 @@ export function Cc3200Browser() {
                 }
             >
                 {steps[step]}
-                <div className={`setup-status state ${busy ? "busy" : result ? (result.ok ? "ok" : "error") : ""}`} role="status" aria-live="polite">
-                    <div className="setup-status-line">
-                        {busy ? <span className="spinner small" /> : result ? result.ok ? <CheckCircle2 size={18} /> : <XCircle size={18} /> : <Circle size={18} />}
-                        <span>
-                            {busy
-                                ? `${st("statusRunning")}: ${status || st("statusWorking")}${progress > 0 ? ` (${Math.round(progress * 100)} %)` : ""}`
-                                : result
-                                  ? `${result.ok ? st("statusDone") : st("statusFailed")}: ${result.text}`
-                                  : st("statusIdle")}
-                        </span>
-                    </div>
-                    {busy && progress > 0 && (
-                        <div className="progress">
-                            <div style={{ width: `${Math.round(progress * 100)}%` }} />
-                        </div>
-                    )}
-                </div>
+                <StatusLine busy={busy} text={status} progress={progress} result={result} />
             </Steps>
             <div className="list mt">
                 <Fold title={`${st("log")} · ${connected ? "●" : st("cc3200NotConnected")}`}>

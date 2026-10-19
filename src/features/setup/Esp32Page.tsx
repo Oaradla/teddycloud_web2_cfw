@@ -8,7 +8,7 @@ import pcbClamp from "./img/esp32-pcb-clamp.webp";
 import esptoolScreen from "./img/esp32-write-patched-image-with-esptools.webp";
 import { ESP32_FLASH_STEPS } from "./esp32/esp32Constants";
 import { useESP32Flasher } from "./esp32/useESP32Flasher";
-import { Code, DnsGuide, ExtLink, Pics, UartHint, Warnings } from "./parts";
+import { Code, DnsGuide, ExtLink, Pics, StatusLine, UartHint, Warnings, useBusyGuard } from "./parts";
 import { st } from "./texts";
 
 /**
@@ -42,6 +42,15 @@ export function Esp32Page() {
     const titles = state.resetBox ? [st("esp32S1"), st("esp32S2"), st("esp32S4"), st("esp32S5")] : [st("esp32S1"), st("esp32S2"), st("esp32S3"), st("esp32S4"), st("esp32S5")];
     const shown = state.resetBox && step > ESP32_FLASH_STEPS.PATCH ? step - 1 : step;
     const busy = f.disableButtons;
+    useBusyGuard(busy);
+    // the outcome of the last action, kept until the next one starts
+    const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+    const wasBusy = useRef(false);
+    useEffect(() => {
+        if (busy) setResult(null);
+        else if (wasBusy.current) setResult({ ok: !state.error, text: state.state || (state.error ? st("statusFailed") : st("statusDone")) });
+        wasBusy.current = busy;
+    }, [busy]);
 
     const manual = (
         <Fold title={st("manualTitle")} sub={st("manualText")}>
@@ -277,16 +286,7 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
             </div>
             <div className="setup-step">
                 {body}
-                {(state.showStatus || state.state) && (
-                    <div className={`setup-status ${state.error ? "error" : ""}`}>
-                        {state.state}
-                        {state.showProgress && (
-                            <div className="progress">
-                                <div style={{ width: `${Math.round(state.progress)}%` }} />
-                            </div>
-                        )}
-                    </div>
-                )}
+                <StatusLine busy={busy} text={state.state} progress={state.showProgress ? state.progress / 100 : 0} result={result} />
                 {(state.downloadLink || state.downloadLinkPatched) && (
                     <div className="row-gap mt" style={{ flexWrap: "wrap" }}>
                         {state.downloadLink && (
