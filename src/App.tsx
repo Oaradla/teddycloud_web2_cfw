@@ -31,6 +31,7 @@ import { getLang, setLang, t } from "./lib/i18n";
 import { applyTheme, getPref, setPref, Theme } from "./lib/prefs";
 import { useLiveEvents } from "./lib/queries";
 import { PlayerProvider } from "./player/Player";
+import { PullToRefresh } from "./ui/PullToRefresh";
 import { Empty } from "./ui/kit";
 
 const tabs: { to: string; label: () => string; icon: ReactNode; match: (p: string) => boolean }[] = [
@@ -51,6 +52,7 @@ function Shell() {
 
     return (
         <div className="app">
+            <PullToRefresh />
             <nav className="sidebar" aria-label="main">
                 <div className="brand">
                     <img src={logo} alt="" />

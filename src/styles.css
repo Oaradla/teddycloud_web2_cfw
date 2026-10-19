@@ -2545,3 +2545,26 @@ input[type="range"].slider::-moz-range-thumb {
 .mb {
     margin-bottom: 12px;
 }
+
+/* pull down to reload, in the installed app */
+.pull-refresh {
+    position: fixed;
+    top: calc(var(--safe-top) - 36px);
+    left: 50%;
+    z-index: 300;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--bg-elev, var(--bg));
+    color: var(--fg-2);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+}
+.pull-refresh.ready {
+    color: var(--accent);
+}
+.pull-refresh.busy svg {
+    animation: spin 0.8s linear infinite;
+}
