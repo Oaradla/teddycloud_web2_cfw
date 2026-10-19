@@ -273,15 +273,31 @@ export function Cc3200Browser() {
         </>,
     ];
 
-    // each step needs the one before done
+    // each step needs the one before done: the first two always, certificates and bootloader can be
+    // skipped on purpose (done before, e.g. by hand), after a question
     const canGo = [releases.length > 0 && Object.values(acks).every(Boolean), backupSaved && mac.length === 12, certsDone, bootloaderDone, true];
+    const blocked = [st("cc3200AcksFirst"), !backupSaved ? st("cc3200BackupFirst") : st("cc3200MacFirst")];
+    const skip = [null, null, { title: st("cc3200CertsSkip"), text: st("cc3200CertsSkipText") }, { title: st("cc3200BootloaderSkip"), text: st("cc3200BootloaderSkipText") }];
+    const goTo = async (n: number) => {
+        for (let i = step; i < n; i++) {
+            if (canGo[i]) continue;
+            const ask = skip[i];
+            if (!ask) {
+                setStep(i);
+                return ui.toast("info", blocked[i]);
+            }
+            setStep(i);
+            if (!(await ui.confirm({ title: ask.title, text: ask.text, confirm: st("skipAnyway"), danger: true }))) return;
+        }
+        setStep(n);
+    };
 
     return (
         <>
             <Steps
                 titles={[st("esp32S1"), st("cc3200Connect"), st("cc3200Certs"), st("cc3200Bootloader"), st("cc3200Card")]}
                 step={step}
-                setStep={(n) => (n <= step || canGo.slice(0, n).every(Boolean) ? setStep(n) : ui.toast("info", step === 1 && !backupSaved ? st("cc3200BackupFirst") : st("next")))}
+                setStep={(n) => (n <= step ? setStep(n) : goTo(n))}
                 last={
                     <a className="btn primary" href="#/">
                         {st("showBoxes")}
