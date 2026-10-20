@@ -5,6 +5,10 @@ built to feel like a native app when installed on a phone (PWA), and to look goo
 It talks to the existing teddyCloud API and is meant to replace the classic UI completely: it
 uses nothing of it (no texts, files or links), so the classic UI can be dropped one day.
 
+> [!CAUTION] This repository is not supported by Revvox, and there are no plans for long-term support!
+The goal remains to support the official teddycloud_web website. 
+Web2 is simply a concept of what Teddycloud could look like, with the intention of potentially incorporating parts of it.
+
 ## Focus
 
 1. **Boxes**: state at a glance (online, battery, the tonie on the box), quick box settings,
