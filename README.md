@@ -73,7 +73,7 @@ GmbH; the names only say which devices the software works with.
 Changing the firmware of a box, opening it or connecting to its debug port
 is at your own risk: a box can become unusable, and it can affect claims
 against the manufacturer. The software comes without any warranty (see the
-licence). Using the manufacturer's cloud is subject to its terms of use.
+licence).
 
 ## Licence
 
@@ -89,7 +89,8 @@ Parts taken over from other projects keep their authors' copyright:
 | `src/features/setup/cc3200/protocol.ts` | port of cc3200tool, Allterco Robotics | GPL-2.0-or-later |
 | `src/features/setup/cc3200/rbtl3100s.dll` | Texas Instruments, the CC3200 NWP bootloader patch, as cc3200tool ships it | none stated |
 | `src/features/setup/esp32/` (flasher) | teddycloud_web (toniebox-reverse-engineering), based on flasher.js by g3gg0 | no licence file |
-| `src/features/setup/img/` (photos of the boxes and tools) | teddycloud_web, `src/assets/boxSetup` | no licence file |
+| `src/features/setup/img/opentb-step*.webp` (opening the box) | Tobias Isakeit, iFixit guides "Toniebox Opening Procedure" and "Toniebox Teardown", converted to WebP | CC BY-NC-SA 3.0 (credited on the page) |
+| `src/features/setup/img/` (the other photos of the boxes and tools) | teddycloud_web, `src/assets/boxSetup` | no licence file |
 
 Where the source publishes no licence file, these parts are used as the
 teddyCloud project uses them itself; they are not covered by the GPL of this
