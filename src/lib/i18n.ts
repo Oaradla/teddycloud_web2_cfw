@@ -510,8 +510,8 @@ const dict = {
     editPlaylist: ["Playlist bearbeiten", "Edit playlist"],
     splitTaf: ["In Kapitel aufteilen", "Split into chapters"],
     splitTafText: [
-        "Jedes der {n} Kapitel wird eine eigene TAF, dazu eine Playlist, die das Album wieder zusammensetzt. Alles kommt in einen neuen Ordner mit dem Namen der TAF; die TAF selbst wandert mit hinein, verknüpfte Tonies behalten sie. Cover und Titel gelten für die Playlist weiter.",
-        "Each of the {n} chapters becomes a TAF of its own, with a playlist that puts the album together again. Everything goes into a new folder named like the TAF; the TAF itself moves there too, linked tonies keep it. Cover and titles carry on for the playlist.",
+        "Jedes der {n} Kapitel wird eine eigene TAF, dazu eine Playlist, die das Album wieder zusammensetzt. Alles kommt in einen neuen Ordner mit dem Namen der TAF; die TAF selbst wandert unverändert mit hinein, verknüpfte Tonies spielen sie weiter. Die Playlist setzt ein eigenes TAF zusammen (mit Cover und Titeln des Originals); soll ein Tonie sie spielen, verknüpfe ihn mit der Playlist.",
+        "Each of the {n} chapters becomes a TAF of its own, with a playlist that puts the album together again. Everything goes into a new folder named like the TAF; the TAF itself moves there unchanged, linked tonies keep playing it. The playlist puts together a TAF of its own (with the cover and titles of the original); to have a tonie play it, link the tonie to the playlist.",
     ],
     splitTafRun: ["Aufteilen", "Split"],
     splitting: ["Teile auf …", "Splitting …"],

@@ -67,11 +67,18 @@ export function UploadPage() {
         });
     };
 
-    const saveAlbum = async (tafPath: string, title: string, titles: string[], picture: File | null, tapPath?: string) => {
+    const saveAlbum = async (
+        tafPath: string,
+        title: string,
+        titles: string[],
+        picture: File | null,
+        tapPath?: string,
+        known?: { audioId: number; sha1Hash: string },
+    ) => {
         const dir = parentPath(tafPath);
         await qc.invalidateQueries({ queryKey: ["files", dir] });
-        const entry = (await tc.files(dir)).find((f) => f.name === baseName(tafPath));
-        const header = entry?.tafHeader;
+        // the TAF of a playlist is not in the file list, its header comes with the upload
+        const header = known ?? (await tc.files(dir)).find((f) => f.name === baseName(tafPath))?.tafHeader;
         if (!header) throw new Error(t("noAudioId"));
         let pic = "";
         if (picture) {
@@ -152,7 +159,7 @@ export function UploadPage() {
                 if (cover || items.length > 1) {
                     step(t("savingCover"), 1);
                     try {
-                        await saveAlbum(result.taf, job.name, titles, cover, result.source.endsWith(".tap") ? result.source : undefined);
+                        await saveAlbum(result.taf, job.name, titles, cover, result.source.endsWith(".tap") ? result.source : undefined, result.header);
                     } catch (e) {
                         ui.toast("error", t("coverFailed"), String((e as Error).message));
                     }

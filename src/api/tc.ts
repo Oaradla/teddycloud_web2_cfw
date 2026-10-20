@@ -121,8 +121,11 @@ export const tc = {
         }
         return out;
     },
-    /** deletes a folder with everything in it (the server removes empty folders only) */
+    /** deletes a folder with everything in it */
     deleteTree: async (path: string, special = "library"): Promise<void> => {
+        // newer servers take the whole folder, also files the lists do not show
+        if (await tc.fileDelete(path, false, special).then(() => true, () => false)) return;
+        // older ones remove empty folders only
         for (const f of await tc.files(path, special)) {
             if (f.name === "." || f.name === "..") continue;
             const p = `${path.replace(/\/$/, "")}/${f.name}`;
@@ -190,7 +193,14 @@ export const tc = {
         if (r.status === 404) return null; // server without playlist building: encoded on playback
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
-        return data as { built: boolean; remux: boolean; filepath?: string; error?: string };
+        return data as {
+            built: boolean;
+            remux: boolean;
+            filepath?: string;
+            error?: string;
+            /** the built TAF, which the file lists leave out */
+            tafHeader?: { audioId: number; sha1Hash: string };
+        };
     },
     /** whether the server can join TAFs of a playlist (otherwise teddyCloud builds it on playback) */
     hasTapBuild: () =>

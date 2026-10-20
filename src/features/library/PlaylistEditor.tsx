@@ -97,7 +97,8 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
         const tap: Tap = {
             type: "tap",
             audio_id: existing?.audio_id || Math.floor(Date.now() / 1000),
-            filepath: existing?.filepath || toLib(`${dir.replace(/\/$/, "")}/${clean}.taf`),
+            // the TAF it builds lies next to it, named after it; the library does not list it
+            filepath: existing?.filepath || toLib(`${dir.replace(/\/$/, "")}/${fileName}.taf`),
             name: name.trim(),
             files: items.map(({ filepath, name }) => ({ filepath, name: name.trim() || stripExt(baseName(filepath)) })),
         };

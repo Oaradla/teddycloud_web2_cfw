@@ -2,7 +2,7 @@
 //   one TAF:     the files are encoded as parts (in parallel), teddyCloud joins them into one TAF
 //                without re-encoding, the parts are removed again
 //   split:       <folder>/<name>/NN - title.taf for every file plus <name>.tap there, whose
-//                TAF teddyCloud puts together in that folder as well
+//                TAF teddyCloud puts together next to it as <name>.tap.taf (hidden in the library)
 // Encoding happens in the browser (parallel web workers) or on the server (PCM upload per file).
 // Servers without the playlist building get the old way: one TAF in one go.
 import { tc } from "../../api/tc";
@@ -32,6 +32,8 @@ export interface UploadResult {
     taf: string;
     /** the folder to show afterwards */
     folder: string;
+    /** audio id and hash of the TAF when the file lists do not show it (the TAF of a playlist) */
+    header?: { audioId: number; sha1Hash: string };
 }
 
 type Step = (text: string, fraction: number) => void;
@@ -103,13 +105,14 @@ export async function uploadAudio(job: UploadJob, step: Step): Promise<UploadRes
         await ensureDir(dir);
         const partName = (i: number) => `${pad(i + 1)} - ${safe(job.titles[i])}.taf`;
         await makeParts(job, dir, partName, step);
-        const out = joinPath(dir, `${name}.taf`);
+        const out = joinPath(dir, `${name}.tap.taf`);
         const tap = await writeTap(dir, `${name}.tap`, out, job.name.trim(), job.files.map((_, i) => ({ path: joinPath(dir, partName(i)), title: job.titles[i] })));
+        let header: UploadResult["header"];
         if (canBuild) {
             step(t("joining"), 0.97);
-            await tc.buildTap(tap);
+            header = (await tc.buildTap(tap))?.tafHeader;
         }
-        return { source: tap, taf: out, folder: dir };
+        return { source: tap, taf: out, folder: dir, header };
     }
 
     const target = joinPath(job.folder, `${name}.taf`);
