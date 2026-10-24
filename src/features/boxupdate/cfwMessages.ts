@@ -1,4 +1,4 @@
-import { getLang } from "../../lib/i18n";
+import { getLang, pick } from "../../lib/i18n";
 
 /** German texts of the fixed messages of the server's /api/cfw answers */
 const DE: Record<string, string> = {
@@ -23,4 +23,6 @@ const DE: Record<string, string> = {
     "CFW support is off (cfw.enabled)": "CFW-Unterstützung ist ausgeschaltet (cfw.enabled)",
 };
 
-export const cfwMessage = (message: string) => (getLang() === "de" ? (DE[message] ?? message) : message);
+export const CFW_MESSAGES = Object.keys(DE);
+
+export const cfwMessage = (message: string) => (DE[message] && getLang() !== "en" ? pick([DE[message], message], `cfw.${message}`) : message);

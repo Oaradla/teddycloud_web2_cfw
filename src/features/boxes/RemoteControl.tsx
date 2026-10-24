@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Headphones, ListMusic, Lock, Pause, Play, SkipBack, SkipForward, Square, Volume1, Volume2 } from "lucide-react";
+import { CloudDownload, Headphones, ListMusic, Lock, Pause, Play, RefreshCw, SkipBack, SkipForward, Square, Volume1, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
-import { contentTitle, figureSubtitle, figureTitle, linkedContent, tagInfo, tagTitle } from "../../lib/format";
+import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent, tagInfo, tagTitle } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { keys, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
@@ -48,6 +48,12 @@ export function RemoteControl({ boxId }: { boxId: string }) {
     const tag = st?.ruid ? tags.data?.find((x) => x.ruid.toLowerCase() === st.ruid.toLowerCase()) : undefined;
     const limit = st?.limit || 15;
     const volume = vol ?? st?.volume ?? 0;
+    const last = status.data?.lastResult;
+    // unknown numbers stay numbers (t returns the key)
+    const lastText = (key: string, n: number) => {
+        const text = t(`${key}_${n}` as never);
+        return text === `${key}_${n}` ? String(n) : text;
+    };
     const stateText = st ? t(`state_${st.state}` as never) : connected ? "…" : t("remoteWaiting");
 
     const choices = (tags.data ?? [])
@@ -113,7 +119,33 @@ export function RemoteControl({ boxId }: { boxId: string }) {
                 />
                 <Volume2 size={20} />
             </div>
+            {st && (
+                <div className="small muted" style={{ marginTop: 4, textAlign: "center" }}>
+                    {t("remoteVolume", { step: volume, limit, output: t(st.headphones ? "headphones" : "speaker") })}
+                </div>
+            )}
             {!connected && <div className="small muted" style={{ marginTop: 8 }}>{t("remoteHint")}</div>}
+            <div className="remote-extra">
+                <button className="btn soft small" disabled={!connected} onClick={() => send("status")}>
+                    <RefreshCw size={15} />
+                    {t("remoteRefresh")}
+                </button>
+                <button className="btn soft small" disabled={!connected} onClick={() => send("updateCheck")}>
+                    <CloudDownload size={15} />
+                    {t("remoteUpdateCheck")}
+                </button>
+            </div>
+            <div className="small muted" style={{ marginTop: 8 }}>
+                {[
+                    st?.time ? t("remoteAsOf", { when: ago(st.time * 1000) }) : "",
+                    status.data?.queued ? t("remoteQueued", { n: status.data.queued }) : "",
+                    last
+                        ? t("remoteLast", { command: lastText("command", last.command), result: lastText("result", last.result), when: ago(last.time * 1000) })
+                        : "",
+                ]
+                    .filter(Boolean)
+                    .join(" · ")}
+            </div>
 
             <Sheet open={pick} onClose={() => setPick(false)} title={t("playTonie")} full>
                 <div style={{ marginBottom: 12 }}>

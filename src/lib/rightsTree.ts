@@ -11,7 +11,7 @@ export type RightsNode = {
 
 export type SettingName = { id: string; label?: string };
 
-const SCOPES = ["box", "tonie", "folder", "users"];
+const SCOPES = ["box", "tonie", "folder", "users", "model"];
 
 /**
  * Tree of the rights a non-admin can have: everything > scope > right, and below

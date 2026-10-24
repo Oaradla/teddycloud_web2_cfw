@@ -1,5 +1,6 @@
-import { ImageDown, ImagePlus, LayoutGrid, List, Plus, Shapes, UserRound } from "lucide-react";
+import { Disc3, ImageDown, ImagePlus, LayoutGrid, List, Plus, Shapes, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { useCustomModels } from "../../lib/queries";
 import { getPref, setPref } from "../../lib/prefs";
@@ -7,16 +8,21 @@ import { Empty, ErrorBox, Loading, Page, Row, SearchField, Segmented, useUi } fr
 import { TonieImage } from "../../ui/TonieImage";
 import { ModelEditor, ModelEditorStart } from "./ModelEditor";
 import { ImageOptimizer } from "./ImageOptimizer";
+import { PicturesList } from "./PicturesList";
+import { ModelPicker } from "../tonies/ModelPicker";
+import { tc } from "../../api/tc";
 
-type Kind = "all" | "figure" | "cover";
+type Kind = "all" | "figure" | "cover" | "pictures";
 
 export function ModelsPage() {
     const models = useCustomModels();
     const ui = useUi();
+    const access = useAccess();
     const [query, setQuery] = useState("");
     const [kind, setKind] = useState<Kind>("all");
     const [editing, setEditing] = useState<ModelEditorStart | null>(null);
     const [optimize, setOptimize] = useState(false);
+    const [pickOriginal, setPickOriginal] = useState(false);
     const [view, setView] = useState(() => getPref("models.view", "list"));
     const toggleView = () => {
         const v = view === "list" ? "grid" : "list";
@@ -36,7 +42,12 @@ export function ModelsPage() {
         ui.actions(t("whatToCreate"), [
             { label: t("newFigure"), icon: <UserRound size={17} />, onSelect: () => setEditing({ mode: "figure" }) },
             { label: t("newCover"), icon: <ImagePlus size={17} />, onSelect: () => setEditing({ mode: "cover" }) },
+            { label: t("overrideOriginal"), icon: <Disc3 size={17} />, onSelect: () => setPickOriginal(true) },
         ]);
+    const override = async (model: string) => {
+        const info = (await ui.run(() => tc.searchTonies(model)))?.find((x) => x.model === model);
+        if (info) setEditing({ mode: "override", info });
+    };
 
     return (
         <Page
@@ -44,9 +55,11 @@ export function ModelsPage() {
             subtitle={t("customModelsHint")}
             back="/more"
             right={
-                <button className="icon-btn" onClick={create} aria-label={t("newModel")}>
-                    <Plus size={24} />
-                </button>
+                access.canCreateModels && (
+                    <button className="icon-btn" onClick={create} aria-label={t("newModel")}>
+                        <Plus size={24} />
+                    </button>
+                )
             }
         >
             <div className="sticky-tools">
@@ -64,28 +77,35 @@ export function ModelsPage() {
                             { value: "all", label: t("all") },
                             { value: "figure", label: t("figures") },
                             { value: "cover", label: t("covers") },
+                            ...(access.canCreateModels ? [{ value: "pictures" as const, label: t("pictures") }] : []),
                         ]}
                     />
                 </div>
             </div>
-            <div className="btn-row" style={{ marginBottom: 10 }}>
-                <button className="btn soft" onClick={() => setEditing({ mode: "figure" })}>
-                    <UserRound size={18} />
-                    {t("newFigure")}
+            {access.canCreateModels && (
+                <div className="btn-row" style={{ marginBottom: 10 }}>
+                    <button className="btn soft" onClick={() => setEditing({ mode: "figure" })}>
+                        <UserRound size={18} />
+                        {t("newFigure")}
+                    </button>
+                    <button className="btn soft" onClick={() => setEditing({ mode: "cover" })}>
+                        <ImagePlus size={18} />
+                        {t("newCover")}
+                    </button>
+                </div>
+            )}
+            {/* changes the pictures of all custom tonies */}
+            {access.admin && (
+                <button className="btn ghost small" style={{ marginBottom: 14, padding: "0 4px" }} onClick={() => setOptimize(true)}>
+                    <ImageDown size={16} />
+                    {t("optimizeImages")}
                 </button>
-                <button className="btn soft" onClick={() => setEditing({ mode: "cover" })}>
-                    <ImagePlus size={18} />
-                    {t("newCover")}
-                </button>
-            </div>
-            <button className="btn ghost small" style={{ marginBottom: 14, padding: "0 4px" }} onClick={() => setOptimize(true)}>
-                <ImageDown size={16} />
-                {t("optimizeImages")}
-            </button>
-            {models.isLoading && <Loading />}
+            )}
+            {kind === "pictures" && <PicturesList models={models.data ?? []} />}
+            {kind !== "pictures" && models.isLoading && <Loading />}
             {models.error && <ErrorBox error={models.error} retry={() => models.refetch()} />}
-            {models.data && list.length === 0 && <Empty icon={<Shapes size={28} />} title={query ? t("nothingFound") : t("noModels")} />}
-            {list.length > 0 && view === "grid" && (
+            {kind !== "pictures" && models.data && list.length === 0 && <Empty icon={<Shapes size={28} />} title={query ? t("nothingFound") : t("noModels")} />}
+            {kind !== "pictures" && list.length > 0 && view === "grid" && (
                 <div className="grid-tonies">
                     {list.map((m) => (
                         <div key={m.model} className="tonie-tile" role="button" tabIndex={0} onClick={() => setEditing({ mode: "edit", model: structuredClone(m) })}>
@@ -104,7 +124,7 @@ export function ModelsPage() {
                     ))}
                 </div>
             )}
-            {list.length > 0 && view === "list" && (
+            {kind !== "pictures" && list.length > 0 && view === "list" && (
                 <div className="list">
                     {list.map((m) => (
                         <Row
@@ -120,6 +140,7 @@ export function ModelsPage() {
                 </div>
             )}
             <ModelEditor start={editing} onClose={() => setEditing(null)} />
+            <ModelPicker open={pickOriginal} onClose={() => setPickOriginal(false)} onPick={override} />
             <ImageOptimizer open={optimize} onClose={() => setOptimize(false)} models={models.data ?? []} />
         </Page>
     );

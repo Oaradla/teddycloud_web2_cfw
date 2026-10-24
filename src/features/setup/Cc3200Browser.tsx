@@ -51,6 +51,7 @@ export function Cc3200Browser() {
     const [log, setLog] = useState<string[]>([]);
     const backup = useRef<{ flash: Uint8Array; files: Map<string, Uint8Array> } | null>(null);
     const [backupSaved, setBackupSaved] = useState(false);
+    const [backupStored, setBackupStored] = useState("");
     const [failed, setFailed] = useState<string[]>([]);
     const [mac, setMac] = useState("");
     const [certsDone, setCertsDone] = useState(false);
@@ -105,6 +106,13 @@ export function Cc3200Browser() {
             setMac(found);
             const done = st("cc3200BackupDone", { files: all.files.size, kb: Math.round(flash.length / 1024), mac: found || "?" });
             addLog(done);
+            // the flash dump also stays on the server, as with the ESP32 box
+            const stored = await tc.storeFlashDump(`CC3200_${found || "unknown"}`, flash).catch(() => "");
+            setBackupStored(stored);
+            if (stored) {
+                setBackupSaved(true);
+                addLog(`backup stored on the server: ${stored}`);
+            }
             return done;
         });
 
@@ -224,6 +232,7 @@ export function Cc3200Browser() {
                         <input className="input mono" value={mac} onChange={(e) => setMac(e.target.value.replace(/[^0-9a-fA-F]/g, "").toLowerCase().slice(0, 12))} />
                         <div className="hint">{st("cc3200MacHint")}</div>
                     </div>
+                    {backupStored && <Notice info>{st("cc3200BackupStored", { name: backupStored })}</Notice>}
                     <button className="btn" onClick={downloadBackup}>
                         {st("cc3200DownloadBackup")}
                     </button>

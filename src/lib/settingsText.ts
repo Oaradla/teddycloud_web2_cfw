@@ -1,7 +1,7 @@
-// German names of the teddyCloud settings; the server sends English ones. The texts come from the
+// Names of the teddyCloud settings in the app's language; the server sends English ones. The texts come from the
 // classic web UI (scripts/import-settings-i18n.mjs), EXTRA covers settings it does not translate.
 import type { SettingOption } from "../api/types";
-import { getLang } from "./i18n";
+import { getLang, langSettings } from "./i18n";
 import de from "./settings.de.json";
 
 type Text = { label?: string; description?: string };
@@ -25,17 +25,20 @@ const EXTRA: Record<string, Text> = {
 };
 
 const key = (id: string) => id.replace(/\./g, "_");
-const options = de.options as Record<string, Text>;
-const groups = de.groups as Record<string, string>;
-const values = de.values as Record<string, Record<string, string>>;
 const german = () => getLang() === "de";
+/** the texts of the current language; English is what the server sends */
+const tables = () => (german() ? de : getLang() === "en" ? {} : langSettings) as { options?: Record<string, Text>; groups?: Record<string, string>; values?: Record<string, Record<string, string>> };
+const extraText = (id: string): Text | undefined => (german() ? EXTRA[key(id)] : undefined);
 
-const text = (o: SettingOption): Text => (german() ? (EXTRA[key(o.ID)] ?? options[key(o.ID)] ?? {}) : {});
+const text = (o: SettingOption): Text => extraText(o.ID) ?? tables().options?.[key(o.ID)] ?? {};
 
-export const settingLabel = (o: SettingOption) =>
-    (o.type === "desc" && german() ? groups[key(o.ID)] : undefined) ?? text(o).label ?? o.label ?? o.shortname;
+export const settingLabel = (o: SettingOption) => (o.type === "desc" ? tables().groups?.[key(o.ID)] : undefined) ?? text(o).label ?? o.label ?? o.shortname;
 
 export const settingDescription = (o: SettingOption) => text(o).description ?? o.description;
 
 /** translated names of enumerated values, by value */
-export const settingValues = (o: SettingOption): Record<string, string> | undefined => (german() ? values[key(o.ID)] : undefined);
+export const settingValues = (o: SettingOption): Record<string, string> | undefined => tables().values?.[key(o.ID)];
+
+/** the name of a setting or a group of settings by its id in the current language, for lists without the option itself */
+export const settingNameById = (id: string, fallback: string) =>
+    tables().groups?.[key(id)] ?? extraText(id)?.label ?? tables().options?.[key(id)]?.label ?? fallback;

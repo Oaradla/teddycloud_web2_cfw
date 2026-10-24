@@ -1,5 +1,5 @@
 // Texts of the box setup: [German, English]; {name} is filled from vars.
-import { getLang } from "../../lib/i18n";
+import { pick } from "../../lib/i18n";
 
 const T = {
     title: ["Box einrichten", "Set up a box"],
@@ -326,7 +326,14 @@ const T = {
     cc3200BackupDone: ["Backup fertig: {files} Dateien, Flash {kb} KB. Box {mac}.", "Backup done: {files} files, flash {kb} KB. Box {mac}."],
     cc3200BackupFailed: ["Nicht alle Dateien ließen sich lesen: {list}", "Not all files could be read: {list}"],
     cc3200DownloadBackup: ["Backup herunterladen", "Download the backup"],
-    cc3200BackupFirst: ["Erst das Backup herunterladen, dann geht es weiter.", "Download the backup first, then you can go on."],
+    cc3200BackupStored: [
+        "Der Flash-Abzug liegt auf dem Server im Firmware-Ordner: {name}. Herunterladen kannst du ihn zusätzlich.",
+        "The flash dump is on the server in the firmware folder: {name}. You can download it as well.",
+    ],
+    cc3200BackupFirst: [
+        "Das Backup konnte nicht auf dem Server gespeichert werden: erst herunterladen, dann geht es weiter.",
+        "The backup could not be stored on the server: download it first, then you can go on.",
+    ],
     cc3200AcksFirst: ["Erst die Hinweise oben bestätigen; dann geht es weiter.", "Confirm the notes above first, then you can go on."],
     cc3200MacFirst: ["Erst die MAC der Box eintragen (12 Zeichen).", "Enter the MAC of the box first (12 characters)."],
     cc3200CertsSkip: ["Ohne Zertifikate und CA weiter?", "Go on without certificates and CA?"],
@@ -368,9 +375,10 @@ const T = {
 } satisfies Record<string, [string, string]>;
 
 export type SetupKey = keyof typeof T;
+export const SETUP_KEYS = Object.keys(T);
 
 export const st = (key: SetupKey, vars: Record<string, string | number> = {}): string =>
-    T[key][getLang() === "de" ? 0 : 1].replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+    pick(T[key], `setup.${key}`).replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
 
 /** a text holding a list, items separated by "|" */
 export const stList = (key: SetupKey): string[] => st(key).split("|");

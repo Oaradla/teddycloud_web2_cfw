@@ -9,6 +9,13 @@ import { settingDescription, settingLabel, settingValues } from "../../lib/setti
 import { Sheet } from "../../ui/Sheet";
 import { Row, Segmented, Slider, Switch, useUi } from "../../ui/kit";
 
+/** a volume step of the CFW, with the limit of the original firmware where it has the same step */
+const ORIGINAL_STEP: Record<number, number> = { 6: 25, 9: 50, 12: 75, 15: 100 };
+const volumeStep = (v: number) => (ORIGINAL_STEP[v] ? t("volumeStepOriginal", { n: v, pct: ORIGINAL_STEP[v] }) : t("volumeStep", { n: v }));
+
+/** settings that slide with their values shown this way, wherever they appear */
+const FORMATS: Partial<Record<string, (v: number) => string>> = { "cfw.box.speaker_limit": volumeStep, "cfw.box.headphone_limit": volumeStep };
+
 /** "0=25%, 1=50%, 2=75%" -> options, undefined when the description is no such list */
 export const enumOptions = (opt: SettingOption): { value: number; label: string }[] | undefined => {
     if (opt.type !== "uint" && opt.type !== "int") return undefined;
@@ -69,7 +76,8 @@ interface SettingRowProps {
 }
 
 /** one setting with the fitting control; on a box (overlay) it shows whether the box has its own value */
-export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format, noReset, labels }: SettingRowProps) {
+export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: givenFormat, noReset, labels }: SettingRowProps) {
+    const format = givenFormat ?? FORMATS[opt.ID];
     const { set, reset } = useSettingActions(overlay);
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
@@ -124,7 +132,8 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format, 
     }
 
     const choices = enumOptions(opt)?.map((c) => ({ ...c, label: labels?.[c.value] ?? c.label }));
-    if (choices && choices.length <= 4) {
+    // side by side only when the names fit the phone's width
+    if (choices && choices.length <= 4 && choices.reduce((n, c) => n + c.label.length, 0) <= 32) {
         return (
             <div className="row-wrap">
                 <Row icon={icon} iconColor={iconColor} title={title} sub={subLine} right={resetBtn} />
@@ -140,8 +149,13 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format, 
     }
 
     const numeric = opt.type === "uint" || opt.type === "int" || opt.type === "float";
-    if (numeric && opt.min !== undefined && opt.max !== undefined && opt.max - opt.min <= 100 && !choices) {
+    // many enumerated steps with a format (e.g. 16 volume steps) slide too; their names are too long for a row
+    const range = choices && format ? { min: choices[0].value, max: choices[choices.length - 1].value } : choices ? undefined : opt;
+    if (numeric && range?.min !== undefined && range.max !== undefined && range.max - range.min <= 100) {
         const v = slide ?? Number(opt.value ?? 0);
+        // as wide as the widest value, so that the slider does not move while sliding
+        const { min, max } = range;
+        const widest = Math.max(...Array.from({ length: Math.floor(max - min) + 1 }, (_, i) => (format ? format(min + i) : String(min + i)).length));
         return (
             <div className="row-wrap">
                 <Row
@@ -149,14 +163,14 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format, 
                     iconColor={iconColor}
                     title={title}
                     sub={subLine}
-                    value={format ? format(v) : String(v)}
                     right={resetBtn}
                 />
-                <div style={{ padding: "0 16px 10px" }}>
+                <div style={{ padding: "0 16px 10px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ minWidth: `${widest + 1}ch`, color: "var(--fg-2)", whiteSpace: "nowrap" }}>{format ? format(v) : String(v)}</span>
                     <Slider
                         value={v}
-                        min={opt.min}
-                        max={opt.max}
+                        min={range.min}
+                        max={range.max}
                         disabled={disabled}
                         onChange={setSlide}
                         onCommit={(n) => {

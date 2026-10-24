@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, CheckCircle2, Disc3, FileAudio, ListMusic, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckCircle2, Disc3, FileAudio, Link2, ListMusic, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import type { FileEntry, Tap } from "../../api/types";
@@ -46,6 +46,9 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
     const [saving, setSaving] = useState(false);
     const [done, setDone] = useState<{ tap: string; built: boolean | null } | null>(null);
     const [assign, setAssign] = useState(false);
+    const [expert, setExpert] = useState(false);
+    const [audioId, setAudioId] = useState("");
+    const [tafPath, setTafPath] = useState("");
     const nextId = useRef(1);
 
     const toItems = (list: { filepath: string; name: string }[]) => list.map((x) => ({ id: nextId.current++, ...x }));
@@ -54,6 +57,7 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
         if (!start) return;
         setDone(null);
         setSaving(false);
+        setExpert(false);
         if ("edit" in start) {
             setTapPath(start.edit);
             setDir(parentPath(start.edit));
@@ -61,6 +65,8 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
             tc.readTap(start.edit)
                 .then((tap) => {
                     setExisting(tap);
+                    setAudioId(String(tap.audio_id ?? ""));
+                    setTafPath(tap.filepath ?? "");
                     setName(tap.name || stripExt(baseName(start.edit)));
                     setItems(toItems(tap.files ?? []));
                 })
@@ -69,6 +75,8 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
         } else {
             setTapPath(null);
             setExisting(null);
+            setAudioId("");
+            setTafPath("");
             setDir(start.dir);
             const files = start.files ?? [];
             setItems(toItems(files.map((f) => ({ filepath: toLib(f.path), name: itemName(f.path, f.entry) }))));
@@ -85,7 +93,13 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
             return next;
         });
 
-    const encodes = items.some((x) => isAudio(x.filepath));
+    const encodes = items.some((x) => isAudio(x.filepath) || !x.filepath.startsWith("lib://"));
+
+    /** any source ffmpeg on the server can read: a path on the server or a URL */
+    const addPath = async () => {
+        const filepath = await ui.prompt({ title: t("addPath"), label: t("addPathHint"), placeholder: "https://… / /path/file.mp3" });
+        if (filepath) setItems((cur) => [...cur, ...toItems([{ filepath, name: stripExt(baseName(filepath)) }])]);
+    };
 
     const save = async () => {
         const clean = safeName(name);
@@ -96,9 +110,9 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
         const target = tapPath ?? `${dir.replace(/\/$/, "")}/${fileName}`;
         const tap: Tap = {
             type: "tap",
-            audio_id: existing?.audio_id || Math.floor(Date.now() / 1000),
+            audio_id: Number(audioId) || existing?.audio_id || Math.floor(Date.now() / 1000),
             // the TAF it builds lies next to it, named after it; the library does not list it
-            filepath: existing?.filepath || toLib(`${dir.replace(/\/$/, "")}/${fileName}.taf`),
+            filepath: tafPath.trim() || existing?.filepath || toLib(`${dir.replace(/\/$/, "")}/${fileName}.taf`),
             name: name.trim(),
             files: items.map(({ filepath, name }) => ({ filepath, name: name.trim() || stripExt(baseName(filepath)) })),
         };
@@ -174,15 +188,38 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
                             <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("playlistNamePlaceholder")} autoFocus={!tapPath} />
                             <div className="hint">{tapPath ? tapPath : t("playlistSavedIn", { dir: dir === "/" ? t("library") : dir })}</div>
                         </div>
+                        <button className="btn ghost small" style={{ paddingLeft: 2, marginBottom: 10 }} onClick={() => setExpert(!expert)}>
+                            {expert ? t("hideExpert") : t("showExpert")}
+                        </button>
+                        {expert && (
+                            <>
+                                <div className="field">
+                                    <label>{t("audioId")}</label>
+                                    <input className="input mono" inputMode="numeric" value={audioId} onChange={(e) => setAudioId(e.target.value.replace(/\D/g, ""))} placeholder={t("automatic")} />
+                                    <div className="hint">{t("tapAudioIdHint")}</div>
+                                </div>
+                                <div className="field">
+                                    <label>{t("tapTafPath")}</label>
+                                    <input className="input mono" value={tafPath} onChange={(e) => setTafPath(e.target.value)} placeholder={t("automatic")} />
+                                    <div className="hint">{t("tapTafPathHint")}</div>
+                                </div>
+                            </>
+                        )}
 
                         <div className="section-head">
                             <h2 className="section-title">
                                 {t("titlesInOrder")} ({items.length})
                             </h2>
-                            <button className="btn ghost small" onClick={() => setPicking(true)}>
-                                <Plus size={16} />
-                                {t("addTitles")}
-                            </button>
+                            <span className="row-gap" style={{ gap: 4 }}>
+                                <button className="btn ghost small" onClick={addPath} title={t("addPathHint")}>
+                                    <Link2 size={16} />
+                                    {t("addPath")}
+                                </button>
+                                <button className="btn ghost small" onClick={() => setPicking(true)}>
+                                    <Plus size={16} />
+                                    {t("addTitles")}
+                                </button>
+                            </span>
                         </div>
                         {items.length === 0 ? (
                             <Empty
@@ -208,7 +245,8 @@ export function PlaylistEditor({ start, onClose }: { start: PlaylistStart | null
                                                 onChange={(e) => setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, name: e.target.value } : x)))}
                                             />
                                             <div className="row-sub" style={{ whiteSpace: "nowrap" }}>
-                                                {isAudio(it.filepath) ? <FileAudio size={12} style={{ verticalAlign: -1 }} /> : null} {baseName(fromLib(it.filepath))}
+                                                {isAudio(it.filepath) ? <FileAudio size={12} style={{ verticalAlign: -1 }} /> : null}{" "}
+                                                {it.filepath.startsWith("lib://") ? baseName(fromLib(it.filepath)) : it.filepath}
                                             </div>
                                         </div>
                                         <button className="icon-btn muted" onClick={() => move(i, -1)} disabled={i === 0} aria-label="up">

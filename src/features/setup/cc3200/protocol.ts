@@ -36,6 +36,44 @@ const FAT_PART_OFFSET = 0x1000;
 const FAT_META2_LENGTH = 0x1000;
 const FAT_NAME_ARRAY_OFFSET = 0x200;
 const SYSTEM_FILES_SKIPPED = ["/sys/servicepack.ucf"];
+/** the files of a Toniebox, asked for by name when its file table has no names (the box still opens files by name);
+ * reading files through the bootloader can leave the table without names (seen with cc3200tool too) */
+const TONIEBOX_FILES = [
+    "/cert/ca.der",
+    "/cert/client.der",
+    "/cert/private.der",
+    "/sys/mcuimg.bin",
+    "/sys/mcuimg1.bin",
+    "/sys/mcuimg2.bin",
+    "/sys/mcuimg3.bin",
+    "/sys/mcubootinfo.bin",
+    "/sys/mode.cfg",
+    "/sys/ipcfg.ini",
+    "/sys/ap.cfg",
+    "/sys/devname.cfg",
+    "/sys/mdns.cfg",
+    "/sys/pref.net",
+    "/sys/stacfg.ini",
+    "/sys/pmcfg.ini",
+    "/sys/otastat.txt",
+    "/sys/date_time.cfg",
+    "/tmp/phy.cal",
+    "/tmp/table.arp",
+    "/www/index.html",
+    "/www/toniebox.js",
+    "/fw/sfx.bin",
+    "/settings.cfg",
+];
+/** further names asked for, which not every box has */
+const OTHER_FILES = [
+    "/cert/c2.der",
+    "/sys/pre-img.bin",
+    "/sys/macadd.bin",
+    "/sys/httpsrv.cfg",
+    "/sys/dhcpsrv.cfg",
+    "/sys/p2p.cfg",
+    "/sys/smartconfigkeys.cfg",
+];
 
 export class Cc3200Error extends Error {}
 
@@ -479,10 +517,14 @@ export class Cc3200 {
         const r1 = header(t1);
         const r2 = header(t2);
         if (r1 < 0 && r2 < 0) throw new Cc3200Error("no valid file table");
-        const meta2Offset = FAT_META2_OFFSET + (r2 >= 0 ? FAT_PART_OFFSET : 0);
+        // the newer table is the active one and its names are in its own block (cc3200tool takes the
+        // names of the second block whenever that one is valid, also when the first one is newer)
+        const second = r2 > r1;
+        this.log(`file tables: revisions ${r1} / ${r2}, using the ${second ? "second" : "first"}`);
+        const meta2Offset = FAT_META2_OFFSET + (second ? FAT_PART_OFFSET : 0);
         // as cc3200tool reads it: from the offset, offset + length bytes
         const meta2 = await this.rawRead(meta2Offset, meta2Offset + FAT_META2_LENGTH, STORAGE_SFLASH);
-        return parseFat(r2 > r1 ? t2 : t1, meta2);
+        return parseFat(second ? t2 : t1, meta2);
     }
 
     private async fileInfo(name: string) {
@@ -534,16 +576,42 @@ export class Cc3200 {
 
     /** all files of the box (except the service pack), each read twice; the ones that failed are named */
     async readAllFiles(progress?: (name: string, i: number, total: number) => void) {
-        const files = (await this.listFiles()).filter((f) => f.name && !SYSTEM_FILES_SKIPPED.includes(f.name.startsWith("/") ? f.name : "/" + f.name));
-        const out = new Map<string, Uint8Array>();
+        const all = await this.listFiles();
+        const slash = (name: string) => (name.startsWith("/") ? name : "/" + name);
+        const named = all.filter((f) => f.name).map((f) => f.name);
+        const files = named.filter((name) => !SYSTEM_FILES_SKIPPED.includes(slash(name)));
         const failed: string[] = [];
-        for (const [i, f] of files.entries()) {
-            progress?.(f.name, i, files.length);
+        // some boxes keep no names in the table; the box still finds its files by name, so the
+        // known ones are asked for one by one (like cc3200tool's --by-file-id, but with names)
+        const unnamed = all.length - named.length;
+        this.log(`file table: ${all.length} entries, ${unnamed} without a name`);
+        if (unnamed > 0) {
+            let found = 0;
+            const notFound: string[] = [];
+            for (const name of [...SYSTEM_FILES_SKIPPED, ...TONIEBOX_FILES, ...OTHER_FILES]) {
+                if (named.some((n) => slash(n) === name)) continue;
+                if (!(await this.exists(name))) {
+                    if (!OTHER_FILES.includes(name)) notFound.push(name);
+                    continue;
+                }
+                found++;
+                if (!SYSTEM_FILES_SKIPPED.includes(name)) files.push(name);
+            }
+            this.log(`${found} of them found by a known name`);
+            if (found < unnamed)
+                failed.push(
+                    `${unnamed - found} files have no name in the file table and no known name` +
+                        (notFound.length ? ` (the box does not find ${notFound.join(", ")} by name)` : ""),
+                );
+        }
+        const out = new Map<string, Uint8Array>();
+        for (const [i, name] of files.entries()) {
+            progress?.(name, i, files.length);
             try {
-                out.set(f.name, await this.readFile(f.name));
+                out.set(name, await this.readFile(name));
             } catch (e) {
-                failed.push(`${f.name}: ${(e as Error).message}`);
-                this.log(`${f.name}: ${(e as Error).message}`);
+                failed.push(`${name}: ${(e as Error).message}`);
+                this.log(`${name}: ${(e as Error).message}`);
             }
         }
         return { files: out, failed };

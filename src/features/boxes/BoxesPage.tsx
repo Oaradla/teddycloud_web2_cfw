@@ -1,22 +1,26 @@
 import { BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, ChevronDown, ChevronRight, Gamepad2, Info, Radio, Settings2 } from "lucide-react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { tc } from "../../api/tc";
 import type { Box, CfwBox } from "../../api/types";
 import { CFW_CAP } from "../../api/types";
 import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
-import { useAllTags, useBoxes, useBoxImage, useBoxState, useCfwBox } from "../../lib/queries";
-import { Empty, ErrorBox, Page } from "../../ui/kit";
+import { keys, useAllTags, useBoxes, useBoxImage, useBoxState, useCfwBox, useSetting } from "../../lib/queries";
+import { Empty, ErrorBox, Notice, Page } from "../../ui/kit";
+import { NewVersionNotice } from "../more/SystemPage";
 import { FigurePic } from "../../ui/FigurePic";
 import { TonieImage } from "../../ui/TonieImage";
 
 export function BoxesPage() {
     const boxes = useBoxes();
     const cfwEnabled = useQuery({ queryKey: ["cfwEnabled"], queryFn: tc.cfwEnabled });
+    const access = useAccess();
     return (
         <Page title={t("boxes")}>
+            {access.admin && <AdminNotices boxes={boxes.data ?? []} />}
             {boxes.isLoading && <BoxSkeleton />}
             {boxes.error && <ErrorBox error={boxes.error} retry={() => boxes.refetch()} />}
             {boxes.data && boxes.data.length === 0 && (
@@ -36,6 +40,33 @@ export function BoxesPage() {
             </div>
             {cfwEnabled.data === "true" && <CfwControls />}
         </Page>
+    );
+}
+
+/** what an admin should know: a newer teddyCloud, new boxes still allowed, boxes without API access */
+function AdminNotices({ boxes }: { boxes: Box[] }) {
+    const allowNew = useSetting("core.allowNewBox");
+    const apiAccess = useQueries({
+        queries: boxes.map((b) => ({ queryKey: [...keys.settings(b.ID), "toniebox.api_access"], queryFn: () => tc.getSetting("toniebox.api_access", b.ID) })),
+    });
+    const withoutApi = boxes.filter((_, i) => apiAccess[i]?.data === "false").map((b) => b.boxName || b.ID);
+    return (
+        <>
+            <NewVersionNotice />
+            {allowNew.data === "true" && (
+                <Notice>
+                    <strong>{t("newBoxesAllowed")}</strong>
+                    <br />
+                    {t("newBoxesAllowedText")}
+                    {withoutApi.length > 0 && (
+                        <>
+                            <br />
+                            {t("boxesWithoutApi", { names: withoutApi.join(", ") })}
+                        </>
+                    )}
+                </Notice>
+            )}
+        </>
     );
 }
 
@@ -113,6 +144,8 @@ export const batteryInfo = (cfw?: CfwBox) => {
         remaining: !b.station && b.remainingMin ? durationText(b.remainingMin) : undefined,
         learned: Boolean(b.learned),
         station: b.station,
+        /** when the report is older than ten minutes (the box is off or asleep) */
+        age: b.time && Date.now() - b.time * 1000 > 10 * 60_000 ? ago(b.time * 1000) : undefined,
     };
 };
 
@@ -120,6 +153,7 @@ export const remoteAvailable = (cfw?: CfwBox) =>
     Boolean(cfw?.isCfw && cfw.settings?.enabled && cfw.settings.remoteControl && cfw.capabilities & CFW_CAP.remote);
 
 function BoxCard({ box }: { box: Box }) {
+    const access = useAccess();
     const state = useBoxState(box.ID);
     const cfw = useCfwBox(box.ID);
     const img = useBoxImage(box);
@@ -179,7 +213,7 @@ function BoxCard({ box }: { box: Box }) {
                     <Settings2 size={16} />
                     {t("settings")}
                 </button>
-                {remoteAvailable(cfw) && online && (
+                {remoteAvailable(cfw) && online && access.can("box", box.ID, "box.cfw") && (
                     <button className="btn small soft" onClick={() => navigate(`/box/${box.ID}?focus=remote`)}>
                         <Gamepad2 size={16} />
                         {t("remote")}

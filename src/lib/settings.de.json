@@ -194,18 +194,18 @@
   },
   "security_mit_warnAccess": {
    "label": "Warnung bei unerwünschtem Zugriff",
-   "description": "Bei ungewöhnlichem Zugriff bis zum Neustart eine Warnung in der Weboberfläche zeigen (siehe on*)."
+   "description": "Bei ungewöhnlichem Zugriff bis zum Neustart eine Warnung in der Weboberfläche zeigen; wann, legen die Einstellungen „Erkennen“ fest."
   },
   "security_mit_lockAccess": {
    "label": "Sperre bei unerwünschtem Zugriff",
-   "description": "Bei ungewöhnlichem Zugriff die Weboberfläche bis zum Neustart sperren (siehe on*)."
+   "description": "Bei ungewöhnlichem Zugriff die Weboberfläche bis zum Neustart sperren; wann, legen die Einstellungen „Erkennen“ fest."
   },
   "security_mit_httpsOnly": {
    "label": "Nur bei HTTPS",
    "description": "Nur auf dem HTTPS-Port sperren/warnen."
   },
   "security_mit_onBlacklistDomain": {
-   "label": "Blacklist-Domains erkennen",
+   "label": "Gesperrte Domains erkennen",
    "description": "Sperren/warnen, wenn die Domain als öffentlich bekannt ist."
   },
   "security_mit_onCrawler": {
@@ -342,7 +342,7 @@
   },
   "encode_ffmpeg_sweep_delay_ms": {
    "label": "Verwerfen-Verzögerung (ms)",
-   "description": "x ms warten, bis das Verwerfen endet und der Stream startet. Verzögert den Start, kann aber die Erfolgsquote erhöhen."
+   "description": "So viele Millisekunden warten, bis das Verwerfen endet und der Stream startet. Verzögert den Start, kann aber die Erfolgsquote erhöhen."
   },
   "encode_stream_max_size": {
    "label": "Maximale Stream-Dateigröße",
@@ -382,7 +382,7 @@
   },
   "toniebox_boxGeneration": {
    "label": "Box-Generation",
-   "description": "Generation der Box (TB1/TB2)"
+   "description": "Generation der Box: unbekannt, Toniebox 1 oder Toniebox 2"
   },
   "toniebox_max_vol_spk": {
    "label": "Lautstärke-Limit Lautsprecher",
@@ -488,6 +488,14 @@
    "label": "Lautstärke-Sperre",
    "description": "Ein kurzer Druck auf ein Ohr ändert die Lautstärke nicht"
   },
+  "cfw_box_idle_off_battery": {
+   "label": "Ausschaltzeit im Akkubetrieb",
+   "description": "Minuten, nach denen sich die Box ohne Bedienung ausschaltet, wenn sie nicht auf der Ladestation steht (1 bis 65535, ca. 45 Tage). Boxen ohne Custom Firmware schalten immer nach 10 Minuten aus"
+  },
+  "cfw_box_idle_off_station": {
+   "label": "Ausschaltzeit auf der Ladestation",
+   "description": "Minuten, nach denen sich die Box ohne Bedienung ausschaltet, während sie auf der Ladestation steht (1 bis 65535, ca. 45 Tage). Boxen ohne Custom Firmware schalten immer nach 10 Minuten aus"
+  },
   "cfw_update_enabled": {
    "label": "Firmware-Update",
    "description": "Der Box Images der Custom Firmware anbieten"
@@ -510,7 +518,7 @@
   },
   "cfw_firmware_github_repo": {
    "label": "GitHub-Repository",
-   "description": "owner/name des GitHub-Repositorys, dessen Releases die Box-Firmware enthalten; leer: kein Download"
+   "description": "Besitzer/Name des GitHub-Repositorys, dessen Releases die Box-Firmware enthalten; leer: kein Download"
   },
   "cfw_firmware_github_download": {
    "label": "Automatischer Download",
@@ -585,8 +593,8 @@
    "description": "QoS-Level"
   },
   "mqtt_retain_will": {
-   "label": "Last Will behalten",
-   "description": "Last-Will-Nachricht als retained senden"
+   "label": "Letzten Willen behalten",
+   "description": "Die Nachricht für den letzten Willen (MQTT Last Will) dauerhaft beim Broker speichern (retained)"
   },
   "mqtt_disable_on_error": {
    "label": "MQTT bei Fehlern abschalten",
@@ -749,6 +757,11 @@
    "1": "50%",
    "2": "75%",
    "3": "100%"
+  },
+  "toniebox_boxGeneration": {
+   "0": "Unbekannt",
+   "1": "Toniebox 1",
+   "2": "Toniebox 2"
   },
   "toniebox_max_vol_hdp": {
    "0": "25%",

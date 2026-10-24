@@ -69,7 +69,12 @@ cp certs/client/esp32/CA.DER certs/client/<mac>/ca.der
 # the first box: also as the default certificates of teddyCloud
 cp certs/client/<mac>/client.der certs/client/client.der
 cp certs/client/<mac>/private.der certs/client/private.der
-cp certs/client/<mac>/ca.der certs/client/ca.der`}</Code>
+cp certs/client/<mac>/ca.der certs/client/ca.der
+# the box certificates with the teddyCloud CA, to put into the image
+mkdir certs/client/esp32-fakeca
+cp certs/client/esp32/CLIENT.DER certs/client/esp32-fakeca/
+cp certs/client/esp32/PRIVATE.DER certs/client/esp32-fakeca/
+cp certs/server/ca.der certs/client/esp32-fakeca/CA.DER`}</Code>
             <Code>{`cp tb.esp32.bin tb.esp32.fakeca.bin
 # the teddyCloud CA into the image
 teddycloud --esp32-inject tb.esp32.fakeca.bin --source certs/client/esp32-fakeca

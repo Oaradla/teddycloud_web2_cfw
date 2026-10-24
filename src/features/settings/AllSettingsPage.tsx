@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { SettingOption } from "../../api/types";
 import { t } from "../../lib/i18n";
-import { useBoxes, useCfwBox, useSettings } from "../../lib/queries";
+import { useBoxes, useCfwBox, useSetting, useSettings } from "../../lib/queries";
 import { shownForBox, shownInServerSettings } from "./visibility";
 import { settingDescription, settingLabel } from "../../lib/settingsText";
 import { getPref, setPref } from "../../lib/prefs";
@@ -18,6 +18,9 @@ export function AllSettingsPage() {
     const boxes = useBoxes();
     const box = boxes.data?.find((b) => b.ID === id);
     const settings = useSettings(id);
+    // users get only the settings they may change in the list
+    const cfwEnabled = useSetting("cfw.enabled", id).data === "true";
+    const cfwForced = useSetting("cfw.force_box_settings", id).data === "true";
     const cfwBox = useCfwBox(id);
     const [query, setQuery] = useState("");
     const [level, setLevel] = useState<Level>(() => getPref("settingsLevel", "2") as Level);
@@ -28,7 +31,7 @@ export function AllSettingsPage() {
         const value = (k: string) => list.find((o) => o.ID === k)?.value === true;
         const shown = id
             ? (o: SettingOption) =>
-                  shownForBox(o.ID, { enabled: value("cfw.enabled"), isCfwBox: Boolean(cfwBox?.isCfw), forced: value("cfw.force_box_settings") }, o.overlayed)
+                  shownForBox(o.ID, { enabled: cfwEnabled, isCfwBox: Boolean(cfwBox?.isCfw), forced: cfwForced }, o.overlayed)
             : (o: SettingOption) => shownInServerSettings(o.ID, { enabled: value("cfw.enabled"), showBoxSettings: value("cfw.show_box_settings") });
         const f = query.trim().toLowerCase();
         const result: { head: SettingOption | null; items: SettingOption[] }[] = [];
@@ -51,7 +54,7 @@ export function AllSettingsPage() {
         }
         if (current.items.length) result.push(current);
         return result;
-    }, [settings.data, query, level, ownOnly, id, cfwBox]);
+    }, [settings.data, query, level, ownOnly, id, cfwBox, cfwEnabled, cfwForced]);
 
     const title = id ? t("allBoxSettings") : t("serverSettings");
     return (

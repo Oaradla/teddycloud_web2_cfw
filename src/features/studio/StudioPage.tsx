@@ -1,72 +1,30 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { strToU8, zipSync } from "fflate";
-import { CheckSquare, FolderPlus, ListPlus, Pencil, Plus, Printer, Scissors, Square, Trash2 } from "lucide-react";
-import { CSSProperties, useEffect, useState } from "react";
+import { CheckSquare, ExternalLink, FileDown, Share2, FolderPlus, ImagePlus, ListPlus, Pencil, Plus, Printer, RotateCcw, Save, Scissors, Square, Trash2 } from "lucide-react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import type { TonieInfo } from "../../api/types";
 import { isTaf, isTap, picUrl, tagInfo } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { getPref, setPref } from "../../lib/prefs";
-import { useAllTags } from "../../lib/queries";
+import { saveFile } from "../../lib/download";
+import { shrinkImage } from "../../lib/image";
+import { keys, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
 import { useSelection } from "../../ui/useSelection";
 import { LibraryPicker } from "../library/LibraryPicker";
 import { TonieImage } from "../../ui/TonieImage";
-import { Empty, Page, Row, SearchField, Section, Segmented, SwitchRow, useUi } from "../../ui/kit";
+import { Empty, Notice, Page, Row, SearchField, Section, Segmented, SwitchRow, useUi } from "../../ui/kit";
+import { useAccess } from "../../lib/access";
+import { flagUrl } from "./flags";
+import { FONTS, fontFaces } from "./fonts";
+import { studioPdf } from "./pdf";
+import { ALIGN, DEFAULTS, effective, labelList, PAPER_MM, sheetGrid, textOn, type LabelSettings, type StudioItem, type StudioSettings } from "./studio";
 
 /*
  * TeddyStudio: labels for tonies, a picture label and a text label per tonie, laid out on a
- * sheet of paper and printed by the browser. Items and settings stay on this device.
+ * sheet of paper and printed by the browser or saved as a PDF. Items and settings stay on this device.
  */
-
-export interface StudioItem {
-    id: string;
-    title: string;
-    episode: string;
-    pic: string;
-    tracks: string[];
-    model: string;
-}
-
-interface StudioSettings {
-    shape: "round" | "square";
-    diameter: number;
-    width: number;
-    height: number;
-    mode: "both" | "image" | "text";
-    text: "title" | "tracks";
-    paper: "A4" | "A5" | "Letter";
-    marginTop: number;
-    marginLeft: number;
-    gapX: number;
-    gapY: number;
-    bleed: number;
-    fontSize: number;
-    background: string;
-    imageScale: number;
-    border: boolean;
-    showModel: boolean;
-}
-
-const DEFAULTS: StudioSettings = {
-    shape: "round",
-    diameter: 40,
-    width: 50,
-    height: 30,
-    mode: "both",
-    text: "title",
-    paper: "A4",
-    marginTop: 10,
-    marginLeft: 10,
-    gapX: 5,
-    gapY: 5,
-    bleed: 0,
-    fontSize: 11,
-    background: "#ffffff",
-    imageScale: 100,
-    border: true,
-    showModel: false,
-};
 
 /** label sheets with their layout (the same presets as the classic UI) */
 const PRESETS: Record<string, { label: string; settings: Partial<StudioSettings> }> = {
@@ -75,8 +33,6 @@ const PRESETS: Record<string, { label: string; settings: Partial<StudioSettings>
     avery40rnd: { label: "Avery 40-RND", settings: { shape: "round", paper: "A4", marginTop: 13, marginLeft: 15, bleed: 1, gapX: 6, gapY: 6, border: false } },
     avery5160: { label: "Avery 5160", settings: { shape: "square", paper: "A4", marginTop: 5, marginLeft: 8, bleed: 1, gapX: 12, gapY: 8, border: false } },
 };
-
-const PAPER_MM = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] } as const;
 
 const load = <T,>(key: string, fallback: T): T => {
     try {
@@ -102,6 +58,7 @@ const itemOf = (info: TonieInfo, id = `${info.model || info.series}-${Date.now()
     pic: info.picture || "",
     tracks: info.tracks ?? [],
     model: info.model || "",
+    language: info.language,
 });
 
 /** the styles of the printed sheet, also used by the preview (styles.css repeats them for the screen) */
@@ -109,10 +66,13 @@ const PRINT_CSS = `
 body { margin: 0; font-family: system-ui, sans-serif; }
 .studio-paper { display: grid; align-content: start; justify-content: start; box-sizing: border-box; overflow: hidden; background: #fff; color: #000; break-after: page; page-break-after: always; }
 .studio-paper:last-child { break-after: auto; page-break-after: auto; }
-.studio-label { display: flex; align-items: center; justify-content: center; flex-direction: column; overflow: hidden; box-sizing: border-box; text-align: center; line-height: 1.2; padding: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.studio-label { position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; overflow: hidden; box-sizing: border-box; text-align: center; line-height: 1.2; padding: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .studio-label:not(.text) { padding: 0; }
 .studio-label img { object-fit: cover; flex-shrink: 0; }
 .studio-label ol { margin: 0; padding-left: 1.4em; text-align: left; font-size: 0.8em; }
+.studio-series { position: absolute; top: 12%; left: 10%; right: 10%; transform: translateY(-50%); font-weight: 700; color: #fff; text-shadow: 0 0 0.6mm #000, 0 0 0.6mm #000; white-space: nowrap; overflow: hidden; }
+.studio-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.studio-flag { width: 6mm !important; height: 4mm !important; margin-top: 1mm; object-fit: contain !important; }
 `;
 
 /** prints the sheet alone in a hidden frame, so nothing else of the page takes room on paper */
@@ -124,7 +84,7 @@ const printSheet = (paper: StudioSettings["paper"]) => {
     document.body.appendChild(frame);
     const doc = frame.contentDocument!;
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper} portrait; margin: 0; }${PRINT_CSS}</style></head><body>${pages.map((p) => p.outerHTML).join("")}</body></html>`);
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper} portrait; margin: 0; }${PRINT_CSS}${fontFaces()}</style></head><body>${pages.map((p) => p.outerHTML).join("")}</body></html>`);
     doc.close();
     const images = [...doc.images];
     Promise.all(images.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => (img.onload = img.onerror = r))))).then(() => {
@@ -133,9 +93,6 @@ const printSheet = (paper: StudioSettings["paper"]) => {
         window.setTimeout(() => frame.remove(), 1000);
     });
 };
-
-/** labels per item: picture and/or text */
-const labelsPerItem = (s: StudioSettings) => (s.mode === "both" ? 2 : 1);
 
 const fmt = (n: number) => Number(n.toFixed(3)).toString();
 
@@ -168,10 +125,9 @@ const cutSvg = (s: StudioSettings, count: number) => {
  * the cut lines: one SVG for a full sheet (the same for all full ones) and, when the last sheet is
  * not full, one for it; both together as a zip
  */
-const downloadCut = (s: StudioSettings, items: number) => {
+const downloadCut = (s: StudioSettings, total: number) => {
     const { cols, rows } = sheetGrid(s);
     const per = cols * rows;
-    const total = items * labelsPerItem(s);
     const full = Math.floor(total / per);
     const rest = total % per;
     const name = `teddystudio-${s.paper.toLowerCase()}-${s.shape === "round" ? `${s.diameter}mm` : `${s.width}x${s.height}mm`}`;
@@ -190,14 +146,6 @@ const downloadCut = (s: StudioSettings, items: number) => {
     window.setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 };
 
-/** black or white, whichever reads better on the background */
-const textOn = (hex: string) => {
-    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-    if (!m) return "#000";
-    const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16));
-    return r * 0.299 + g * 0.587 + b * 0.114 > 150 ? "#000" : "#fff";
-};
-
 export function StudioPage() {
     const ui = useUi();
     const tags = useAllTags();
@@ -206,6 +154,17 @@ export function StudioPage() {
     const [adding, setAdding] = useState(false);
     const [editing, setEditing] = useState<StudioItem | null>(null);
 
+    const imageInput = useRef<HTMLInputElement>(null);
+    const qc = useQueryClient();
+
+    // the bundled fonts for the preview
+    useEffect(() => {
+        if (document.getElementById("studio-fonts")) return;
+        const style = document.createElement("style");
+        style.id = "studio-fonts";
+        style.textContent = fontFaces();
+        document.head.appendChild(style);
+    }, []);
     useEffect(() => setPref("studio.items", JSON.stringify(items)), [items]);
     useEffect(() => setPref("studio.settings", JSON.stringify(s)), [s]);
     const set = (patch: Partial<StudioSettings>) => setS((prev) => ({ ...prev, ...patch }));
@@ -236,6 +195,53 @@ export function StudioPage() {
         );
     };
 
+    /** pictures of this device, only for this print: they stay in the list, not in the library */
+    const addImages = async (files: FileList) => {
+        const added: StudioItem[] = [];
+        for (const file of [...files]) {
+            const small = await shrinkImage(file, file.name).catch(() => file);
+            const pic = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(small);
+            });
+            added.push(itemOf({ series: file.name.replace(/\.[^.]+$/, ""), episode: "", picture: pic, tracks: [], model: "" }));
+        }
+        setItems((prev) => [...prev, ...added]);
+    };
+
+    // making the PDF takes a while; phones hand out a file only on a tap, so it is offered afterwards
+    const [made, setMade] = useState<{ file: File; missing: number } | null>(null);
+    const pdf = async (list = items) => {
+        ui.toast("info", t("studioPdfMaking"));
+        const r = await ui.run(() => studioPdf(list, s));
+        if (r) setMade({ file: new File([r.blob], `teddystudio-${new Date().toISOString().slice(0, 10)}.pdf`, { type: "application/pdf" }), missing: r.missing });
+    };
+
+    /**
+     * teddyCloud keeps the pictures of tonies.json itself from now on (/cache/…, loadable for the PDF);
+     * the labels get these addresses and the PDF is made again
+     */
+    const cachePictures = async () => {
+        const list = await ui.run(async () => {
+            await tc.setSetting("tonie_json.cache_images", true);
+            await tc.reloadToniesJson();
+            return Promise.all(
+                items.map(async (item) => {
+                    if (!/^https?:/.test(item.pic) || !item.model) return item;
+                    const hit = (await tc.searchTonies(item.model).catch(() => [])).find((x) => x.model === item.model);
+                    return hit?.picture && !/^https?:/.test(hit.picture) ? { ...item, pic: hit.picture } : item;
+                }),
+            );
+        });
+        if (!list) return;
+        setItems(list);
+        qc.invalidateQueries({ queryKey: keys.allTags });
+        setMade(null);
+        ui.toast("ok", t("studioCacheOn"));
+        await pdf(list);
+    };
+
     return (
         <Page
             title={t("teddyStudio")}
@@ -243,8 +249,11 @@ export function StudioPage() {
             back="/more"
             right={
                 <>
-                    <button className="icon-btn" onClick={() => downloadCut(s, items.length)} disabled={!items.length} aria-label={t("studioCutSvg")} title={t("studioCutSvg")}>
+                    <button className="icon-btn" onClick={() => downloadCut(s, labelList(items, s).length)} disabled={!items.length} aria-label={t("studioCutSvg")} title={t("studioCutSvg")}>
                         <Scissors size={20} />
+                    </button>
+                    <button className="icon-btn" onClick={() => pdf()} disabled={!items.length} aria-label={t("studioPdf")} title={t("studioPdf")}>
+                        <FileDown size={20} />
                     </button>
                     <button className="icon-btn" onClick={() => printSheet(s.paper)} disabled={!items.length} aria-label={t("studioPrint")} title={t("studioPrint")}>
                         <Printer size={20} />
@@ -267,6 +276,18 @@ export function StudioPage() {
                         <Row icon={<Plus size={17} />} title={t("studioAdd")} accent onClick={() => setAdding(true)} chevron={false} />
                         <Row icon={<ListPlus size={17} />} title={t("studioAddMine")} onClick={addMine} chevron={false} disabled={!tags.data} />
                         <Row icon={<FolderPlus size={17} />} title={t("studioAddFolder")} onClick={() => setPickFolder(true)} chevron={false} />
+                        <Row icon={<ImagePlus size={17} />} title={t("studioAddImage")} sub={t("studioAddImageHint")} onClick={() => imageInput.current?.click()} chevron={false} />
+                        <input
+                            ref={imageInput}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden-input"
+                            onChange={(e) => {
+                                if (e.target.files?.length) addImages(e.target.files);
+                                e.target.value = "";
+                            }}
+                        />
                         {items.map((item) => (
                             <Row
                                 key={item.id}
@@ -303,6 +324,7 @@ export function StudioPage() {
                     )}
                 </div>
             </div>
+            <PdfSheet made={made} onClose={() => setMade(null)} onCachePictures={cachePictures} />
             <AddSheet open={adding} onClose={() => setAdding(false)} onAdd={addInfos} />
             <LibraryPicker
                 open={pickFolder}
@@ -315,6 +337,7 @@ export function StudioPage() {
                 }}
             />
             <EditSheet
+                s={s}
                 item={editing}
                 onClose={() => setEditing(null)}
                 onSave={(item) => setItems((prev) => prev.map((x) => (x.id === item.id ? item : x)))}
@@ -333,7 +356,131 @@ function NumberField({ label, value, onChange, unit = "mm", step = 1 }: { label:
     );
 }
 
+/** the settings a label may have of its own; the sheet has them too */
+const LABEL_FIELDS: {
+    key: keyof LabelSettings;
+    label: () => string;
+    kind: "number" | "select" | "color" | "bool";
+    unit?: string;
+    step?: number;
+    options?: () => { value: string; label: string }[];
+}[] = [
+    { key: "mode", label: () => t("studioMode"), kind: "select", options: () => [{ value: "both", label: t("studioBoth") }, { value: "image", label: t("studioImage") }, { value: "text", label: t("studioText") }] },
+    { key: "text", label: () => t("studioTextLabel"), kind: "select", options: () => [{ value: "title", label: t("studioTitle") }, { value: "tracks", label: t("studioTracks") }] },
+    { key: "font", label: () => t("studioFont"), kind: "select", options: () => FONTS.map((f) => ({ value: f.css, label: f.label })) },
+    { key: "fontSize", label: () => t("studioFontSize"), kind: "number", unit: "pt" },
+    { key: "padding", label: () => t("studioPadding"), kind: "number", unit: "mm", step: 0.5 },
+    { key: "background", label: () => t("studioBackground"), kind: "color" },
+    { key: "imageScale", label: () => t("studioImageScale"), kind: "number", unit: "%", step: 5 },
+    {
+        key: "imageAlign",
+        label: () => t("studioImageAlign"),
+        kind: "select",
+        options: () => (["center", "top", "bottom", "left", "right"] as const).map((v) => ({ value: v, label: t(`studioAlign_${v}`) })),
+    },
+    { key: "imageOffsetX", label: () => t("studioImageOffsetX"), kind: "number", unit: "mm", step: 0.5 },
+    { key: "imageOffsetY", label: () => t("studioImageOffsetY"), kind: "number", unit: "mm", step: 0.5 },
+    { key: "seriesFontSize", label: () => t("studioSeriesFontSize"), kind: "number", unit: "pt" },
+    { key: "seriesOnImage", label: () => t("studioSeriesOnImage"), kind: "bool" },
+    { key: "rotateSeries", label: () => t("studioRotateSeries"), kind: "bool" },
+    { key: "showModel", label: () => t("studioShowModel"), kind: "bool" },
+    { key: "flag", label: () => t("studioFlag"), kind: "bool" },
+];
+
+/** the label settings; with changed/reset the fields that differ from the sheet get a reset button */
+function LabelFields({
+    value,
+    onChange,
+    changed,
+    onReset,
+}: {
+    value: LabelSettings;
+    onChange: (patch: Partial<LabelSettings>) => void;
+    changed?: (key: keyof LabelSettings) => boolean;
+    onReset?: (key: keyof LabelSettings) => void;
+}) {
+    const reset = (key: keyof LabelSettings) =>
+        changed?.(key) && (
+            <button type="button" className="btn ghost small" style={{ padding: 0, height: "auto" }} onClick={() => onReset?.(key)} aria-label={t("reset")} title={t("reset")}>
+                <RotateCcw size={13} />
+            </button>
+        );
+    const field = (f: (typeof LABEL_FIELDS)[number]) => {
+        const v = value[f.key];
+        return (
+            <label key={f.key} className="studio-field">
+                <span>
+                    {f.label()} {reset(f.key)}
+                </span>
+                {f.kind === "select" ? (
+                    <select className="select" value={String(v)} onChange={(e) => onChange({ [f.key]: e.target.value })}>
+                        {f.options!().map((o) => (
+                            <option key={o.value} value={o.value}>
+                                {o.label}
+                            </option>
+                        ))}
+                    </select>
+                ) : f.kind === "color" ? (
+                    <input type="color" value={String(v)} onChange={(e) => onChange({ [f.key]: e.target.value })} />
+                ) : (
+                    <input className="input" type="number" step={f.step ?? 1} value={Number(v)} onChange={(e) => onChange({ [f.key]: Number(e.target.value) || 0 })} />
+                )}
+                {f.unit && <span className="muted small">{f.unit}</span>}
+            </label>
+        );
+    };
+    return (
+        <>
+            <div className="studio-settings">{LABEL_FIELDS.filter((f) => f.kind !== "bool").map(field)}</div>
+            {LABEL_FIELDS.filter((f) => f.kind === "bool").map((f) => (
+                <SwitchRow
+                    key={f.key}
+                    title={
+                        <>
+                            {f.label()} {reset(f.key)}
+                        </>
+                    }
+                    checked={Boolean(value[f.key])}
+                    onChange={(on) => onChange({ [f.key]: on })}
+                />
+            ))}
+        </>
+    );
+}
+
+/** templates of the user: whole settings under a name */
+const loadTemplates = (): Record<string, StudioSettings> => {
+    try {
+        return JSON.parse(getPref("studio.templates", "{}"));
+    } catch {
+        return {};
+    }
+};
+
 function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial<StudioSettings>) => void }) {
+    const ui = useUi();
+    const [templates, setTemplates] = useState(loadTemplates);
+    const store = (next: Record<string, StudioSettings>) => {
+        setTemplates(next);
+        setPref("studio.templates", JSON.stringify(next));
+    };
+    const saveTemplate = async () => {
+        const name = await ui.prompt({ title: t("studioSaveTemplate"), label: t("name") });
+        if (name) store({ ...templates, [name]: s });
+    };
+    const deleteTemplate = () =>
+        ui.actions(
+            t("studioDeleteTemplate"),
+            Object.keys(templates).map((name) => ({
+                label: name,
+                icon: <Trash2 size={17} />,
+                danger: true,
+                onSelect: () => {
+                    const { [name]: _, ...rest } = templates;
+                    store(rest);
+                },
+            })),
+        );
     return (
         <Section title={t("studioLabels")}>
             <div className="studio-settings">
@@ -343,29 +490,25 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
                         className="select"
                         value=""
                         onChange={(e) => {
-                            const p = PRESETS[e.target.value];
-                            if (p) set(p.settings);
+                            const [kind, id] = e.target.value.split(":", 2);
+                            if (kind === "preset") set(PRESETS[id].settings);
+                            if (kind === "own") set(templates[id]);
                         }}
                     >
                         <option value="">{t("studioPresetPick")}</option>
                         {Object.entries(PRESETS).map(([id, p]) => (
-                            <option key={id} value={id}>
+                            <option key={id} value={`preset:${id}`}>
                                 {p.label}
+                            </option>
+                        ))}
+                        {Object.keys(templates).map((name) => (
+                            <option key={name} value={`own:${name}`}>
+                                {name}
                             </option>
                         ))}
                     </select>
                 </label>
                 <Segmented value={s.shape} onChange={(shape) => set({ shape })} options={[{ value: "round", label: t("studioRound") }, { value: "square", label: t("studioSquare") }]} />
-                <Segmented
-                    value={s.mode}
-                    onChange={(mode) => set({ mode })}
-                    options={[
-                        { value: "both", label: t("studioBoth") },
-                        { value: "image", label: t("studioImage") },
-                        { value: "text", label: t("studioText") },
-                    ]}
-                />
-                <Segmented value={s.text} onChange={(text) => set({ text })} options={[{ value: "title", label: t("studioTitle") }, { value: "tracks", label: t("studioTracks") }]} />
                 {s.shape === "round" ? (
                     <NumberField label={t("studioDiameter")} value={s.diameter} onChange={(diameter) => set({ diameter })} />
                 ) : (
@@ -387,73 +530,103 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
                 <NumberField label={t("studioGapX")} value={s.gapX} onChange={(gapX) => set({ gapX })} />
                 <NumberField label={t("studioGapY")} value={s.gapY} onChange={(gapY) => set({ gapY })} />
                 <NumberField label={t("studioBleed")} value={s.bleed} onChange={(bleed) => set({ bleed })} step={0.5} />
-                <NumberField label={t("studioFontSize")} value={s.fontSize} onChange={(fontSize) => set({ fontSize })} unit="pt" />
-                <NumberField label={t("studioImageScale")} value={s.imageScale} onChange={(imageScale) => set({ imageScale })} unit="%" step={5} />
-                <label className="studio-field">
-                    <span>{t("studioBackground")}</span>
-                    <input type="color" value={s.background} onChange={(e) => set({ background: e.target.value })} />
-                </label>
             </div>
             <SwitchRow title={t("studioBorder")} sub={t("studioBorderHint")} checked={s.border} onChange={(border) => set({ border })} />
-            <SwitchRow title={t("studioShowModel")} checked={s.showModel} onChange={(showModel) => set({ showModel })} />
-            <Row title={t("studioReset")} onClick={() => set(DEFAULTS)} chevron={false} />
+            <LabelFields value={s} onChange={set} />
+            <Row icon={<Save size={17} />} title={t("studioSaveTemplate")} onClick={saveTemplate} chevron={false} />
+            {Object.keys(templates).length > 0 && <Row icon={<Trash2 size={17} />} title={t("studioDeleteTemplate")} onClick={deleteTemplate} chevron={false} />}
+            <Row icon={<RotateCcw size={17} />} title={t("studioReset")} onClick={() => set(DEFAULTS)} chevron={false} />
         </Section>
     );
 }
 
-/**
- * how many labels fit on a sheet: columns and rows between the margins (the right and bottom
- * margin taken as the left and top one), at least one of each
- */
-const sheetGrid = (s: StudioSettings) => {
-    const [pw, ph] = PAPER_MM[s.paper];
-    const w = s.shape === "round" ? s.diameter : s.width;
-    const h = s.shape === "round" ? s.diameter : s.height;
-    const cols = Math.max(1, Math.floor((pw - 2 * s.marginLeft + s.gapX + 0.01) / (w + s.gapX)));
-    const rows = Math.max(1, Math.floor((ph - 2 * s.marginTop + s.gapY + 0.01) / (h + s.gapY)));
-    return { pw, ph, w, h, cols, rows };
-};
+/** the picture of a flag, loaded when needed */
+const useFlag = (language?: string) => useQuery({ queryKey: ["flag", language], queryFn: () => flagUrl(language), enabled: Boolean(language), staleTime: Infinity }).data;
+
+/** text along the upper arc of a round label, as the PDF draws it */
+function ArcText({ id, text, e, w }: { id: string; text: string; e: StudioSettings; w: number }) {
+    const size = (e.seriesFontSize * 0.3528 * 100) / w;
+    const r = 50 - size * 0.9;
+    return (
+        <svg className="studio-arc" viewBox="0 0 100 100">
+            <path id={id} d={`M ${50 - r},50 A ${r},${r} 0 0,1 ${50 + r},50`} fill="none" />
+            <text fontSize={size} fontWeight={700} fontFamily={e.font} fill="#fff" stroke="rgba(0,0,0,0.75)" strokeWidth={size / 5} paintOrder="stroke" dominantBaseline="middle">
+                <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">
+                    {text}
+                </textPath>
+            </text>
+        </svg>
+    );
+}
+
+function LabelView({ label: { item, e, kind }, s, index }: { label: ReturnType<typeof labelList>[number]; s: StudioSettings; index: number }) {
+    const { w, h } = sheetGrid(s);
+    const round = s.shape === "round";
+    const flag = useFlag(kind === "text" && e.flag ? item.language : undefined);
+    const style: CSSProperties = {
+        width: `${w}mm`,
+        height: `${h}mm`,
+        borderRadius: round ? "50%" : "2mm",
+        background: e.background,
+        color: textOn(e.background),
+        border: s.border ? "0.2mm solid #999" : "none",
+        fontSize: `${e.fontSize}pt`,
+        fontFamily: e.font,
+        padding: kind === "text" ? (round ? `${e.padding}mm calc(10% + ${e.padding}mm)` : `${e.padding}mm`) : 0,
+    };
+    if (kind === "image") {
+        const [fx, fy] = ALIGN[e.imageAlign];
+        return (
+            <div className="studio-label" style={style}>
+                {item.pic && (
+                    <img
+                        src={picUrl(item.pic)}
+                        alt=""
+                        style={{
+                            width: `calc(100% + ${2 * s.bleed}mm)`,
+                            height: `calc(100% + ${2 * s.bleed}mm)`,
+                            margin: `-${s.bleed}mm`,
+                            objectPosition: `${fx * 100}% ${fy * 100}%`,
+                            transform: `translate(${e.imageOffsetX}mm, ${-e.imageOffsetY}mm) scale(${e.imageScale / 100})`,
+                        }}
+                    />
+                )}
+                {e.seriesOnImage &&
+                    item.title &&
+                    (round && e.rotateSeries ? (
+                        <ArcText id={`arc-${index}`} text={item.title} e={e} w={w} />
+                    ) : (
+                        <div className="studio-series" style={{ fontSize: `${e.seriesFontSize}pt` }}>
+                            {item.title}
+                        </div>
+                    ))}
+            </div>
+        );
+    }
+    return (
+        <div className="studio-label text" style={style}>
+            {e.text === "tracks" && item.tracks.length ? (
+                <ol>
+                    {item.tracks.map((tr, i) => (
+                        <li key={i}>{tr}</li>
+                    ))}
+                </ol>
+            ) : (
+                <div>
+                    <strong>{item.title}</strong>
+                    {item.episode && <div>{item.episode}</div>}
+                </div>
+            )}
+            {e.showModel && item.model && <small>{item.model}</small>}
+            {flag && <img className="studio-flag" src={flag} alt="" />}
+        </div>
+    );
+}
 
 /** the printed sheets, one per page of the paper size; on screen a scaled preview of each */
 function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
     const { pw, ph, w, h, cols, rows } = sheetGrid(s);
-    const label: CSSProperties = {
-        width: `${w}mm`,
-        height: `${h}mm`,
-        borderRadius: s.shape === "round" ? "50%" : "2mm",
-        background: s.background,
-        color: textOn(s.background),
-        border: s.border ? "0.2mm solid #999" : "none",
-        fontSize: `${s.fontSize}pt`,
-    };
-    const labels = items.flatMap((item) => [
-        s.mode !== "text" && (
-            <div key={`${item.id}-i`} className="studio-label" style={label}>
-                <img
-                    src={picUrl(item.pic)}
-                    alt=""
-                    style={{ width: `calc(100% + ${2 * s.bleed}mm)`, height: `calc(100% + ${2 * s.bleed}mm)`, margin: `-${s.bleed}mm`, transform: `scale(${s.imageScale / 100})` }}
-                />
-            </div>
-        ),
-        s.mode !== "image" && (
-            <div key={`${item.id}-t`} className="studio-label text" style={label}>
-                {s.text === "tracks" && item.tracks.length ? (
-                    <ol>
-                        {item.tracks.map((tr, i) => (
-                            <li key={i}>{tr}</li>
-                        ))}
-                    </ol>
-                ) : (
-                    <div>
-                        <strong>{item.title}</strong>
-                        {item.episode && <div>{item.episode}</div>}
-                    </div>
-                )}
-                {s.showModel && item.model && <small>{item.model}</small>}
-            </div>
-        ),
-    ]).filter(Boolean);
+    const labels = labelList(items, s).map((l, i) => <LabelView key={`${l.item.id}-${l.kind}`} label={l} s={s} index={i} />);
     const perPage = cols * rows;
     const pages = Array.from({ length: Math.max(1, Math.ceil(labels.length / perPage)) }, (_, i) => labels.slice(i * perPage, (i + 1) * perPage));
     return (
@@ -538,7 +711,7 @@ function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void
     );
 }
 
-function EditSheet({ item, onClose, onSave }: { item: StudioItem | null; onClose: () => void; onSave: (item: StudioItem) => void }) {
+function EditSheet({ s, item, onClose, onSave }: { s: StudioSettings; item: StudioItem | null; onClose: () => void; onSave: (item: StudioItem) => void }) {
     const [draft, setDraft] = useState<StudioItem | null>(item);
     useEffect(() => setDraft(item), [item]);
     if (!draft) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
@@ -548,11 +721,13 @@ function EditSheet({ item, onClose, onSave }: { item: StudioItem | null; onClose
             <input className="input" value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
         </div>
     );
+    const overrides = draft.overrides ?? {};
     return (
         <Sheet
             open={!!item}
             onClose={onClose}
             title={t("studioEdit")}
+            full
             footer={
                 <>
                     <button className="btn" onClick={onClose}>
@@ -572,10 +747,87 @@ function EditSheet({ item, onClose, onSave }: { item: StudioItem | null; onClose
         >
             {field("title", t("studioTitle"))}
             {field("episode", t("studioEpisode"))}
-            {field("pic", t("studioPicture"))}
+            {!draft.pic.startsWith("data:") && field("pic", t("studioPicture"))}
             <div className="field">
                 <label>{t("studioTracks")}</label>
                 <textarea className="input" rows={6} value={draft.tracks.join("\n")} onChange={(e) => setDraft({ ...draft, tracks: e.target.value.split("\n") })} />
+            </div>
+            <Section
+                title={t("studioThisLabel")}
+                footer={t("studioThisLabelHint")}
+                right={
+                    Object.keys(overrides).length > 0 && (
+                        <button className="btn ghost small" onClick={() => setDraft({ ...draft, overrides: undefined })}>
+                            {t("reset")}
+                        </button>
+                    )
+                }
+            >
+                <LabelFields
+                    value={effective(s, draft)}
+                    onChange={(patch) => setDraft({ ...draft, overrides: { ...overrides, ...patch } })}
+                    changed={(key) => key in overrides}
+                    onReset={(key) => {
+                        const { [key]: _, ...rest } = overrides;
+                        setDraft({ ...draft, overrides: rest });
+                    }}
+                />
+            </Section>
+        </Sheet>
+    );
+}
+
+/** the finished PDF: share (phones), save or open it */
+function PdfSheet({ made, onClose, onCachePictures }: { made: { file: File; missing: number } | null; onClose: () => void; onCachePictures: () => Promise<void> }) {
+    const access = useAccess();
+    const [busy, setBusy] = useState(false);
+    const canShare = made !== null && typeof navigator.canShare === "function" && navigator.canShare({ files: [made.file] });
+    const cacheImages = async () => {
+        setBusy(true);
+        await onCachePictures();
+        setBusy(false);
+    };
+    return (
+        <Sheet open={made !== null} onClose={onClose} title={t("studioPdfReady")}>
+            {made && made.missing > 0 && (
+                <Notice>
+                    {t("studioPdfMissing", { n: made.missing })}. {t("studioPdfMissingHint")}
+                    {access.canServerSettings && (
+                        <div className="mt">
+                            <button className="btn soft small" onClick={cacheImages} disabled={busy}>
+                                {busy ? <span className="spinner small" /> : null}
+                                {t("studioCacheTurnOn")}
+                            </button>
+                            <div className="small muted" style={{ marginTop: 6 }}>
+                                {t("studioCacheTurnOnHint")}
+                            </div>
+                        </div>
+                    )}
+                </Notice>
+            )}
+            <div className="list mt">
+                {canShare && (
+                    <Row
+                        icon={<Share2 size={17} />}
+                        title={t("studioPdfShare")}
+                        sub={t("studioPdfShareHint")}
+                        onClick={() => navigator.share({ files: [made!.file], title: made!.file.name }).then(onClose, () => undefined)}
+                        chevron={false}
+                    />
+                )}
+                <Row icon={<FileDown size={17} />} title={t("studioPdf")} sub={made?.file.name} onClick={() => {
+                        if (made) saveFile(made.file.name, made.file, "application/pdf");
+                        onClose();
+                    }} chevron={false} />
+                <Row
+                    icon={<ExternalLink size={17} />}
+                    title={t("studioPdfOpen")}
+                    onClick={() => {
+                        if (made) window.open(URL.createObjectURL(made.file), "_blank");
+                        onClose();
+                    }}
+                    chevron={false}
+                />
             </div>
         </Sheet>
     );

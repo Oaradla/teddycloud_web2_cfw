@@ -1,10 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Disc3, KeyRound, Lock, LogIn, Plus, ShieldAlert, ShieldCheck, Trash2, Unlock, UserPlus, Users, Wifi } from "lucide-react";
+import { Disc3, FolderOpen, Image, KeyRound, Radio, Shapes, Lock, LogIn, Plus, ShieldAlert, ShieldCheck, Trash2, Unlock, UserPlus, Users, Wifi } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AclCatalog, AclGroup, auth, AuthUser } from "../../api/auth";
 import { tc } from "../../api/tc";
 import { useAccess } from "../../lib/access";
-import { ago, dateTime } from "../../lib/format";
+import { useNavigate } from "react-router-dom";
+import { ago, dateTime, ruidPretty } from "../../lib/format";
+import { useAllTags, useBoxes } from "../../lib/queries";
+import { Fold } from "../../ui/Fold";
 import { t } from "../../lib/i18n";
 import { buildRightsTree } from "../../lib/rightsTree";
 import { Sheet } from "../../ui/Sheet";
@@ -45,6 +48,7 @@ export function UsersPage() {
         );
 
     const u = users.data;
+    const client = access.status?.client;
     const hasAdmin = u?.users.some((x) => (x.level ?? "admin") === "admin");
 
     const toggleLogin = async (on: boolean) => {
@@ -182,6 +186,22 @@ export function UsersPage() {
                 </Section>
             )}
 
+            {client && access.admin && (
+                <Section
+                    title={t("externalAccess")}
+                    footer={
+                        <>
+                            {t("externalAccessHint")} <a href="#/settings">{t("openSettings")}</a>
+                        </>
+                    }
+                >
+                    {client.forwardedForIgnored && <Notice>{t("untrustedProxy", { ip: client.ip })}</Notice>}
+                    <Row icon={<Wifi size={17} />} title={t("yourAddress")} value={<span className="mono selectable">{client.ip}</span>} />
+                    <Row title={t("network")} value={t(client.lan ? "networkLan" : "networkRemote")} />
+                    <Row title={t("connection")} value={`${client.secure ? "HTTPS" : "HTTP"}${client.viaTrustedProxy ? " · " + t("viaProxy") : ""}`} />
+                </Section>
+            )}
+
             <UserSheet
                 user={edit}
                 onClose={() => setEdit(null)}
@@ -216,6 +236,46 @@ const groupOptions = (levels: string[], groups: AclGroup[]) => [
     ...groups.filter((g) => levels.includes(g.base)).map((g) => ({ value: `group:${g.id}`, label: g.name })),
 ];
 const groupChange = (value: string) => (value.startsWith("group:") ? { group: value.slice(6) } : { level: value, group: "" });
+
+/** what the user owns or has shared, each list opens on a tap */
+function OwnedSection({ username, onOpen }: { username: string; onOpen: () => void }) {
+    const owned = useQuery({ queryKey: ["aclOwned", username], queryFn: () => auth.owned(username) });
+    const boxes = useBoxes();
+    const tags = useAllTags();
+    const navigate = useNavigate();
+    if (!owned.data) return null;
+    const open = (to: string) => {
+        onOpen();
+        navigate(to);
+    };
+    const boxName = (id: string) => boxes.data?.find((b) => b.ID === id)?.boxName || id;
+    const tonieName = (ruid: string) => {
+        const info = tags.data?.find((x) => x.ruid.toUpperCase() === ruid)?.tonieInfo;
+        return info?.series ? `${info.series}${info.episode ? ` – ${info.episode}` : ""}` : ruidPretty(ruid);
+    };
+    const groups = [
+        { key: "boxes", title: t("boxes"), icon: <Radio size={17} />, name: boxName, to: (id: string) => `/box/${id}` },
+        { key: "tonies", title: t("tonies"), icon: <Disc3 size={17} />, name: tonieName, to: (id: string) => `/tonie/${id.toLowerCase()}` },
+        { key: "folders", title: t("library"), icon: <FolderOpen size={17} />, name: (id: string) => id, to: (id: string) => `/library?path=${encodeURIComponent(id)}` },
+        { key: "models", title: t("customModels"), icon: <Shapes size={17} />, name: (id: string) => id, to: () => "/models" },
+        { key: "images", title: t("pictures"), icon: <Image size={17} />, name: (id: string) => id, to: () => "/models" },
+    ] as const;
+    return (
+        <Section title={t("ownedBy", { name: username })}>
+            {groups.map((g) => {
+                const items = owned.data[g.key] ?? [];
+                const mine = items.filter((x) => x.owner).length;
+                return (
+                    <Fold key={g.key} icon={g.icon} title={g.title} sub={t("ownedCount", { n: mine, shared: items.length - mine })}>
+                        {items.map((x) => (
+                            <Row key={x.id} title={g.name(x.id)} sub={x.owner ? t("ownerOne") : t("sharedRights", { rights: x.granted ?? "" })} onClick={() => open(g.to(x.id))} chevron />
+                        ))}
+                    </Fold>
+                );
+            })}
+        </Section>
+    );
+}
 
 function UserSheet({
     user,
@@ -324,6 +384,7 @@ function UserSheet({
                     )}
                 </Section>
                 {self && <p className="small muted">{t("editYourselfHint")}</p>}
+                <OwnedSection username={u.username} onOpen={onClose} />
             </Sheet>
             <PasswordSheet
                 open={pw}
@@ -436,7 +497,7 @@ function CreateUserSheet({
 function LimitsSheet({ which, catalog, onClose, onChanged }: { which: "user" | "guest" | "tonie" | "box" | null; catalog: AclCatalog; onClose: () => void; onChanged: () => void }) {
     const ui = useUi();
     const tree = useMemo(
-        () => (which === "tonie" ? buildRightsTree(catalog.rights, [], ["tonie"]) : buildRightsTree(catalog.rights, catalog.boxSettings ?? [], undefined, catalog.boxSettingGroups ?? {})),
+        () => (which === "tonie" ? buildRightsTree(catalog.rights.filter((r) => r.name !== "tonie.share"), [], ["tonie"]) : buildRightsTree(catalog.rights, catalog.boxSettings ?? [], undefined, catalog.boxSettingGroups ?? {})),
         [which, catalog],
     );
     const current = which === "user" ? catalog.levelLimits.user : which === "guest" ? catalog.levelLimits.guest : which === "tonie" ? catalog.unassigned.tonie : catalog.unassigned.box;

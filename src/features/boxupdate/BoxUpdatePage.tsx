@@ -1,14 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CloudDownload, Cpu, FileText, GitBranch, RefreshCw, Send, Trash2, UploadCloud } from "lucide-react";
+import { AlertTriangle, Check, CheckSquare, CloudDownload, Cpu, ExternalLink, FileText, GitBranch, RefreshCw, Send, Trash2, UploadCloud, X } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { tc } from "../../api/tc";
 import type { CfwBox, CfwChannel, CfwImage, CfwResult } from "../../api/types";
 import { ago, dateTime } from "../../lib/format";
 import { t } from "../../lib/i18n";
+import { useAccess } from "../../lib/access";
 import { keys, useBoxes, useBoxImage, useCfwBoxes } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
 import { Empty, ErrorBox, Loading, Notice, Page, Row, Section, Segmented, useUi } from "../../ui/kit";
+import { useSelection } from "../../ui/useSelection";
 import { cfwMessage } from "./cfwMessages";
 import { InstallGuide } from "./InstallGuide";
 
@@ -33,6 +35,17 @@ const imageLabel = (image: CfwImage) =>
 /** the images a box can take: its own platform; the original ESP32 firmware only for the return from the CFW */
 const imagesForBox = (images: CfwImage[], box: CfwBox) =>
     images.filter((i) => platformOf(i) === platformOf(box) && (!i.original || box.isCfw));
+
+const imageId = (i: CfwImage) => `${platformOf(i)}-${i.build}`;
+
+/** custom firmware images no box runs or has assigned, except the newest of each platform */
+const oldImages = (images: CfwImage[], boxes: CfwBox[]) => {
+    const newest = new Map<string, number>();
+    for (const i of images) if (!i.original) newest.set(platformOf(i), Math.max(newest.get(platformOf(i)) ?? 0, i.build));
+    const used = (i: CfwImage) =>
+        boxes.some((b) => platformOf(b) === platformOf(i) && [b.version, b.update?.target, b.update?.next].includes(i.build));
+    return images.filter((i) => !i.original && i.build !== newest.get(platformOf(i)) && !used(i));
+};
 
 /** an ESP32 box with the original firmware takes its assigned image once, through its own update check */
 const esp32Installs = (box: CfwBox) =>
@@ -59,6 +72,7 @@ const result = async (fn: () => Promise<CfwResult>): Promise<CfwResult> => {
 export function BoxUpdatePage() {
     const qc = useQueryClient();
     const ui = useUi();
+    const access = useAccess();
     const boxes = useCfwBoxes();
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, refetchInterval: 20_000 });
     const [image, setImage] = useState<CfwImage | null>(null);
@@ -73,12 +87,32 @@ export function BoxUpdatePage() {
         await refresh();
     };
 
+    const images = firmware.data?.images ?? [];
+    const sorted = [...images].sort((a, b) => b.build - a.build);
+    const sel = useSelection(
+        (id) => setImage(sorted.find((i) => imageId(i) === id) ?? null),
+        sorted.map(imageId),
+    );
+
     if (boxes.data === null) return <SupportOff />;
 
-    const images = firmware.data?.images ?? [];
+    /* users update the boxes they have the update right for; the builds are the admin's */
+    const mine = (boxes.data ?? []).filter((b) => access.can("box", b.id, "box.update"));
     // the guide is for the first box; once one runs the custom firmware it moves down, closed
-    const anyCfw = (boxes.data ?? []).some((b) => b.isCfw);
-    const sorted = [...images].sort((a, b) => b.build - a.build);
+    const anyCfw = mine.some((b) => b.isCfw);
+    const old = oldImages(images, boxes.data ?? []);
+    const chosen = sorted.filter((i) => sel.selected.has(imageId(i)));
+
+    const removeImages = async (list: CfwImage[], title: string) => {
+        const ok = await ui.confirm({ title, text: t("deleteImagesText", { n: list.length, v: list.map(imageLabel).join(", ") }), confirm: t("delete"), danger: true });
+        if (!ok) return;
+        let failed = 0;
+        for (const i of list) if (!(await tc.cfwDeleteFirmware(i).then((r) => r.ok, () => false))) failed++;
+        sel.clear();
+        if (failed) ui.toast("error", t("bulkFailed", { n: failed }));
+        else ui.toast("ok", t("deleted"));
+        await refresh();
+    };
 
     return (
         <Page
@@ -95,13 +129,13 @@ export function BoxUpdatePage() {
             {(boxes.isLoading || firmware.isLoading) && <Loading />}
             {firmware.error && <ErrorBox error={firmware.error} retry={() => firmware.refetch()} />}
 
-            {boxes.data && !anyCfw && <InstallGuide open />}
+            {boxes.data && !anyCfw && access.admin && <InstallGuide open />}
 
             {boxes.data && (
                 <Section title={t("boxes")} plain footer={t("boxUpdateBoxesHint")}>
-                    {boxes.data.length === 0 && <Empty icon={<Cpu size={28} />} title={t("noBoxes")} />}
+                    {mine.length === 0 && <Empty icon={<Cpu size={28} />} title={t("noBoxes")} />}
                     <div style={{ display: "grid", gap: 12 }}>
-                        {boxes.data.map((box) => (
+                        {mine.map((box) => (
                             <BoxCard key={box.id} box={box} images={images} notify={notify} />
                         ))}
                     </div>
@@ -112,18 +146,45 @@ export function BoxUpdatePage() {
                 <Section
                     title={t("firmwareLibrary")}
                     right={
-                        <button className="btn ghost small" onClick={() => setUpload(true)}>
-                            <UploadCloud size={16} />
-                            {t("upload")}
-                        </button>
+                        access.admin && (
+                            <>
+                                {sorted.length > 1 && (
+                                    <button className="btn ghost small" onClick={() => sel.setSelecting(true)}>
+                                        <CheckSquare size={16} />
+                                        {t("select")}
+                                    </button>
+                                )}
+                                <button className="btn ghost small" onClick={() => setUpload(true)}>
+                                    <UploadCloud size={16} />
+                                    {t("upload")}
+                                </button>
+                            </>
+                        )
                     }
                     footer={firmware.data.defaultPage ? t("defaultPage", { v: firmware.data.defaultPage.label }) : undefined}
                 >
                     {sorted.length === 0 && <Row title={t("noImages")} sub={t("noImagesHint")} />}
                     {sorted.map((i) => (
+                        <div key={imageId(i)} className="row-wrap" role="button" tabIndex={0} {...(access.admin ? sel.itemProps(imageId(i)) : {})}>
                         <Row
-                            key={`${platformOf(i)}-${i.build}`}
-                            icon={<Cpu size={17} />}
+                            className={sel.selected.has(imageId(i)) ? "checked" : ""}
+                            icon={sel.selecting ? undefined : <Cpu size={17} />}
+                            leading={
+                                sel.selecting ? (
+                                    <button
+                                        type="button"
+                                        className={`select-box ${sel.selected.has(imageId(i)) ? "checked" : ""}`}
+                                        aria-label={t("select")}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            sel.toggle(imageId(i), e.shiftKey);
+                                        }}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                    >
+                                        {sel.selected.has(imageId(i)) && <Check size={15} strokeWidth={3} />}
+                                    </button>
+                                ) : undefined
+                            }
                             title={
                                 <>
                                     {i.version || formatBuild(i.build)} <span className="badge">{platformName(i)}</span>{" "}
@@ -133,15 +194,31 @@ export function BoxUpdatePage() {
                             sub={[i.original ? "" : formatBuild(i.build), i.source === "github" ? `GitHub ${i.githubTag}` : t("uploaded"), i.pageLabel ? t("setupPageV", { v: i.pageLabel }) : "", i.notes]
                                 .filter(Boolean)
                                 .join(" · ")}
-                            onClick={() => setImage(i)}
                         />
+                        </div>
                     ))}
+                    {access.admin && old.length > 0 && (
+                        <Row icon={<Trash2 size={17} />} title={t("deleteOldImages", { n: old.length })} sub={t("deleteOldImagesHint")} danger onClick={() => removeImages(old, t("deleteOldImagesTitle"))} chevron={false} />
+                    )}
                 </Section>
             )}
 
-            {firmware.data && <GithubSection github={firmware.data.github} notify={notify} />}
+            {sel.selecting && (
+                <div className="select-bar" role="toolbar">
+                    <button className="icon-btn" onClick={sel.clear} aria-label={t("cancel")}>
+                        <X size={20} />
+                    </button>
+                    <span className="count">{chosen.length ? t("nSelected", { n: chosen.length }) : t("selectImages")}</span>
+                    <button className="btn danger small" disabled={!chosen.length} onClick={() => removeImages(chosen, t("deleteImages"))}>
+                        <Trash2 size={15} />
+                        {t("delete")}
+                    </button>
+                </div>
+            )}
 
-            {anyCfw && <InstallGuide open={false} />}
+            {firmware.data && access.admin && <GithubSection github={firmware.data.github} notify={notify} />}
+
+            {anyCfw && access.admin && <InstallGuide open={false} />}
 
             <ImageSheet image={image} onClose={() => setImage(null)} notify={notify} />
             <UploadSheet open={upload} onClose={() => setUpload(false)} notify={notify} />
@@ -151,11 +228,12 @@ export function BoxUpdatePage() {
 
 /** CFW support off (or not on this server): switch it on, and the guide */
 function SupportOff() {
+    const access = useAccess();
     const qc = useQueryClient();
     const ui = useUi();
     const enabled = useQuery({ queryKey: ["cfwEnabled"], queryFn: tc.cfwEnabled });
     if (enabled.isLoading) return <Loading />;
-    if (enabled.data !== "false")
+    if (enabled.data !== "false" || !access.admin)
         return (
             <Page title={t("boxUpdate")} back="/more" narrow>
                 <Empty icon={<Cpu size={28} />} title={t("noCfwSupport")} text={t("noCfwSupportText")} />
@@ -560,7 +638,7 @@ function GithubSection({ github, notify }: { github: { repo: string; autoDownloa
             </div>
             {github.releases.length > 0 && (
                 <div className="list mt">
-                    {github.releases.map((r) => (
+                    {github.releases.slice(0, 2).map((r) => (
                         <Row
                             key={r.tag}
                             title={
@@ -580,6 +658,14 @@ function GithubSection({ github, notify }: { github: { repo: string; autoDownloa
                             }
                         />
                     ))}
+                    {github.releases.length > 2 && (
+                        <Row
+                            icon={<ExternalLink size={17} />}
+                            title={t("githubOlder", { n: github.releases.length - 2 })}
+                            onClick={() => window.open(`https://github.com/${github.repo}/releases`, "_blank", "noopener")}
+                            chevron={false}
+                        />
+                    )}
                 </div>
             )}
             {!github.repo && (

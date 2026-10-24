@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, FileAudio, Folder, FolderPlus, ListMusic } from "lucide-react";
+import { Check, ChevronLeft, FileAudio, Folder, FolderPlus, FolderTree, ListMusic } from "lucide-react";
 import { useEffect, useState } from "react";
 import { backendUrl } from "../../api/client";
 import type { FileEntry } from "../../api/types";
@@ -9,6 +9,9 @@ import { tc } from "../../api/tc";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sheet } from "../../ui/Sheet";
 import { Empty, ErrorBox, Loading, Row, SearchField, useUi } from "../../ui/kit";
+import { getPref, setPref } from "../../lib/prefs";
+import { useDeepSearch } from "../../lib/deepSearch";
+import { DeepResults } from "./DeepResults";
 
 /** picks a TAF or TAP file of the library; returns "lib://<path>" */
 export function LibraryPicker({
@@ -35,6 +38,7 @@ export function LibraryPicker({
     const [path, setPath] = useState(startPath);
     const [filter, setFilter] = useState("");
     const [picked, setPicked] = useState<{ path: string; entry: FileEntry }[]>([]);
+    const [deep, setDeep] = useState(() => getPref("lib.deep", "") === "1");
     useEffect(() => {
         if (open) {
             setPath(startPath);
@@ -59,10 +63,17 @@ export function LibraryPicker({
     const qc = useQueryClient();
     usePrefetchSubfolders(path, open ? files.data : undefined);
     const prefetch = (p: string) => qc.prefetchQuery({ queryKey: keys.files(p), queryFn: () => tc.files(p), staleTime: 30_000 });
+    const pickable = (x: FileEntry) => x.isDir || (!folderMode && (multi ? isTaf(x.name) || isAudio(x.name) : isTaf(x.name) || isTap(x.name)));
+    const deepSearch = useDeepSearch(path, filter, deep);
+    const pick = (p: string, x: FileEntry) => {
+        if (multi) return togglePick(p, x);
+        onPick?.("lib://" + p.replace(/^\//, ""));
+        onClose();
+    };
     const f = filter.trim().toLowerCase();
     const list = (files.data ?? [])
         .filter((x) => x.name !== "." && x.name !== "..")
-        .filter((x) => x.isDir || (!folderMode && (multi ? isTaf(x.name) || isAudio(x.name) : isTaf(x.name) || isTap(x.name))))
+        .filter(pickable)
         .filter((x) => !f || x.name.toLowerCase().includes(f))
         .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name, undefined, { numeric: true }));
 
@@ -114,13 +125,44 @@ export function LibraryPicker({
                     </button>
                 )}
             </div>
-            <div style={{ marginBottom: 12 }}>
-                <SearchField value={filter} onChange={setFilter} placeholder={t("filterFolder")} />
+            <div className="toolbar" style={{ marginBottom: 12 }}>
+                <SearchField value={filter} onChange={setFilter} placeholder={deep ? t("searchSubfoldersPlaceholder") : t("filterFolder")} />
+                <button
+                    className={`icon-btn filled ${deep ? "on" : ""}`}
+                    onClick={() => {
+                        setDeep(!deep);
+                        setPref("lib.deep", deep ? "" : "1");
+                    }}
+                    aria-pressed={deep}
+                    aria-label={t("searchSubfolders")}
+                    title={t("searchSubfolders")}
+                >
+                    <FolderTree size={19} />
+                </button>
             </div>
-            {files.isLoading && <Loading />}
-            {files.error && <ErrorBox error={files.error} retry={() => files.refetch()} />}
-            {files.data && list.length === 0 && <Empty icon={<Folder size={28} />} title={t("folderEmpty")} />}
-            {list.length > 0 && (
+            {deepSearch.active && (
+                <DeepResults
+                    loading={deepSearch.loading}
+                    hits={deepSearch.hits.filter(({ entry }) => pickable(entry))}
+                    root={path}
+                    onOpen={(p, x) => {
+                        if (!x.isDir) return pick(p, x);
+                        setFilter("");
+                        setPath(p);
+                    }}
+                    right={(p, x) =>
+                        multi && !x.isDir ? (
+                            <span className={`select-box ${isPicked(p) ? "checked" : ""}`} style={{ position: "static", opacity: 1 }}>
+                                {isPicked(p) && <Check size={15} strokeWidth={3} />}
+                            </span>
+                        ) : undefined
+                    }
+                />
+            )}
+            {!deepSearch.active && files.isLoading && <Loading />}
+            {!deepSearch.active && files.error && <ErrorBox error={files.error} retry={() => files.refetch()} />}
+            {!deepSearch.active && files.data && list.length === 0 && <Empty icon={<Folder size={28} />} title={t("folderEmpty")} />}
+            {!deepSearch.active && list.length > 0 && (
                 <div className="list">
                     {list.map((x) => {
                         const p = joinPath(path, x.name);
@@ -156,11 +198,7 @@ export function LibraryPicker({
                                 }
                                 title={x.tonieInfo?.series ? `${x.tonieInfo.series}${x.tonieInfo.episode ? " – " + x.tonieInfo.episode : ""}` : x.name}
                                 sub={[lengthText(x.tafHeader?.lengthSeconds), bytes(x.size)].filter(Boolean).join(" · ")}
-                                onClick={() => {
-                                    if (multi) return togglePick(p, x);
-                                    onPick?.("lib://" + p.replace(/^\//, ""));
-                                    onClose();
-                                }}
+                                onClick={() => pick(p, x)}
                                 chevron={false}
                                 right={
                                     multi ? (

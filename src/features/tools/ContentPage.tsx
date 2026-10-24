@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileAudio, FileText, Folder, FolderOpen, Trash2 } from "lucide-react";
+import { FileAudio, FileText, Folder, FolderInput, FolderOpen, MoreHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { tc } from "../../api/tc";
 import { bytes, dateTime } from "../../lib/format";
@@ -54,6 +54,8 @@ export function ContentPage() {
                 {files.data && entries.length === 0 && <Empty icon={<Folder size={28} />} title={t("emptyFolder")} />}
                 {entries.map((f) => {
                     const full = [...parts, f.name].join("/");
+                    // the content TAF of a tag lies at <first 8 of the ruid>/<last 8>
+                    const ruid = parts.length === 1 && /^[0-9A-F]{8}$/i.test(f.name) ? parts[0] + f.name : "";
                     const tonie = f.tonieInfo?.series ? `${f.tonieInfo.series}${f.tonieInfo.episode ? " – " + f.tonieInfo.episode : ""}` : "";
                     return (
                         <Row
@@ -67,16 +69,31 @@ export function ContentPage() {
                                 f.isDir ? undefined : (
                                     <button
                                         className="icon-btn"
-                                        aria-label={t("delete")}
-                                        title={t("delete")}
-                                        onClick={async (e) => {
+                                        aria-label={t("more")}
+                                        onClick={(e) => {
                                             e.stopPropagation();
-                                            if (!(await ui.confirm({ title: t("deleteFileTitle", { name: f.name }), confirm: t("delete"), danger: true }))) return;
-                                            await ui.run(() => tc.fileDelete(full, false, "", overlay || undefined), t("deleted"));
-                                            qc.invalidateQueries({ queryKey: ["contentFiles"] });
+                                            const migrate = (root: boolean) => async () => {
+                                                await ui.run(() => tc.migrateToLibrary(ruid, root, overlay || undefined), t("migrated"));
+                                                qc.invalidateQueries({ queryKey: ["contentFiles"] });
+                                                qc.invalidateQueries({ queryKey: ["files"] });
+                                            };
+                                            ui.actions(f.name, [
+                                                { label: t("migrateByAudioId"), icon: <FolderInput size={17} />, onSelect: migrate(false), hidden: !ruid },
+                                                { label: t("migrateToRoot"), icon: <FolderInput size={17} />, onSelect: migrate(true), hidden: !ruid },
+                                                {
+                                                    label: t("delete"),
+                                                    icon: <Trash2 size={17} />,
+                                                    danger: true,
+                                                    onSelect: async () => {
+                                                        if (!(await ui.confirm({ title: t("deleteFileTitle", { name: f.name }), confirm: t("delete"), danger: true }))) return;
+                                                        await ui.run(() => tc.fileDelete(full, false, "", overlay || undefined), t("deleted"));
+                                                        qc.invalidateQueries({ queryKey: ["contentFiles"] });
+                                                    },
+                                                },
+                                            ]);
                                         }}
                                     >
-                                        <Trash2 size={17} />
+                                        <MoreHorizontal size={18} />
                                     </button>
                                 )
                             }

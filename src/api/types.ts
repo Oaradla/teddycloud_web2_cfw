@@ -96,6 +96,9 @@ export interface PluginMeta {
     description?: string;
     pluginHomepage?: string;
     standalone?: boolean;
+    /** where the menu shows it: home, tonies, tonieboxes, settings or community */
+    teddyCloudSection?: string;
+    hideInNav?: boolean;
 }
 
 export interface CustomModel {
@@ -131,6 +134,8 @@ export interface AuthStatus {
     twoFactorRequired?: boolean;
     recoveryCodesLeft?: number;
     passwordMinLength?: number;
+    /** this connection as the server sees it */
+    client?: { ip: string; lan: boolean; secure: boolean; viaTrustedProxy: boolean; forwardedForIgnored?: boolean };
 }
 
 /* ---------- custom firmware (only on servers with CFW support) ---------- */
@@ -221,6 +226,7 @@ export interface CfwStatus {
         locks: { slap: boolean; tilt: boolean; volume: boolean };
         time: number;
     };
+    lastResult?: { command: number; result: number; time: number };
 }
 
 export interface CfwProfile {

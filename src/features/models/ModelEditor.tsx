@@ -1,11 +1,12 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2, Disc3, FileAudio, Link2, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Camera, CheckCircle2, Copy, Disc3, FileAudio, Link2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getJson, q } from "../../api/client";
 import { shrinkImage } from "../../lib/image";
 import { tc } from "../../api/tc";
-import type { CustomModel, FileEntry } from "../../api/types";
+import type { CustomModel, FileEntry, TonieInfo } from "../../api/types";
 import { baseName, isTap, parentPath, stripExt } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { keys, useCustomModels, useFetchFiles, useInvalidateTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
@@ -19,8 +20,13 @@ import { TagPicker } from "../tonies/TagPicker";
  * - figure: a figure of its own (picture + name) to give to a tonie later
  * - cover: picture and titles for a TAF/TAP of the library (matched by its audio id and hash)
  * - edit: an existing custom model
+ * - override: a custom model with the number of an official figure, which replaces its data everywhere
  */
-export type ModelEditorStart = { mode: "figure" } | { mode: "cover"; file?: string } | { mode: "edit"; model: CustomModel };
+export type ModelEditorStart =
+    | { mode: "figure" }
+    | { mode: "cover"; file?: string }
+    | { mode: "edit"; model: CustomModel }
+    | { mode: "override"; info: TonieInfo };
 
 const blank = (): CustomModel => ({
     model: "",
@@ -120,6 +126,8 @@ export function ModelEditor({
     const [assign, setAssign] = useState(false);
     const [expert, setExpert] = useState(false);
     const fileInput = useRef<HTMLInputElement>(null);
+    const access = useAccess();
+    const mayEdit = original ? access.mayChangeModel(original) : access.canCreateModels;
 
     const set = <K extends keyof CustomModel>(k: K, v: CustomModel[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
@@ -162,6 +170,12 @@ export function ModelEditor({
             setDraft(structuredClone(start.model));
             setOriginal(start.model.model);
             setKind(start.model.audio_id.length ? "cover" : "figure");
+        } else if (start.mode === "override") {
+            const i = start.info;
+            setDraft({ ...blank(), model: i.model, series: i.series, episodes: i.episode, pic: i.picture, tracks: i.tracks ?? [], language: i.language || "de-de" });
+            setOriginal(null);
+            setKind("figure");
+            setExpert(true);
         } else {
             setDraft(blank());
             setOriginal(null);
@@ -170,9 +184,36 @@ export function ModelEditor({
         }
     }, [start]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const modelId = draft.model.trim();
+    /** an official figure with this number: the custom model replaces its data */
+    const official = useQuery({
+        queryKey: ["officialModel", modelId],
+        queryFn: () => tc.searchTonies(modelId).then((list) => list.find((x) => x.model === modelId) ?? null),
+        enabled: Boolean(start) && modelId.length >= 2,
+    });
+
+    /** what another custom model has already: its number, or the same audio id with the same hash */
+    const duplicate = () => {
+        const others = (models.data ?? []).filter((m) => m.model !== original);
+        if (modelId && others.some((m) => m.model.toLowerCase() === modelId.toLowerCase())) return t("modelIdTaken", { model: modelId });
+        const pairs = draft.audio_id.map((id, i) => `${id}/${(draft.hash[i] ?? "").toLowerCase()}`);
+        const twin = others.find((m) => m.audio_id.some((id, i) => pairs.includes(`${id}/${(m.hash[i] ?? "").toLowerCase()}`)));
+        return twin ? t("audioTaken", { model: twin.series || twin.model }) : "";
+    };
+
+    /** the same data as a new custom model with a number of its own */
+    const copy = () => {
+        setOriginal(null);
+        setDraft((d) => ({ ...d, model: "", audio_id: [], hash: [], series: `${d.series} (${t("copyNoun")})` }));
+        setLinked(null);
+        ui.toast("info", t("copyCreated"));
+    };
+
     const save = async () => {
         if (!draft.series.trim()) return ui.toast("error", t("nameRequired"));
         if (kind === "cover" && !draft.audio_id.length) return ui.toast("error", t("chooseFileFirst"));
+        const dup = duplicate();
+        if (dup) return ui.toast("error", dup);
         setSaving(true);
         const taken = new Set((models.data ?? []).map((m) => m.model.toLowerCase()));
         const model: CustomModel = {
@@ -191,6 +232,7 @@ export function ModelEditor({
         setSaving(false);
         if (!ok) return;
         qc.invalidateQueries({ queryKey: keys.customModels });
+        qc.invalidateQueries({ queryKey: ["aclMine"] });
         qc.invalidateQueries({ queryKey: ["files"] });
         invalidateTags();
         onSaved?.(model);
@@ -200,14 +242,18 @@ export function ModelEditor({
 
     const remove = async () => {
         if (!original) return;
-        const yes = await ui.confirm({
+        // the picture can go along when no other custom tonie shows it
+        const pic = models.data?.find((m) => m.model === original)?.pic ?? "";
+        const lastOfPic = pic.startsWith("/custom_img/") && !models.data?.some((m) => m.model !== original && m.pic === pic);
+        const { ok: yes, checked } = await ui.confirmCheck({
             title: t("deleteModel"),
             text: t("deleteModelText", { name: draft.series || draft.model }),
             confirm: t("delete"),
             danger: true,
+            check: lastOfPic ? { label: t("deletePictureToo"), value: true } : undefined,
         });
         if (!yes) return;
-        const ok = await ui.run(() => tc.deleteModel(original), t("deleted"));
+        const ok = await ui.run(() => tc.deleteModel(original, checked), t("deleted"));
         if (ok !== undefined) {
             qc.invalidateQueries({ queryKey: keys.customModels });
             invalidateTags();
@@ -252,17 +298,24 @@ export function ModelEditor({
                         </>
                     ) : (
                         <>
-                            {original && (
+                            {original && mayEdit && (
                                 <button className="btn danger" style={{ flex: "0 0 auto" }} onClick={remove} aria-label={t("delete")}>
                                     <Trash2 size={18} />
+                                </button>
+                            )}
+                            {original && access.canCreateModels && (
+                                <button className="btn" style={{ flex: "0 0 auto" }} onClick={copy} aria-label={t("copyModel")} title={t("copyModel")}>
+                                    <Copy size={18} />
                                 </button>
                             )}
                             <button className="btn" onClick={onClose}>
                                 {t("cancel")}
                             </button>
-                            <button className="btn primary" onClick={save} disabled={saving || linking}>
-                                {t("save")}
-                            </button>
+                            {mayEdit && (
+                                <button className="btn primary" onClick={save} disabled={saving || linking}>
+                                    {t("save")}
+                                </button>
+                            )}
                         </>
                     )
                 }
@@ -278,7 +331,9 @@ export function ModelEditor({
                         </p>
                     </div>
                 ) : (
-                    <>
+                    <fieldset disabled={!mayEdit} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+                        {!mayEdit && <Notice info>{t("modelNotYours")}</Notice>}
+                        {official.data && <Notice info>{t("overridesOriginal", { model: official.data.model, name: [official.data.series, official.data.episode].filter(Boolean).join(" – ") })}</Notice>}
                         <p className="muted small" style={{ margin: "0 2px 14px" }}>
                             {kind === "figure" ? t("figureIntro") : t("coverIntro")}
                         </p>
@@ -393,7 +448,7 @@ export function ModelEditor({
                                 </div>
                             </div>
                         )}
-                    </>
+                    </fieldset>
                 )}
             </Sheet>
 

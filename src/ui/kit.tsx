@@ -12,6 +12,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { chapterLength, duration } from "../lib/format";
 import { t } from "../lib/i18n";
+import { notifications } from "../lib/notifications";
 import { Sheet } from "./Sheet";
 
 /* ------------------------------------------------------------------ page frame */
@@ -121,6 +122,9 @@ interface RowProps {
     leading?: ReactNode;
 }
 
+/** text values longer than this stand below the title of a row */
+const LONG_VALUE = 8;
+
 export function Row({
     icon,
     iconColor,
@@ -138,6 +142,8 @@ export function Row({
     nowrap,
     leading,
 }: RowProps) {
+    // a long text value goes below the title: beside it, it would squeeze the title on the phone
+    const below = typeof value === "string" && value.length > LONG_VALUE;
     const content = (
         <>
             {leading}
@@ -152,8 +158,9 @@ export function Row({
             <span className="row-body">
                 <div className={`row-title ${nowrap ? "nowrap" : ""}`}>{title}</div>
                 {sub && <div className="row-sub">{sub}</div>}
+                {below && <div className="row-value-below">{value}</div>}
             </span>
-            {value !== undefined && <span className="row-value">{value}</span>}
+            {value !== undefined && !below && <span className="row-value">{value}</span>}
             {right}
             {(chevron ?? Boolean(to)) && <ChevronRight size={18} className="row-chevron" />}
         </>
@@ -478,6 +485,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     const toast = useCallback(
         (kind: ToastKind, text: string, detail?: string) => {
             const id = nextId.current++;
+            notifications.add({ kind, text, detail });
             setToasts((list) => [...list.slice(-2), { id, kind, text, detail }]);
             window.setTimeout(() => dismiss(id), kind === "error" ? 6000 : 2800);
         },

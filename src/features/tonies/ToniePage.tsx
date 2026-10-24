@@ -10,18 +10,24 @@ import {
     Play,
     Radio,
     Shapes,
+    SkipBack,
+    SkipForward,
+    Search,
+    Share2,
     Trash2,
     UserRound,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { backendUrl } from "../../api/client";
 import { tc } from "../../api/tc";
 import type { Tag } from "../../api/types";
-import { contentTitle, figureSubtitle, figureTitle, lengthText, libPath, linkedContent, parentPath, ruidPretty, sourceLabel, tagInfo } from "../../lib/format";
+import { baseName, contentTitle, figureSubtitle, figureTitle, isTaf, joinPath, lengthText, libPath, linkedContent, parentPath, ruidPretty, sourceLabel, tagInfo } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { canPlayTag, libraryFileUrl, tagPlayItem } from "../../lib/play";
-import { useAllTags, useBoxes, useCfwBoxes, useInvalidateTags, useSettings, useTag } from "../../lib/queries";
+import { useAllTags, useBoxes, useCfwBoxes, useInvalidateTags, useSetting, useTag } from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { ChapterTime, ErrorBox, Loading, Page, Row, Section, SwitchRow, useUi } from "../../ui/kit";
 import { FigurePic } from "../../ui/FigurePic";
@@ -32,6 +38,7 @@ import { LibraryPicker } from "../library/LibraryPicker";
 import { CfwTagSettings } from "./CfwTagSettings";
 import { ModelPicker } from "./ModelPicker";
 import { StreamPicker } from "./StreamPicker";
+import { ShareSheet, useCanShare } from "../users/ShareSheet";
 
 export function ToniePage() {
     const { ruid = "" } = useParams();
@@ -53,25 +60,28 @@ export function ToniePage() {
 
 function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxIds: string[] }) {
     const ui = useUi();
+    const navigate = useNavigate();
     const player = usePlayer();
     const invalidate = useInvalidateTags();
     const boxes = useBoxes();
     const cfwBoxes = useCfwBoxes();
-    const globalSettings = useSettings("");
+    const showTagSettings = useSetting("cfw.show_tag_settings");
     const [pickContent, setPickContent] = useState(false);
     const [pickModel, setPickModel] = useState(false);
     const [pickStream, setPickStream] = useState(false);
     const [ogg, setOgg] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const [fetching, setFetching] = useState(false);
+    const canShare = useCanShare();
     const info = tagInfo(tag);
     const linked = linkedContent(tag);
     const playable = canPlayTag(tag);
     const isPlaying = player.item?.id === tag.ruid;
     const chapters = tag.trackSeconds ?? [];
     const titles = info.tracks ?? [];
-    const showCfw =
-        cfwBoxes.data != null &&
-        globalSettings.data?.find((o) => o.ID === "cfw.show_tag_settings")?.value === true;
-    const remoteBoxes = (cfwBoxes.data ?? []).filter((b) => remoteAvailable(b) && b.online);
+    const showCfw = cfwBoxes.data != null && showTagSettings.data === "true";
+    const access = useAccess();
+    const remoteBoxes = (cfwBoxes.data ?? []).filter((b) => remoteAvailable(b) && b.online && access.can("box", b.id, "box.cfw"));
 
     const change = async (key: string, value: string | boolean, ok?: string) => {
         await ui.run(() => tc.setContent(tag.ruid, key, value, overlay || undefined), ok ?? t("saved"));
@@ -98,6 +108,21 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
         invalidate();
     };
 
+    /** the original content from the Boxine cloud, as the box would load it; the server keeps it */
+    const canFetch = !playable && !tag.source && Boolean(tag.downloadTriggerUrl) && access.can("tonie", tag.ruid, "tonie.edit");
+    const fetchFromCloud = async () => {
+        setFetching(true);
+        const ok = await ui.run(async () => {
+            // not through request(): a 401 here comes from Boxine (token of the tag), not from the login
+            const r = await fetch(backendUrl(tag.downloadTriggerUrl!), { credentials: "same-origin" });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            await r.blob(); /* the whole content: the server stores it while sending */
+            return true;
+        }, t("cloudDownloaded"));
+        setFetching(false);
+        if (ok) invalidate();
+    };
+
     const playOnBox = () => {
         const send = (id: string) =>
             ui.run(() => tc.cfwRemote(id, "play", { ruid: tag.ruid }), t("commandSent"));
@@ -111,6 +136,38 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
 
     const boxName = (id: string) => boxes.data?.find((b) => b.ID === id)?.boxName || id;
     const lib = libPath(tag.source);
+    const folder = lib ? parentPath("/" + lib) : "";
+
+    // the next and the previous file of the folder not heard yet, e.g. for a series of audio books
+    const siblings = useQuery({
+        queryKey: ["files", folder],
+        queryFn: () => tc.files(folder),
+        enabled: Boolean(lib),
+    });
+    const episodes = (siblings.data ?? [])
+        .filter((f) => !f.isDir && f.name !== `${f.tafHeader?.audioId}.taf`)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const at = episodes.findIndex((f) => f.name === baseName(lib));
+    const nextEpisode = episodes.slice(at + 1).find((f) => !f.listened);
+    const prevEpisode = at > 0 ? episodes.slice(0, at).reverse().find((f) => !f.listened) : undefined;
+
+    const contentModel = linked?.model && linked.model !== tag.tonieInfo?.model ? linked.model : "";
+    /** the content tonies.json names for the figure, when a TAF of the library has it */
+    const findFigureContent = async () => {
+        const found = await ui.run(async () => {
+            const pairs = await tc.modelAudio(tag.tonieInfo.model);
+            if (!pairs.length) throw new Error(t("figureNoAudio"));
+            const files = await tc.walkTree("/");
+            const hit = files.find(
+                ({ entry }) =>
+                    isTaf(entry.name) &&
+                    pairs.some((p) => String(entry.tafHeader?.audioId) === p.audioId && entry.tafHeader?.sha1Hash.toLowerCase() === p.hash),
+            );
+            if (!hit) throw new Error(t("figureAudioNotInLibrary"));
+            return hit.path;
+        });
+        if (found && (await ui.confirm({ title: t("assignFigureContent"), text: found, confirm: t("assign") }))) assign("lib://" + found.replace(/^\//, ""));
+    };
 
     return (
         <>
@@ -144,6 +201,12 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
                             <Play size={18} fill="currentColor" />
                             {isPlaying ? t("nowPlaying") : t("listen")}
                         </button>
+                        {canFetch && (
+                            <button className="btn soft" disabled={fetching} onClick={fetchFromCloud}>
+                                <Cloud size={18} />
+                                {fetching ? t("cloudDownloading") : t("cloudDownload")}
+                            </button>
+                        )}
                         {remoteBoxes.length > 0 && playable && (
                             <button className="btn soft" onClick={playOnBox}>
                                 <Gamepad2 size={18} />
@@ -164,6 +227,27 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
                     chevron
                 />
                 <Row icon={<Link2 size={17} />} title={t("assignStream")} sub={t("assignStreamHint")} onClick={() => setPickStream(true)} chevron />
+                {nextEpisode && (
+                    <Row
+                        icon={<SkipForward size={17} />}
+                        title={t("nextEpisode")}
+                        sub={nextEpisode.name}
+                        onClick={() => assign("lib:/" + joinPath(folder, nextEpisode.name))}
+                        chevron={false}
+                    />
+                )}
+                {prevEpisode && (
+                    <Row
+                        icon={<SkipBack size={17} />}
+                        title={t("prevEpisode")}
+                        sub={prevEpisode.name}
+                        onClick={() => assign("lib:/" + joinPath(folder, prevEpisode.name))}
+                        chevron={false}
+                    />
+                )}
+                {tag.tonieInfo?.model && (
+                    <Row icon={<Search size={17} />} title={t("findFigureContent")} sub={t("findFigureContentHint")} onClick={findFigureContent} chevron={false} />
+                )}
                 {tag.source && <Row icon={<Trash2 size={17} />} title={t("removeContent")} danger onClick={removeContent} chevron={false} />}
             </Section>
 
@@ -175,6 +259,15 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
                     onClick={() => setPickModel(true)}
                     chevron
                 />
+                {contentModel && (
+                    <Row
+                        icon={<Shapes size={17} />}
+                        title={t("figureFromContent")}
+                        sub={[linked?.series, linked?.episode, contentModel].filter(Boolean).join(" · ")}
+                        onClick={() => change("tonie_model", contentModel, t("figureSet"))}
+                        chevron={false}
+                    />
+                )}
             </Section>
 
             {chapters.length > 0 && (
@@ -226,12 +319,24 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
 
             {showCfw && <CfwTagSettings ruid={tag.ruid} />}
 
+            {canShare("tonie", tag.ruid) && (
+                <Section>
+                    <Row icon={<Share2 size={17} />} title={t("share")} sub={t("shareHint")} onClick={() => setSharing(true)} chevron />
+                </Section>
+            )}
+
             <Section title={t("info")}>
                 <Row icon={<Shapes size={17} />} title="RUID" value={<span className="mono selectable">{tag.ruid.toUpperCase()}</span>} />
                 {tag.uid && <Row icon={<Shapes size={17} />} title="UID" value={<span className="mono selectable">{tag.uid}</span>} />}
                 {!tag.uid && <Row icon={<Shapes size={17} />} title="UID" value={<span className="mono">{ruidPretty(tag.ruid)}</span>} />}
                 {boxIds.length > 0 && (
-                    <Row icon={<UserRound size={17} />} title={t("knownBy")} value={boxIds.map(boxName).join(", ")} />
+                    <Row
+                        icon={<UserRound size={17} />}
+                        title={t("knownBy")}
+                        value={boxIds.map(boxName).join(", ")}
+                        onClick={() => ui.actions(t("knownBy"), boxIds.map((id) => ({ label: boxName(id), icon: <Radio size={17} />, onSelect: () => navigate(`/box/${id}`) })))}
+                        chevron
+                    />
                 )}
                 {playable && (
                     <Row icon={<Download size={17} />} title={t("downloadOgg")} sub={t("downloadOggHint")} onClick={() => setOgg(true)} chevron />
@@ -266,6 +371,7 @@ function TonieDetail({ tag, overlay, boxIds }: { tag: Tag; overlay: string; boxI
                 chapters={chapters}
                 chapterTitles={titles}
             />
+            <ShareSheet target={sharing ? { type: "tonie", id: tag.ruid, title: figureTitle(tag) } : null} onClose={() => setSharing(false)} />
             <StreamPicker open={pickStream} onClose={() => setPickStream(false)} onPick={assign} current={tag.source} />
             <ModelPicker
                 open={pickModel}

@@ -6,7 +6,7 @@ import { Segmented, SwitchRow } from "../../ui/kit";
    "global" ones the box */
 
 type Scope = "figure" | "global";
-type ValueKind = "none" | "minutes" | "minutesOnce" | "volumeStart" | "ledStart";
+type ValueKind = "none" | "minutes" | "minutesOnce" | "idleMinutes" | "volumeStart" | "ledStart";
 interface ActionDef {
     action: number;
     key: string;
@@ -41,6 +41,8 @@ const ACTIONS: ActionDef[] = [
     { action: 14, key: "tiltLockGlobal", scope: "global", modes: "all", value: "none" },
     { action: 15, key: "volumeLockGlobal", scope: "global", modes: "all", value: "none" },
     { action: 16, key: "bothEarsOff", scope: "global", modes: "all", value: "none" },
+    { action: 17, key: "idleOffBattery", scope: "global", modes: "none", value: "idleMinutes" },
+    { action: 18, key: "idleOffStation", scope: "global", modes: "none", value: "idleMinutes" },
 ];
 const MODE_REMOVE = 3;
 const MAX_ACTIONS = 16;
@@ -49,7 +51,7 @@ const LED_LEVELS = [0, 2, 1];
 
 const def = (action: number) => ACTIONS.find((a) => a.action === action);
 const scopeOf = (actions: CfwAction[]): Scope => actions.map((a) => def(a.action)).find(Boolean)?.scope ?? "figure";
-const defaultValue = (d: ActionDef) => (d.value === "minutes" || d.value === "minutesOnce" ? 30 : d.value === "ledStart" ? 3 : 0);
+const defaultValue = (d: ActionDef) => (d.value === "minutes" || d.value === "minutesOnce" || d.value === "idleMinutes" ? 30 : d.value === "ledStart" ? 3 : 0);
 const fresh = (scope: Scope): CfwAction => {
     const d = ACTIONS.find((a) => a.scope === scope)!;
     return { action: d.action, mode: 0, value: defaultValue(d) };
@@ -127,6 +129,22 @@ export function CfwEventFields({ event, onChange }: { event: CfwEvent; onChange:
                                     style={{ maxWidth: 110 }}
                                 />
                                 <span className="small muted">{t("minutesShort")}</span>
+                            </label>
+                        )}
+                        {d?.value === "idleMinutes" && (
+                            <label className="row-gap">
+                                <input
+                                    className="input"
+                                    type="number"
+                                    min={0}
+                                    max={65535}
+                                    value={a.value}
+                                    onChange={(e) => update(i, { value: Math.max(0, Math.min(65535, Number(e.target.value) || 0)) })}
+                                    style={{ maxWidth: 110 }}
+                                />
+                                <span className="small muted">
+                                    {t("minutesShort")} · {t("cfwIdleMinutesHint")}
+                                </span>
                             </label>
                         )}
                         {d && a.mode !== MODE_REMOVE && d.value === "volumeStart" && (

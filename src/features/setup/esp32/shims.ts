@@ -1,7 +1,7 @@
 // What the ESP32 flasher code (taken over from teddycloud_web, now maintained here) expects of
 // its surroundings: an API client, notifications and a t() for its texts, on web2's own pieces.
 import { backendUrl, request } from "../../../api/client";
-import { getLang } from "../../../lib/i18n";
+import { pick } from "../../../lib/i18n";
 import { useUi } from "../../../ui/kit";
 import { ESP32_TEXTS } from "./texts";
 
@@ -33,10 +33,9 @@ export { backendUrl };
 
 /** t() over the texts of the flasher (texts.ts), {{name}} filled from vars */
 export const useTranslation = () => {
-    const index = getLang() === "de" ? 0 : 1;
     return {
         t: (key: string, vars: Record<string, string | number> = {}) =>
-            (ESP32_TEXTS[key]?.[index] ?? key).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => String(vars[name] ?? "")),
+            (ESP32_TEXTS[key] ? pick(ESP32_TEXTS[key], `esp32.${key}`) : key).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => String(vars[name] ?? "")),
     };
 };
 export type TFunction = (key: string, vars?: Record<string, string | number>) => string;

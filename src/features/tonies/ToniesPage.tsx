@@ -1,14 +1,17 @@
-import { Check, CheckSquare, Disc3, LayoutGrid, List, Pencil, Play, SearchX, SlidersHorizontal, X } from "lucide-react";
+import { Check, CheckSquare, CircleHelp, Disc3, Download, LayoutGrid, List, Pencil, Play, Save, SearchX, SlidersHorizontal, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { contentTitle, figureInfo, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
-import { t } from "../../lib/i18n";
+import { contentTitle, figureInfo, figureSubtitle, figureTitle, linkedContent, tagInfo } from "../../lib/format";
+import { exportCsv, exportHtml, exportJson } from "../../lib/exportTags";
+import { lang, t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
 import { TagWithBox, useAllTags, useBoxes, useBoxesDiffer } from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { FigurePic } from "../../ui/FigurePic";
-import { Empty, ErrorBox, Page, SearchField } from "../../ui/kit";
+import { Empty, ErrorBox, Page, SearchField, useUi } from "../../ui/kit";
+import { compileFilter, FilterError } from "../../lib/tagFilter";
+import { FilterHelpSheet } from "./FilterHelpSheet";
 import { ChoiceGroup, Popover } from "../../ui/Popover";
 import { useSelection } from "../../ui/useSelection";
 import { BulkEditSheet } from "./BulkEditSheet";
@@ -34,6 +37,23 @@ const matches = (tag: TagWithBox, f: Content) => {
     }
 };
 
+const languageName = (code: string) => {
+    try {
+        return new Intl.DisplayNames([lang()], { type: "language" }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+};
+
+/** saved filter profiles: name -> the query string of the page */
+const loadProfiles = (): Record<string, string> => {
+    try {
+        return JSON.parse(getPref("tonies.filters", "{}"));
+    } catch {
+        return {};
+    }
+};
+
 const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 /** the tonies; with system the system sound tags of the boxes instead */
@@ -43,6 +63,12 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
     const content = (params.get("f") as Content) || "all";
     const series = params.get("series") ?? "";
     const hidden = params.get("hidden") === "1";
+    const language = params.get("lang") ?? "";
+    const expert = params.get("x") ?? "";
+    const [expertDraft, setExpertDraft] = useState(expert);
+    const [help, setHelp] = useState(false);
+    const [profiles, setProfiles] = useState(loadProfiles);
+    const ui = useUi();
     const [query, setQuery] = useState(params.get("q") ?? "");
     const [sort, setSortState] = useState<Sort>(() => getPref("tonies.sort", "az") as Sort);
     const [view, setViewState] = useState<View>(() => getPref("tonies.view", "grid") as View);
@@ -75,9 +101,21 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         [base],
     );
 
+    const languages = useMemo(() => [...new Set(base.map((x) => tagInfo(x).language).filter(Boolean) as string[])].sort(), [base]);
+    const expertFilter = useMemo(() => {
+        try {
+            return { test: compileFilter(expert, base) };
+        } catch (e) {
+            if (e instanceof FilterError) return { error: e.message };
+            throw e;
+        }
+    }, [expert, base]);
+
     const list = useMemo(() => {
         const f = query.trim().toLowerCase();
         const result = base
+            .filter((x) => !language || tagInfo(x).language === language)
+            .filter((x) => !expertFilter.test || expertFilter.test(x))
             .filter((x) => hidden || !x.hide)
             .filter((x) => matches(x, content))
             .filter((x) => !box || x.boxIds.includes(box))
@@ -98,7 +136,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             return cmp(title(a), title(b));
         });
         return result;
-    }, [base, query, content, box, series, hidden, sort]);
+    }, [base, query, content, box, series, hidden, sort, language, expertFilter]);
 
     const contentLabels: Record<Content, string> = {
         all: t("all"),
@@ -114,7 +152,38 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         ...(content !== "all" ? [{ label: contentLabels[content], clear: () => setParam("f", "") }] : []),
         ...(series ? [{ label: series, clear: () => setParam("series", "") }] : []),
         ...(hidden ? [{ label: t("showHidden"), clear: () => setParam("hidden", "") }] : []),
+        ...(language ? [{ label: languageName(language), clear: () => setParam("lang", "") }] : []),
+        ...(expert ? [{ label: expert, clear: () => (setParam("x", ""), setExpertDraft("")) }] : []),
     ];
+
+    const saveProfile = async () => {
+        const name = await ui.prompt({ title: t("saveFilter"), label: t("name") });
+        if (!name) return;
+        const next = new URLSearchParams(params);
+        if (query) next.set("q", query);
+        const all = { ...profiles, [name]: next.toString() };
+        setProfiles(all);
+        setPref("tonies.filters", JSON.stringify(all));
+        ui.toast("ok", t("filterSaved"));
+    };
+    const loadProfile = (name: string) => {
+        const next = new URLSearchParams(profiles[name]);
+        setQuery(next.get("q") ?? "");
+        setExpertDraft(next.get("x") ?? "");
+        next.delete("q");
+        setParams(next, { replace: true });
+    };
+    const deleteProfile = (name: string) => {
+        const { [name]: _, ...rest } = profiles;
+        setProfiles(rest);
+        setPref("tonies.filters", JSON.stringify(rest));
+    };
+    const exportList = (tags: TagWithBox[]) =>
+        ui.actions(t("exportN", { n: tags.length }), [
+            { label: "CSV", icon: <Download size={17} />, onSelect: () => exportCsv(tags) },
+            { label: "JSON", icon: <Download size={17} />, onSelect: () => exportJson(tags) },
+            { label: "HTML", icon: <Download size={17} />, onSelect: () => ui.run(() => exportHtml(tags)) },
+        ]);
 
     const open = (tag: TagWithBox) => navigate(`/tonie/${tag.ruid}${tag.overlay ? `?box=${tag.overlay}` : ""}`);
     const play = (tag: TagWithBox) => player.play(tagPlayItem(tag));
@@ -261,7 +330,71 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                         { value: "1", label: t("showHidden") },
                     ]}
                 />
+                {languages.length > 1 && (
+                    <div className="choice-group">
+                        <div className="choice-label">{t("language")}</div>
+                        <select className="select" value={language} onChange={(e) => setParam("lang", e.target.value)}>
+                            <option value="">{t("allLanguages")}</option>
+                            {languages.map((l) => (
+                                <option key={l} value={l}>
+                                    {languageName(l)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                <div className="choice-group">
+                    <div className="choice-label">
+                        {t("expertFilter")}
+                        <button className="btn ghost small" onClick={() => setHelp(true)} aria-label={t("help")} style={{ padding: "0 4px" }}>
+                            <CircleHelp size={15} />
+                        </button>
+                    </div>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            setParam("x", expertDraft.trim());
+                        }}
+                    >
+                        <input
+                            className="input mono"
+                            value={expertDraft}
+                            placeholder='series = "Pixi" and valid'
+                            onChange={(e) => setExpertDraft(e.target.value)}
+                            onBlur={() => setParam("x", expertDraft.trim())}
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                        />
+                    </form>
+                    {expertFilter.error && <div className="small" style={{ color: "var(--danger)", marginTop: 4 }}>{t("filterInvalid", { at: expertFilter.error })}</div>}
+                </div>
+                <div className="choice-group">
+                    <div className="choice-label">{t("savedFilters")}</div>
+                    <div className="choice-options">
+                        {Object.keys(profiles).map((name) => (
+                            <span key={name} className="chip">
+                                <button type="button" className="chip-text" onClick={() => loadProfile(name)}>
+                                    {name}
+                                </button>
+                                <button type="button" className="chip-x" onClick={() => deleteProfile(name)} aria-label={t("delete")}>
+                                    <X size={13} />
+                                </button>
+                            </span>
+                        ))}
+                        <button type="button" className="chip" onClick={saveProfile}>
+                            <Save size={14} /> {t("saveFilter")}
+                        </button>
+                    </div>
+                </div>
+                <div className="choice-group">
+                    <button className="btn soft small" disabled={!list.length} onClick={() => exportList(list)}>
+                        <Download size={15} />
+                        {t("exportN", { n: list.length })}
+                    </button>
+                </div>
             </Popover>
+            <FilterHelpSheet open={help} onClose={() => setHelp(false)} />
 
             {tags.isLoading && (
                 <div className="grid-tonies">
@@ -377,6 +510,9 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                         onClick={() => sel.setSelected(allSelected ? new Set() : new Set(list.map((x) => x.ruid)))}
                     >
                         {allSelected ? t("selectNone") : t("selectAll")}
+                    </button>
+                    <button className="icon-btn" disabled={!selectedTags.length} onClick={() => exportList(selectedTags)} aria-label={t("export")}>
+                        <Download size={19} />
                     </button>
                     <button className="btn primary small" disabled={!selectedTags.length} onClick={() => setBulk(true)}>
                         <Pencil size={15} />

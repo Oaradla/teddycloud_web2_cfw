@@ -17,15 +17,31 @@ export const setPref = (key: string, value: string) => {
     }
 };
 
-export type Theme = "auto" | "light" | "dark";
+/** all preferences of this device, e.g. to take them to another one */
+export const allPrefs = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)!;
+            if (key.startsWith(PREFIX)) out[key.slice(PREFIX.length)] = localStorage.getItem(key) ?? "";
+        }
+    } catch {
+        /* ignore */
+    }
+    return out;
+};
+
+export type Theme = "auto" | "light" | "dark" | "matrix";
 
 export const applyTheme = (theme: Theme) => {
     const root = document.documentElement;
     if (theme === "auto") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
     const dark =
-        theme === "dark" || (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        theme === "dark" ||
+        theme === "matrix" || (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document
         .querySelectorAll('meta[name="theme-color"]')
-        .forEach((m) => m.setAttribute("content", dark ? "#111214" : "#f6f5f2"));
+        .forEach((m) => m.setAttribute("content", theme === "matrix" ? "#000000" : dark ? "#111214" : "#f6f5f2"));
+    window.dispatchEvent(new Event("themechange"));
 };

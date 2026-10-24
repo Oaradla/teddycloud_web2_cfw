@@ -9,7 +9,8 @@ import { ApiError } from "../../api/client";
 import { shrinkImage } from "../../lib/image";
 import { newModelId } from "../models/ModelEditor";
 import { uploadAudio } from "./uploadAudio";
-import { useInvalidateTags, useSettings } from "../../lib/queries";
+import { useAccess } from "../../lib/access";
+import { useInvalidateTags, useSetting } from "../../lib/queries";
 import { Notice, Page, Row, Section, Segmented, useUi } from "../../ui/kit";
 import { LibraryPicker } from "../library/LibraryPicker";
 import { TagPicker } from "../tonies/TagPicker";
@@ -31,11 +32,11 @@ export function UploadPage() {
     const [items, setItems] = useState<Item[]>([]);
     const [name, setName] = useState("");
     const [mode, setMode] = useState<Mode>("taf");
-    const settings = useSettings("");
-    const settingValue = (k: string) => settings.data?.find((o) => o.ID === k)?.value;
+    const useFrontend = useSetting("encode.use_frontend");
+    const bitrate = useSetting("encode.bitrate");
     const [encoderChoice, setEncoder] = useState<Encoder | null>(null);
     // what the server suggests (encode.use_frontend) until the user picks
-    const encoder: Encoder = encoderChoice ?? (settingValue("encode.use_frontend") === false ? "server" : "browser");
+    const encoder: Encoder = encoderChoice ?? (useFrontend.data === "false" ? "server" : "browser");
     const [over, setOver] = useState(false);
     const [busy, setBusy] = useState<{ step: string; progress: number } | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export function UploadPage() {
     const qc = useQueryClient();
     const navigate = useNavigate();
     const invalidateTags = useInvalidateTags();
+    const access = useAccess();
 
     const audioCount = items.filter((i) => isAudio(i.file.name)).length;
     const canTaf = items.length > 0 && audioCount === items.length;
@@ -111,6 +113,7 @@ export function UploadPage() {
             pic,
         });
         qc.invalidateQueries({ queryKey: ["customModels"] });
+        qc.invalidateQueries({ queryKey: ["aclMine"] });
         invalidateTags();
     };
 
@@ -143,7 +146,7 @@ export function UploadPage() {
                     folder,
                     split: mode === "split",
                     encoder,
-                    bitrate: Number(settingValue("encode.bitrate")) || 96,
+                    bitrate: Number(bitrate.data) || 96,
                 };
                 const step = (text: string, progress: number) => setBusy({ step: text, progress });
                 let result;
@@ -156,7 +159,7 @@ export function UploadPage() {
                     result = await uploadAudio({ ...job, encoder: "server" }, step);
                 }
                 // picture and chapter names: an album cover model linked to the TAF
-                if (cover || items.length > 1) {
+                if ((cover || items.length > 1) && access.canCreateModels) {
                     step(t("savingCover"), 1);
                     try {
                         await saveAlbum(result.taf, job.name, titles, cover, result.source.endsWith(".tap") ? result.source : undefined, result.header);
@@ -284,7 +287,7 @@ export function UploadPage() {
                                 <div className="hint">{mode === "split" ? t("splitNameHint") : t("tafNameHint")}</div>
                             </div>
                         )}
-                        {!plain && (
+                        {!plain && access.canCreateModels && (
                             <div className="list" style={{ marginBottom: 14 }}>
                                 <Row
                                     leading={

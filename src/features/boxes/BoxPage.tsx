@@ -1,7 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+    BatteryMedium,
     Cpu,
     Disc3,
+    ExternalLink,
+    FileKey,
+    Lock,
     Ear,
     Hand,
     Headphones,
@@ -10,32 +14,37 @@ import {
     MoveDiagonal,
     Pencil,
     Play,
+    PlugZap,
     Radio,
     RefreshCw,
     Settings2,
+    Share2,
     SlidersHorizontal,
     Speaker,
+    Trash2,
     Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { tc } from "../../api/tc";
 import type { SettingOption } from "../../api/types";
 import { ago, contentTitle, dateTime, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
-import { keys, useAllTags, useBoxes, useBoxImage, useBoxModels, useBoxState, useBoxesDiffer, useCfwBox, useSettings } from "../../lib/queries";
+import { keys, useAllTags, useBoxes, useBoxImage, useBoxModels, useBoxState, useBoxesDiffer, useCfwBox, useSetting, useSettings } from "../../lib/queries";
 import { BoxModelSheet } from "./BoxModelSheet";
 import { usePlayer } from "../../player/Player";
-import { ErrorBox, Loading, Page, Row, Section, useUi } from "../../ui/kit";
+import { ErrorBox, Loading, Page, Row, Section, SwitchRow, useUi } from "../../ui/kit";
+import { certStatusText } from "../tools/CertificatesPage";
 import { FigurePic } from "../../ui/FigurePic";
 import { TonieImage } from "../../ui/TonieImage";
 import { SettingRow } from "../settings/SettingControls";
 import { cfwSettingsFor } from "../settings/visibility";
 import { batteryInfo, remoteAvailable } from "./BoxesPage";
 import { RemoteControl } from "./RemoteControl";
+import { ShareSheet, useCanShare } from "../users/ShareSheet";
 
-const pct15 = (v: number) => `${Math.round((v / 15) * 100)} %`;
 
 export function BoxPage() {
     const { id = "" } = useParams();
@@ -48,8 +57,27 @@ export function BoxPage() {
     const img = useBoxImage(box);
     const models = useBoxModels();
     const [modelOpen, setModelOpen] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const canShare = useCanShare();
+    const access = useAccess();
     const tags = useAllTags();
     const settings = useSettings(id);
+    const cfwEnabled = useSetting("cfw.enabled", id);
+    const cfwForced = useSetting("cfw.force_box_settings", id);
+    const boxGeneration = useSetting("toniebox.boxGeneration", id);
+    const apiAccess = useSetting("toniebox.api_access", id);
+    const certStatus = useSetting("internal.boxCertStatus", id);
+    const checkHackiebox = useSetting("frontend.check_cc3200_cfw");
+    const boxIC = useSetting("internal.toniebox_firmware.boxIC", id);
+    const ip = state.data?.ip;
+    // the custom firmware of the hackiebox project answers on the box itself; boxIC 1 is a CC3200
+    const hackiebox = useQuery({
+        queryKey: ["hackiebox", ip],
+        queryFn: () => fetch(`http://${ip}/api/ajax?cmd=box-battery&sub=stats`).then((r) => r.ok),
+        enabled: checkHackiebox.data === "true" && boxIC.data === "1" && Boolean(ip),
+        retry: false,
+    });
+    const navigate = useNavigate();
     const boxesDiffer = useBoxesDiffer();
     const player = usePlayer();
     const ui = useUi();
@@ -77,11 +105,11 @@ export function BoxPage() {
     const opts = new Map<string, SettingOption>((settings.data ?? []).map((o) => [o.ID, o]));
     const opt = (k: string) => opts.get(k);
     const useCfwSettings = cfwSettingsFor({
-        enabled: opt("cfw.enabled")?.value === true,
+        enabled: cfwEnabled.data === "true",
         isCfwBox: Boolean(cfw?.isCfw),
-        forced: opt("cfw.force_box_settings")?.value === true,
+        forced: cfwForced.data === "true",
     });
-    const tb2 = Number(opt("toniebox.boxGeneration")?.value) === 2;
+    const tb2 = boxGeneration.data === "2";
     const tagCount = tags.data?.filter((x) => x.boxIds.includes(id) && x.type !== "system").length;
 
     const rename = async () => {
@@ -134,6 +162,12 @@ export function BoxPage() {
                             </span>
                         )}
                         {cfw?.isCfw && <span className="badge accent">CFW</span>}
+                        {apiAccess.data === "false" && (
+                            <span className="badge danger">
+                                <Lock size={12} />
+                                {t("apiAccessOff")}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
@@ -163,7 +197,7 @@ export function BoxPage() {
                 </Section>
             )}
 
-            {remoteAvailable(cfw) && (
+            {remoteAvailable(cfw) && access.can("box", id, "box.cfw") && (
                 <div ref={remoteRef} className="section" style={{ scrollMarginTop: 70 }}>
                     <div className="section-head">
                         <h2 className="section-title">{t("remote")}</h2>
@@ -178,8 +212,8 @@ export function BoxPage() {
                     <Section title={t("boxSettings")} footer={t("boxSettingsHint")}>
                         {useCfwSettings ? (
                             <>
-                                {row("cfw.box.speaker_limit", { label: t("speakerLimit"), icon: <Speaker size={17} />, format: pct15 })}
-                                {row("cfw.box.headphone_limit", { label: t("headphoneLimit"), icon: <Headphones size={17} />, format: pct15 })}
+                                {row("cfw.box.speaker_limit", { label: t("speakerLimit"), icon: <Speaker size={17} />})}
+                                {row("cfw.box.headphone_limit", { label: t("headphoneLimit"), icon: <Headphones size={17} />})}
                             </>
                         ) : (
                             <>
@@ -196,6 +230,8 @@ export function BoxPage() {
                                 {row("cfw.box.tilt_lock", { label: t("tiltLock"), sub: t("tiltLockHint"), icon: <MoveDiagonal size={17} /> })}
                                 {row("cfw.box.volume_lock", { label: t("volumeLock"), sub: t("volumeLockHint"), icon: <Volume2 size={17} /> })}
                                 {row("cfw.box.both_ears_off", { label: t("bothEarsOff"), sub: t("bothEarsOffHint"), icon: <Ear size={17} /> })}
+                                {row("cfw.box.idle_off_battery", { label: t("idleOffBattery"), sub: t("idleOffHint"), icon: <BatteryMedium size={17} />, format: (v) => `${v} ${t("minutesShort")}` })}
+                                {row("cfw.box.idle_off_station", { label: t("idleOffStation"), sub: t("idleOffHint"), icon: <PlugZap size={17} />, format: (v) => `${v} ${t("minutesShort")}` })}
                             </>
                         ) : (
                             <>
@@ -212,7 +248,8 @@ export function BoxPage() {
             <Section>
                 {boxesDiffer && <Row icon={<Disc3 size={17} />} title={t("toniesOfBox")} value={tagCount ?? ""} to={`/tonies?box=${id}`} />}
                 <Row icon={<SlidersHorizontal size={17} />} title={t("allBoxSettings")} sub={t("allBoxSettingsHint")} to={`/box/${id}/settings`} />
-                {cfw?.isCfw && (
+                {canShare("box", id) && <Row icon={<Share2 size={17} />} title={t("share")} sub={t("shareHint")} onClick={() => setSharing(true)} chevron />}
+                {cfw?.isCfw && access.can("box", id, "box.update") && (
                     <Row
                         icon={<RefreshCw size={17} />}
                         title={t("firmwareUpdate")}
@@ -221,6 +258,40 @@ export function BoxPage() {
                 )}
             </Section>
 
+            {access.admin && (
+                <Section title={t("boxAdmin")}>
+                    <SwitchRow
+                        icon={<Lock size={17} />}
+                        title={t("apiAccess")}
+                        sub={t("apiAccessHint")}
+                        checked={apiAccess.data !== "false"}
+                        onChange={async (on) => {
+                            await ui.run(() => tc.setSetting("toniebox.api_access", on, id), t("saved"));
+                            apiAccess.refetch();
+                        }}
+                    />
+                    <Row
+                        icon={<FileKey size={17} />}
+                        title={t("boxCertificates")}
+                        value={certStatus.data !== undefined ? certStatusText(certStatus.data) : undefined}
+                        to={`/system/certificates?box=${id}`}
+                    />
+                    <Row
+                        icon={<Trash2 size={17} />}
+                        title={t("removeBox")}
+                        sub={t("removeBoxHint")}
+                        danger
+                        chevron={false}
+                        onClick={async () => {
+                            if (!(await ui.confirm({ title: t("removeBoxTitle", { name: box.boxName || box.ID }), text: t("removeBoxHint"), confirm: t("remove"), danger: true }))) return;
+                            if ((await ui.run(() => tc.removeBox(id), t("boxRemoved"))) === undefined) return;
+                            await qc.invalidateQueries({ queryKey: keys.boxes });
+                            navigate("/");
+                        }}
+                    />
+                </Section>
+            )}
+
             <Section title={t("info")}>
                 {battery && (
                     <Row
@@ -228,13 +299,15 @@ export function BoxPage() {
                         title={t("battery")}
                         value={battery.percent !== undefined ? `${battery.percent} % · ${battery.volts}` : battery.station ? `${t("charging")} · ${battery.volts}` : battery.volts}
                         sub={
-                            battery.station
-                                ? t("batteryCharging")
-                                : battery.remaining
-                                  ? t("batteryRemaining", { time: battery.remaining })
-                                  : battery.percent !== undefined && !battery.learned
-                                    ? t("batteryLearning")
-                                    : undefined
+                            battery.age
+                                ? t("batteryAsOf", { when: battery.age })
+                                : battery.station
+                                  ? t("batteryCharging")
+                                  : battery.remaining
+                                    ? t("batteryRemaining", { time: battery.remaining })
+                                    : battery.percent !== undefined && !battery.learned
+                                      ? t("batteryLearning")
+                                      : undefined
                         }
                     />
                 )}
@@ -247,6 +320,15 @@ export function BoxPage() {
                     chevron
                 />
                 {s?.ip && <Row icon={<Settings2 size={17} />} title={t("ipAddress")} value={<span className="mono selectable">{s.ip}</span>} />}
+                {hackiebox.data && (
+                    <Row
+                        icon={<ExternalLink size={17} />}
+                        title={t("boxWebFrontend")}
+                        sub={t("boxWebFrontendHint")}
+                        onClick={() => window.open(`http://${ip}`, "_blank", "noopener")}
+                        chevron
+                    />
+                )}
                 {cfw?.isCfw && (
                     <Row
                         icon={<Cpu size={17} />}
@@ -257,6 +339,7 @@ export function BoxPage() {
                 {s?.lastSeen ? <Row icon={<RefreshCw size={17} />} title={t("lastContact")} value={dateTime(s.lastSeen)} /> : null}
             </Section>
             <BoxModelSheet box={box} open={modelOpen} onClose={() => setModelOpen(false)} />
+            <ShareSheet target={sharing ? { type: "box", id, title: box.boxName || box.ID } : null} onClose={() => setSharing(false)} />
         </Page>
     );
 }

@@ -38,7 +38,8 @@ export const NO_RUID = "ffffffffffffffff";
 export const tc = {
     /* ---------- boxes ---------- */
     boxes: () => getJson<{ boxes: Box[] }>("/api/getBoxes").then((r) => r.boxes ?? []),
-    boxModels: () => getJson<BoxModel[]>("/api/tonieboxesJson").catch(() => [] as BoxModel[]),
+    // without tonieboxes.json the server answers no list
+    boxModels: () => getJson<BoxModel[]>("/api/tonieboxesJson").then((r) => (Array.isArray(r) ? r : []), () => [] as BoxModel[]),
     boxState: async (id: string): Promise<BoxState> => {
         const [online, lastRuid, lastRuidTime, lastSeen, ip, firmware] = await Promise.all([
             setting("internal.online", id),
@@ -57,6 +58,8 @@ export const tc = {
             firmware: firmware && firmware !== "0" ? firmware : "",
         };
     },
+    /** forgets a box: its settings (overlay); it comes back as new when it connects again */
+    removeBox: (id: string) => postText(`/api/settings/removeOverlay${q({ overlay: id })}`, ""),
     renameBox: (id: string, name: string) =>
         postText(`/api/settings/set/boxName${q({ overlay: id })}`, name),
 
@@ -91,10 +94,28 @@ export const tc = {
     /* ---------- custom models ---------- */
     customModels: () => getJson<CustomModel[]>("/api/toniesCustomJson"),
     upsertModel: (model: CustomModel) => postJson("/api/toniesCustomJsonUpsert", model),
-    deleteModel: (model: string) => postJson("/api/toniesCustomJsonDelete", { models: [model] }),
+    /** pictures: also the picture when no other custom tonie shows it */
+    deleteModel: (model: string, pictures = false) => postJson("/api/toniesCustomJsonDelete", { models: [model], pictures }),
+    /** the custom tonies used only by these library paths: they may go with them */
+    orphanModels: (paths: string[]) => postJson<string[]>("/api/toniesCustomJsonOrphans", paths),
+    /** the custom tonies and pictures the user may change */
+    modelsChangeable: () => getJson<{ models: string[]; images: string[] }>("/api/toniesCustomJsonChangeable"),
+    deleteCustomImage: (name: string) => postText(`/api/fileDelete${q({ special: "custom_img" })}`, name),
     renameModel: (fromModel: string, toModel: string) =>
         postJson("/api/toniesCustomJsonRename", { fromModel, toModel, updateContentJson: true }),
     reloadToniesJson: () => getText("/api/toniesJsonReload"),
+    /** the audio ids and hashes of a figure, from the custom models and tonies.json (a few MB, fetched on demand) */
+    modelAudio: async (model: string) => {
+        const lists = await Promise.all([tc.customModels(), getJson<CustomModel[]>("/api/toniesJson")]);
+        const entry = lists.flat().find((x) => x.model === model);
+        return (entry?.audio_id ?? []).map((id, i) => ({ audioId: String(id), hash: (entry!.hash?.[i] ?? "").toLowerCase() })).filter((x) => x.hash);
+    },
+    /** a flash dump of a box into the server's firmware folder; answers the file name it got there */
+    storeFlashDump: (name: string, data: Uint8Array) => {
+        const form = new FormData();
+        form.append(name, new Blob([data as BlobPart]), name);
+        return postForm("/api/esp32/uploadFirmware", form);
+    },
     uploadCustomImage: (file: File, path = "") => {
         const form = new FormData();
         form.append(file.name, file, file.name);
@@ -108,23 +129,26 @@ export const tc = {
         ),
     dirCreate: (path: string, special = "library") =>
         postText(`/api/dirCreate${q({ special })}`, path),
-    fileDelete: (path: string, isDir: boolean, special = "library", overlay?: string) =>
-        postText(`/api/${isDir ? "dirDelete" : "fileDelete"}${q({ special, overlay })}`, path),
+    /** models: also the custom tonies used only by what is deleted */
+    fileDelete: (path: string, isDir: boolean, special = "library", overlay?: string, models = false) =>
+        postText(`/api/${isDir ? "dirDelete" : "fileDelete"}${q({ special, overlay, models: models ? 1 : undefined })}`, path),
     /** everything inside a folder, all levels */
     walkTree: async (path: string, special = "library"): Promise<{ path: string; entry: FileEntry }[]> => {
-        const out: { path: string; entry: FileEntry }[] = [];
-        for (const f of await tc.files(path, special)) {
-            if (f.name === "." || f.name === "..") continue;
-            const p = `${path.replace(/\/$/, "")}/${f.name}`;
-            out.push({ path: p, entry: f });
-            if (f.isDir) out.push(...(await tc.walkTree(p, special)));
-        }
-        return out;
+        // the folders of one level are read at the same time
+        const levels = await Promise.all(
+            (await tc.files(path, special))
+                .filter((f) => f.name !== "." && f.name !== "..")
+                .map(async (f) => {
+                    const p = `${path.replace(/\/$/, "")}/${f.name}`;
+                    return [{ path: p, entry: f }, ...(f.isDir ? await tc.walkTree(p, special) : [])];
+                }),
+        );
+        return levels.flat();
     },
     /** deletes a folder with everything in it */
-    deleteTree: async (path: string, special = "library"): Promise<void> => {
+    deleteTree: async (path: string, special = "library", models = false): Promise<void> => {
         // newer servers take the whole folder, also files the lists do not show
-        if (await tc.fileDelete(path, false, special).then(() => true, () => false)) return;
+        if (await tc.fileDelete(path, false, special, undefined, models).then(() => true, () => false)) return;
         // older ones remove empty folders only
         for (const f of await tc.files(path, special)) {
             if (f.name === "." || f.name === "..") continue;
@@ -133,6 +157,11 @@ export const tc = {
             else await tc.fileDelete(p, false, special);
         }
         await tc.fileDelete(path, true, special);
+    },
+    /** moves the content TAF of a tag into the library (by/audioId/ or its root) and assigns it there */
+    migrateToLibrary: async (ruid: string, root: boolean, overlay?: string) => {
+        const r = await (await postText(`/api/migrateContent2Lib${q({ overlay })}`, `ruid=${ruid}&libroot=${root}`)).text();
+        if (r.trim() !== "OK") throw new Error(r || "failed");
     },
     fileMove: (source: string, target: string, special = "library") =>
         postText(
@@ -266,6 +295,14 @@ export const tc = {
     cfwEnabled: () => setting("cfw.enabled").then((v) => v.trim()),
     securityIncident: () => setting("internal.security_mit.incident").then((v) => v === "true"),
     restart: () => getText("/api/triggerRestart"),
+    /** a time request answered by teddyCloud itself, and one it forwards to the Boxine cloud */
+    timeOk: (viaCloud: boolean) =>
+        getText(viaCloud ? "/reverse/v1/time" : "/v1/time")
+            .then((v) => v.trim().length === 10)
+            .catch(() => false),
+    /** the newest teddyCloud on GitHub: a commit of develop or a release */
+    latestVersion: (develop: boolean) =>
+        getJson<{ sha?: string; tag_name?: string }>(develop ? "/reverseGeneric/teddycloud_develop" : "/reverseGeneric/teddycloud_release"),
 
     /* ---------- login ---------- */
     authStatus: async (): Promise<AuthStatus> => {

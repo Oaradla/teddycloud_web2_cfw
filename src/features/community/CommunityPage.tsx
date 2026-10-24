@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, ExternalLink, GitBranch, Heart, LifeBuoy, MessageCircle, Users } from "lucide-react";
+import { Award, BookOpen, ExternalLink, GitBranch, Heart, History, Languages, LifeBuoy, MessageCircle, Sparkles, Users } from "lucide-react";
 import { getJson } from "../../api/client";
 import { t } from "../../lib/i18n";
 import { Fold } from "../../ui/Fold";
@@ -41,6 +41,13 @@ export function CommunityPage() {
                 <Row icon={<Users size={17} />} title="Forum" sub={t("communityForum")} onClick={open(LINKS.forum)} right={<ExternalLink size={16} />} chevron={false} />
                 <Row icon={<BookOpen size={17} />} title="Wiki" sub={t("communityWiki")} onClick={open(LINKS.wiki)} right={<ExternalLink size={16} />} chevron={false} />
                 <Row icon={<GitBranch size={17} />} title="GitHub" sub={t("communityGithub")} onClick={open(LINKS.github)} right={<ExternalLink size={16} />} chevron={false} />
+            </Section>
+
+            <Section title={t("aboutWeb2")}>
+                <Row icon={<Sparkles size={17} />} title={t("features")} sub={t("featuresHint")} to="/community/features" />
+                <Row icon={<History size={17} />} title={t("changes")} sub={t("changesHint")} to="/community/changes" />
+                <Row icon={<Languages size={17} />} title={t("translations")} sub={t("translationsHint")} to="/community/translations" />
+                <Row icon={<Award size={17} />} title={t("credits")} sub={t("creditsHint")} to="/community/credits" />
             </Section>
 
             <Section title={t("faqTitle")}>

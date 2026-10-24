@@ -3,6 +3,7 @@ import {
     Activity,
     Bell,
     Printer,
+    Puzzle,
     Cpu,
     Languages,
     LogOut,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { tc } from "../../api/tc";
-import { getLang, setLang, t } from "../../lib/i18n";
+import { getLang, Lang, LANGS, setLang, t } from "../../lib/i18n";
 import { applyTheme, getPref, setPref, Theme } from "../../lib/prefs";
 import { persister } from "../../lib/persist";
 import { useAccess } from "../../lib/access";
@@ -25,8 +26,10 @@ import { Page, Row, Section, Segmented, useUi } from "../../ui/kit";
 export function MorePage() {
     const auth = useQuery({ queryKey: keys.auth, queryFn: tc.authStatus });
     const access = useAccess();
+    const plugins = useQuery({ queryKey: ["plugins"], queryFn: tc.plugins, staleTime: 5 * 60_000 });
+    const navPlugins = (plugins.data ?? []).filter((p) => !p.hideInNav && p.teddyCloudSection);
     const [theme, setTheme] = useState<Theme>(() => getPref("theme", "auto") as Theme);
-    const [lang, setLangState] = useState(getLang());
+    const lang = getLang();
     const qc = useQueryClient();
     const ui = useUi();
 
@@ -47,12 +50,20 @@ export function MorePage() {
                 <Row icon={<Printer size={17} />} title={t("teddyStudio")} sub={t("teddyStudioHint")} to="/studio" />
             </Section>
 
-            {(access.canServerSettings || access.admin) && (
-            <Section title={t("settings")}>
+            {navPlugins.length > 0 && (
+                <Section title={t("plugins")}>
+                    {navPlugins.map((p) => (
+                        <Row key={p.pluginId} icon={<Puzzle size={17} />} title={p.pluginName} sub={p.description} to={`/plugins/${p.pluginId}`} />
+                    ))}
+                </Section>
+            )}
+
+            {(access.canServerSettings || access.admin || access.canUpdateBoxes) && (
+                <Section title={t("settings")}>
                     {access.canServerSettings && <Row icon={<SlidersHorizontal size={17} />} title={t("serverSettings")} sub={t("serverSettingsHint")} to="/settings" />}
                     {access.admin && <Row icon={<Activity size={17} />} title={t("system")} sub={t("systemHint")} to="/system" />}
                     {access.admin && <Row icon={<Wrench size={17} />} title={t("boxSetup")} sub={t("boxSetupHint")} to="/setup" />}
-                    {access.admin && <Row icon={<Cpu size={17} />} title={t("boxUpdate")} sub={t("boxUpdateHint")} to="/boxupdate" />}
+                    {access.canUpdateBoxes && <Row icon={<Cpu size={17} />} title={t("boxUpdate")} sub={t("boxUpdateHint")} to="/boxupdate" />}
                 </Section>
             )}
 
@@ -71,6 +82,7 @@ export function MorePage() {
                                 { value: "auto", label: t("themeAuto") },
                                 { value: "light", label: t("themeLight") },
                                 { value: "dark", label: t("themeDark") },
+                                { value: "matrix", label: t("themeMatrix") },
                             ]}
                         />
                     </div>
@@ -78,17 +90,13 @@ export function MorePage() {
                 <div className="row-wrap">
                     <Row icon={<Languages size={17} />} title={t("language")} />
                     <div style={{ padding: "0 16px 12px" }}>
-                        <Segmented
-                            value={lang}
-                            onChange={(v) => {
-                                setLangState(v);
-                                setLang(v);
-                            }}
-                            options={[
-                                { value: "de", label: "Deutsch" },
-                                { value: "en", label: "English" },
-                            ]}
-                        />
+                        <select className="select" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+                            {Object.entries(LANGS).map(([code, name]) => (
+                                <option key={code} value={code}>
+                                    {name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
             </Section>

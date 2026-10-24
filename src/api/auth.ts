@@ -66,6 +66,9 @@ export interface AclMine {
     boxes: Record<string, AclMineEntry>;
     tonies: Record<string, AclMineEntry>;
     folders: Record<string, AclMineEntry>;
+    /** custom tonies by lower case model id; only the own ones */
+    models?: Record<string, AclMineEntry>;
+    images?: Record<string, AclMineEntry>;
     unassigned: { tonie?: string; box?: string };
 }
 
@@ -183,6 +186,8 @@ export const auth = {
         return { ...ADMIN_MINE, ...(await r.json()) };
     },
     catalog: () => getJson<AclCatalog>("/api/acl/catalog"),
+    /** what a user owns or has shared (admins only) */
+    owned: (user: string) => getJson<Record<"boxes" | "tonies" | "folders" | "models" | "images", { id: string; owner: boolean; granted?: string }[]>>(`/api/acl/owned${q({ user })}`),
     aclUsers: () => getJson<{ users?: { username: string; level: string; group?: string }[] }>("/api/acl/users").then((d) => d.users ?? []),
     entry: (type: AclScope, id: string) => getJson<AclEntry>(`/api/acl/get${q({ type, id })}`),
     saveEntry: (type: AclScope, id: string, changes: { owners?: string[]; shares?: Record<string, string> }) =>

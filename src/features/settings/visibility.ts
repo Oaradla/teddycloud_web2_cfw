@@ -86,3 +86,10 @@ export const shownForBox = (id: string, cfw: CfwBoxState, overlayed: boolean) =>
     if (REPLACED_BY_CFW.includes(id)) return !cfwShown || overlayed;
     return PER_BOX.some((part) => id.includes(part));
 };
+
+/** for which boxes a setting of the box page is there at all: only with the CFW, only without, or every box */
+export const boxSettingScope = (id: string): "cfw" | "plain" | undefined => {
+    if (id === "cfw.enabled" || isCfwBoxSetting(id) || CFW_BOX_SWITCHES.includes(id)) return "cfw";
+    if (id === "cfw.force_box_settings" || id === "cfw.event_notice_language" || REPLACED_BY_CFW.includes(id)) return "plain";
+    return undefined;
+};

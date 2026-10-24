@@ -25,13 +25,19 @@ import {
     Wand2,
     X,
     Scissors,
+    Share2,
+    Wrench,
+    FolderTree,
+    Braces,
+    Copy,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { backendUrl } from "../../api/client";
 import { tc } from "../../api/tc";
 import type { FileEntry } from "../../api/types";
-import { ago, baseName, bytes, isAudio, isImage, isTaf, isTap, joinPath, lengthText, stripExt } from "../../lib/format";
+import { ago, baseName, bytes, isAudio, isImage, isTaf, isTap, joinPath, lengthText, parentPath, stripExt } from "../../lib/format";
+import { ShareSheet, useCanShare, type ShareTarget } from "../users/ShareSheet";
 import { t } from "../../lib/i18n";
 import { filePlayItem, libraryFileUrl } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
@@ -47,6 +53,32 @@ import { PlaylistEditor, PlaylistStart } from "./PlaylistEditor";
 import { Lightbox, LightboxItem } from "../../ui/Lightbox";
 import { useSelection } from "../../ui/useSelection";
 import { LibraryPicker } from "./LibraryPicker";
+import { UnusedTafsSheet } from "./UnusedTafsSheet";
+import { useDeepSearch } from "../../lib/deepSearch";
+import { DeepResults } from "./DeepResults";
+import { TextSheet } from "../../ui/TextSheet";
+
+/** entries for tonies.custom.json from the TAF headers, to fill in and paste */
+const customJsonSnippet = (files: FileEntry[]) =>
+    files
+        .filter((f) => isTaf(f.name) && f.tafHeader?.audioId && f.tafHeader.sha1Hash)
+        .map((f, i) =>
+            JSON.stringify({
+                no: String(i + 1),
+                model: f.tonieInfo?.model || "CUST-",
+                audio_id: [String(f.tafHeader!.audioId)],
+                hash: [f.tafHeader!.sha1Hash],
+                title: stripExt(f.name),
+                series: f.tonieInfo?.series || "",
+                episodes: f.tonieInfo?.episode || "",
+                tracks: f.tonieInfo?.tracks || [],
+                release: "",
+                language: f.tonieInfo?.language || "",
+                category: "",
+                pic: f.tonieInfo?.picture || "",
+            }),
+        )
+        .join(",\n");
 
 type Sort = "name" | "date" | "size" | "length";
 type Dir = "asc" | "desc";
@@ -72,6 +104,8 @@ export function LibraryPage() {
     const [view, setView] = useState<View>(() => getPref("lib.view", "list") as View);
     const [show, setShow] = useState<Show>("all");
     const [names, setNames] = useState(() => getPref("lib.names", "") === "1");
+    const [deep, setDeep] = useState(() => getPref("lib.deep", "") === "1");
+    const deepSearch = useDeepSearch(path, filter, deep);
     const [menu, setMenu] = useState(false);
     const menuBtn = useRef<HTMLButtonElement>(null);
     const [assignFor, setAssignFor] = useState<string | null>(null);
@@ -80,8 +114,12 @@ export function LibraryPage() {
     const [details, setDetails] = useState<FileEntry | null>(null);
     const [oggFor, setOggFor] = useState<FileEntry | null>(null);
     const [playlist, setPlaylist] = useState<PlaylistStart | null>(null);
+    const [text, setText] = useState<{ title: string; text: string; hint?: string } | null>(null);
+    const [unusedOpen, setUnusedOpen] = useState(false);
     const ui = useUi();
     const qc = useQueryClient();
+    const canShare = useCanShare();
+    const [shareFor, setShareFor] = useState<ShareTarget | null>(null);
     const player = usePlayer();
     const navigate = useNavigate();
     const invalidateTags = useInvalidateTags();
@@ -98,7 +136,10 @@ export function LibraryPage() {
         setParams(p === "/" ? {} : { path: p });
     };
     const prefetch = (p: string) => qc.prefetchQuery({ queryKey: keys.files(p), queryFn: () => tc.files(p), staleTime: 30_000 });
-    const refresh = () => qc.invalidateQueries({ queryKey: ["files"] });
+    const refresh = () => {
+        qc.invalidateQueries({ queryKey: ["files"] });
+        qc.invalidateQueries({ queryKey: ["walkTree"] });
+    };
 
     const list = useMemo(() => {
         const f = filter.trim().toLowerCase();
@@ -140,27 +181,11 @@ export function LibraryPage() {
         refresh();
     };
 
-    /** custom models whose audio id belongs to one of these TAFs */
-    const modelsOf = async (entries: FileEntry[]) => {
-        const ids = new Set(entries.map((e) => e.tafHeader?.audioId).filter(Boolean).map(String));
-        if (!ids.size) return [];
-        const models = await tc.customModels().catch(() => []);
-        return models.filter((m) => m.audio_id.some((id) => ids.has(String(id))));
-    };
-
-    /** deletes files and folders (with content), asking for the custom models that belong to them */
+    /** deletes files and folders (with content), asking for the custom tonies used only by them */
     const removeMany = async (xs: FileEntry[]) => {
-        const all: FileEntry[] = [];
         let count = 0;
-        for (const x of xs) {
-            all.push(x);
-            if (x.isDir) {
-                const inside = await tc.walkTree(joinPath(path, x.name)).catch(() => []);
-                count += inside.length;
-                all.push(...inside.map((i) => i.entry));
-            }
-        }
-        const models = await modelsOf(all);
+        for (const x of xs) if (x.isDir) count += (await tc.walkTree(joinPath(path, x.name)).catch(() => [])).length;
+        const models = await tc.orphanModels(xs.map((x) => joinPath(path, x.name))).catch(() => [] as string[]);
         const one = xs.length === 1 ? xs[0] : null;
         const { ok, checked } = await ui.confirmCheck({
             title: one ? (one.isDir ? t("deleteFolder") : t("deleteFile")) : t("deleteN", { n: xs.length }),
@@ -173,11 +198,11 @@ export function LibraryPage() {
         let failed = 0;
         for (const x of xs) {
             const p = joinPath(path, x.name);
-            await (x.isDir ? tc.deleteTree(p) : tc.fileDelete(p, false)).catch(() => failed++);
+            await (x.isDir ? tc.deleteTree(p, "library", checked) : tc.fileDelete(p, false, "library", undefined, checked)).catch(() => failed++);
         }
         if (checked && models.length) {
-            for (const m of models) await tc.deleteModel(m.model).catch(() => failed++);
             qc.invalidateQueries({ queryKey: ["customModels"] });
+            qc.invalidateQueries({ queryKey: ["aclMine"] });
             invalidateTags();
         }
         if (failed) ui.toast("error", t("bulkFailed", { n: failed }));
@@ -232,6 +257,26 @@ export function LibraryPage() {
         if (r) go("/" + r.folder);
     };
 
+    const showJson = async (x: FileEntry) => {
+        const data = await ui.run(() => tc.readTap(joinPath(path, x.name)));
+        if (data) setText({ title: x.name, text: JSON.stringify(data, null, 2) });
+    };
+
+    /** a copy of a playlist; it builds a TAF of its own */
+    const duplicateTap = async (x: FileEntry) => {
+        const name = await ui.prompt({ title: t("duplicatePlaylist"), label: t("name"), value: `${stripExt(x.name)} (2).tap` });
+        if (!name) return;
+        const fileName = name.endsWith(".tap") ? name : name + ".tap";
+        await ui.run(async () => {
+            const tap = await tc.readTap(joinPath(path, x.name));
+            const copy = { ...tap, audio_id: Math.floor(Date.now() / 1000), filepath: "lib://" + joinPath(path, fileName + ".taf").replace(/^\//, "") };
+            await tc.saveTap(copy, path, fileName);
+        }, t("duplicated"));
+        refresh();
+    };
+
+    const snippet = (xs: FileEntry[]) => setText({ title: t("customJsonSnippet"), text: customJsonSnippet(xs), hint: t("customJsonSnippetHint") });
+
     const actions = (x: FileEntry) => {
         const p = joinPath(path, x.name);
         const playable = isTaf(x.name) || isAudio(x.name);
@@ -241,6 +286,14 @@ export function LibraryPage() {
             { label: t("play"), icon: <Play size={17} />, onSelect: () => player.play(filePlayItem(p, x)), hidden: !playable },
             { label: t("assignToTonie"), icon: <Disc3 size={17} />, onSelect: () => setAssignFor(p), hidden: !tonieFile },
             { label: t("editPlaylist"), icon: <ListMusic size={17} />, onSelect: () => setPlaylist({ edit: p }), hidden: !isTap(x.name) },
+            { label: t("duplicatePlaylist"), icon: <Copy size={17} />, onSelect: () => duplicateTap(x), hidden: !isTap(x.name) },
+            { label: t("showJson"), icon: <Braces size={17} />, onSelect: () => showJson(x), hidden: !isTap(x.name) && !/\.json$/i.test(x.name) },
+            {
+                label: t("showTafHeader"),
+                icon: <Braces size={17} />,
+                onSelect: () => setText({ title: x.name, text: JSON.stringify(x.tafHeader, null, 2) }),
+                hidden: !x.tafHeader,
+            },
             {
                 label: t("splitTaf"),
                 icon: <Scissors size={17} />,
@@ -254,6 +307,7 @@ export function LibraryPage() {
                 hidden: !tonieFile,
             },
             { label: t("convertToTaf"), icon: <Wand2 size={17} />, onSelect: () => encode(x), hidden: !isAudio(x.name) },
+            { label: t("share"), icon: <Share2 size={17} />, onSelect: () => setShareFor({ type: "folder", id: p.replace(/^\/+/, ""), title: x.name }), hidden: !x.isDir || !canShare("folder", p.replace(/^\/+/, "")) },
             { label: t("rename"), icon: <Pencil size={17} />, onSelect: () => rename(x) },
             { label: t("move"), icon: <ArrowRightLeft size={17} />, onSelect: () => setMoveFor(x) },
             { label: t("download"), icon: <Download size={17} />, onSelect: () => download(x), hidden: x.isDir },
@@ -355,6 +409,22 @@ export function LibraryPage() {
                             </button>
                         </>
                     )}
+                    <button
+                        className="icon-btn"
+                        aria-label={t("tools")}
+                        onClick={() =>
+                            ui.actions(t("tools"), [
+                                { label: t("unusedTafs"), icon: <FileAudio size={17} />, onSelect: () => setUnusedOpen(true) },
+                                {
+                                    label: selectedFiles.length ? t("customJsonSnippetSelected", { n: selectedFiles.length }) : t("customJsonSnippet"),
+                                    icon: <Braces size={17} />,
+                                    onSelect: () => snippet(selectedFiles.length ? selectedFiles : list),
+                                },
+                            ])
+                        }
+                    >
+                        <Wrench size={20} />
+                    </button>
                     <button className="icon-btn" onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)} aria-label={t("upload")}>
                         <Upload size={21} />
                     </button>
@@ -374,7 +444,19 @@ export function LibraryPage() {
                     </div>
                 )}
                 <div className="toolbar">
-                    <SearchField value={filter} onChange={setFilter} placeholder={t("filterFolder")} />
+                    <SearchField value={filter} onChange={setFilter} placeholder={deep ? t("searchSubfoldersPlaceholder") : t("filterFolder")} />
+                    <button
+                        className={`icon-btn filled ${deep ? "on" : ""}`}
+                        onClick={() => {
+                            setDeep(!deep);
+                            setPref("lib.deep", deep ? "" : "1");
+                        }}
+                        aria-pressed={deep}
+                        aria-label={t("searchSubfolders")}
+                        title={t("searchSubfolders")}
+                    >
+                        <FolderTree size={19} />
+                    </button>
                     <button
                         className="icon-btn filled"
                         onClick={() => pref<View>("lib.view", setView)(view === "list" ? "grid" : "list")}
@@ -459,9 +541,20 @@ export function LibraryPage() {
                 />
             </Popover>
 
-            {files.isLoading && <Loading />}
-            {files.error && !files.data && <ErrorBox error={files.error} retry={() => files.refetch()} />}
-            {files.data && list.length === 0 && (
+            {deepSearch.active && (
+                <DeepResults
+                    loading={deepSearch.loading}
+                    hits={deepSearch.hits}
+                    root={path}
+                    onOpen={(p, entry) => {
+                        go(entry.isDir ? p : parentPath(p));
+                        if (!entry.isDir) setDetails(entry);
+                    }}
+                />
+            )}
+            {!deepSearch.active && files.isLoading && <Loading />}
+            {!deepSearch.active && files.error && !files.data && <ErrorBox error={files.error} retry={() => files.refetch()} />}
+            {!deepSearch.active && files.data && list.length === 0 && (
                 <Empty
                     icon={<Folder size={28} />}
                     title={filter || show !== "all" ? t("nothingFound") : t("folderEmpty")}
@@ -476,7 +569,7 @@ export function LibraryPage() {
                     }
                 />
             )}
-            {list.length > 0 && view === "list" && (
+            {!deepSearch.active && list.length > 0 && view === "list" && (
                 <div className="list">
                     {list.map((x) => (
                         <div key={x.name} className="row-wrap" role="button" tabIndex={0} {...sel.itemProps(x.name)} {...dirProps(x)}>
@@ -520,7 +613,7 @@ export function LibraryPage() {
                     ))}
                 </div>
             )}
-            {list.length > 0 && view === "grid" && (
+            {!deepSearch.active && list.length > 0 && view === "grid" && (
                 <div className={`grid-files ${sel.selecting ? "selecting" : ""}`}>
                     {list.map((x) => (
                         <div
@@ -569,6 +662,8 @@ export function LibraryPage() {
                 </div>
             )}
             <PlaylistEditor start={playlist} onClose={() => setPlaylist(null)} />
+            <TextSheet title={text?.title ?? ""} text={text?.text ?? null} hint={text?.hint} onClose={() => setText(null)} />
+            <UnusedTafsSheet open={unusedOpen} onClose={() => setUnusedOpen(false)} />
             {zoom && <Lightbox items={[zoom]} index={0} onClose={() => setZoom(null)} />}
             <TagPicker
                 open={assignFor !== null}
@@ -580,6 +675,7 @@ export function LibraryPage() {
                     invalidateTags();
                 }}
             />
+            <ShareSheet target={shareFor} onClose={() => setShareFor(null)} />
             <LibraryPicker open={moveFor !== null} onClose={() => setMoveFor(null)} folderMode startPath={path} title={t("moveTo")} onPick={move} />
             <ModelEditor start={coverFor} onClose={() => setCoverFor(null)} onSaved={refresh} />
             <DownloadSheet

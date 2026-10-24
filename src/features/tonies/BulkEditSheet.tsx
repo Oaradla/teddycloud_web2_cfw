@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { tc } from "../../api/tc";
 import type { CfwProfile, CfwTag } from "../../api/types";
 import { t } from "../../lib/i18n";
-import { TagWithBox, useCfwBoxes, useInvalidateTags, useSettings } from "../../lib/queries";
+import { TagWithBox, useCfwBoxes, useInvalidateTags, useSetting } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
 import { Loading, Notice, Row, Section, Segmented, useUi } from "../../ui/kit";
 import { CfwProfileFields, EMPTY_PROFILE, FieldState, MIXED, Mixed, PROFILE_KEYS, ProfileValues } from "./CfwProfileFields";
@@ -28,8 +28,8 @@ export function BulkEditSheet({ open, onClose, tags }: { open: boolean; onClose:
     const qc = useQueryClient();
     const invalidateTags = useInvalidateTags();
     const cfwBoxes = useCfwBoxes();
-    const globalSettings = useSettings("");
-    const showCfw = cfwBoxes.data != null && globalSettings.data?.find((o) => o.ID === "cfw.show_tag_settings")?.value === true;
+    const showTagSettings = useSetting("cfw.show_tag_settings");
+    const showCfw = cfwBoxes.data != null && showTagSettings.data === "true";
     const ruids = useMemo(() => tags.map((x) => x.ruid).sort(), [tags]);
     const cfwTags = useQuery({
         queryKey: ["cfwTags", ruids],

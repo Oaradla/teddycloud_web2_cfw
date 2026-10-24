@@ -30,6 +30,13 @@ export function useAccess() {
         staleTime: 60_000,
     });
     const m = active ? (mine.data ?? ADMIN_MINE) : ADMIN_MINE;
+    // also those used only where the user may change things (folders, tonies)
+    const changeable = useQuery({
+        queryKey: ["aclMine", status.data?.username ?? "", "models"],
+        queryFn: tc.modelsChangeable,
+        enabled: active && !m.admin && m.system.includes("model.create"),
+        staleTime: 60_000,
+    });
 
     const can = (scope: AclScope | "system", id: string, right: string) => {
         if (m.admin) return true;
@@ -57,5 +64,13 @@ export function useAccess() {
         owns,
         canManageUsers: m.admin || m.system.includes("users.manage"),
         canServerSettings: m.admin || m.system.includes("system.settings"),
+        canCreateModels: m.admin || m.system.includes("model.create"),
+        /** the box update page: the update right on at least one box */
+        canUpdateBoxes: m.admin || Object.values(m.boxes).some((b) => b.rights?.includes("box.update")),
+        /** custom tonies the user added, or used only where the user may change things */
+        mayChangeModel: (model: string) =>
+            m.admin || Boolean(m.models?.[model.toLowerCase()]?.owner) || Boolean(changeable.data?.models.some((x) => x.toLowerCase() === model.toLowerCase())),
+        /** pictures in custom_img the user added, or shown only by custom tonies the user may change */
+        mayDeleteImage: (name: string) => m.admin || Boolean(m.images?.[name]?.owner) || Boolean(changeable.data?.images.includes(name)),
     };
 }

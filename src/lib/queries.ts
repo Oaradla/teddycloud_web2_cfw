@@ -108,6 +108,10 @@ export const useTag = (ruid: string, overlay: string) =>
 export const useSettings = (overlay: string) =>
     useQuery({ queryKey: keys.settings(overlay), queryFn: () => tc.settingsIndex(overlay || undefined) });
 
+/** one setting as text, also for users who may not list it with all settings */
+export const useSetting = (key: string, overlay = "") =>
+    useQuery({ queryKey: [...keys.settings(overlay), key], queryFn: () => tc.getSetting(key, overlay || undefined) });
+
 export const useFiles = (path: string) =>
     useQuery({ queryKey: keys.files(path), queryFn: () => tc.files(path) });
 
