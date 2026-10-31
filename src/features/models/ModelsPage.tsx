@@ -1,4 +1,13 @@
-import { Disc3, ImageDown, ImagePlus, LayoutGrid, List, Plus, Shapes, UserRound } from "lucide-react";
+import {
+    Disc3,
+    ImageDown,
+    ImagePlus,
+    LayoutGrid,
+    List,
+    Plus,
+    Shapes,
+    UserRound,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
@@ -34,15 +43,35 @@ export function ModelsPage() {
         const f = query.trim().toLowerCase();
         return (models.data ?? [])
             .filter((m) => kind === "all" || (kind === "cover") === m.audio_id.length > 0)
-            .filter((m) => !f || `${m.model} ${m.series} ${m.episodes} ${m.title}`.toLowerCase().includes(f))
-            .sort((a, b) => (a.series || a.model).localeCompare(b.series || b.model, undefined, { numeric: true }));
+            .filter(
+                (m) =>
+                    !f ||
+                    `${m.model} ${m.series} ${m.episodes} ${m.title}`.toLowerCase().includes(f),
+            )
+            .sort((a, b) =>
+                (a.series || a.model).localeCompare(b.series || b.model, undefined, {
+                    numeric: true,
+                }),
+            );
     }, [models.data, query, kind]);
 
     const create = () =>
-        ui.actions(t("whatToCreate"), [
-            { label: t("newFigure"), icon: <UserRound size={17} />, onSelect: () => setEditing({ mode: "figure" }) },
-            { label: t("newCover"), icon: <ImagePlus size={17} />, onSelect: () => setEditing({ mode: "cover" }) },
-            { label: t("overrideOriginal"), icon: <Disc3 size={17} />, onSelect: () => setPickOriginal(true) },
+        ui.actions(t("models.whatToCreate"), [
+            {
+                label: t("common.newFigure"),
+                icon: <UserRound size={17} />,
+                onSelect: () => setEditing({ mode: "figure" }),
+            },
+            {
+                label: t("models.newCover"),
+                icon: <ImagePlus size={17} />,
+                onSelect: () => setEditing({ mode: "cover" }),
+            },
+            {
+                label: t("models.overrideOriginal"),
+                icon: <Disc3 size={17} />,
+                onSelect: () => setPickOriginal(true),
+            },
         ]);
     const override = async (model: string) => {
         const info = (await ui.run(() => tc.searchTonies(model)))?.find((x) => x.model === model);
@@ -51,12 +80,12 @@ export function ModelsPage() {
 
     return (
         <Page
-            title={t("customModels")}
-            subtitle={t("customModelsHint")}
+            title={t("common.customModels")}
+            subtitle={t("models.customModelsHint")}
             back="/more"
             right={
                 access.canCreateModels && (
-                    <button className="icon-btn" onClick={create} aria-label={t("newModel")}>
+                    <button className="icon-btn" onClick={create} aria-label={t("models.newModel")}>
                         <Plus size={24} />
                     </button>
                 )
@@ -65,7 +94,11 @@ export function ModelsPage() {
             <div className="sticky-tools">
                 <div className="toolbar">
                     <SearchField value={query} onChange={setQuery} />
-                    <button className="icon-btn filled" onClick={toggleView} aria-label={view === "list" ? t("viewGrid") : t("viewList")}>
+                    <button
+                        className="icon-btn filled"
+                        onClick={toggleView}
+                        aria-label={view === "list" ? t("common.viewGrid") : t("common.viewList")}
+                    >
                         {view === "list" ? <LayoutGrid size={19} /> : <List size={19} />}
                     </button>
                 </div>
@@ -74,10 +107,12 @@ export function ModelsPage() {
                         value={kind}
                         onChange={setKind}
                         options={[
-                            { value: "all", label: t("all") },
-                            { value: "figure", label: t("figures") },
-                            { value: "cover", label: t("covers") },
-                            ...(access.canCreateModels ? [{ value: "pictures" as const, label: t("pictures") }] : []),
+                            { value: "all", label: t("common.all") },
+                            { value: "figure", label: t("models.figures") },
+                            { value: "cover", label: t("models.covers") },
+                            ...(access.canCreateModels
+                                ? [{ value: "pictures" as const, label: t("common.pictures") }]
+                                : []),
                         ]}
                     />
                 </div>
@@ -86,35 +121,52 @@ export function ModelsPage() {
                 <div className="btn-row" style={{ marginBottom: 10 }}>
                     <button className="btn soft" onClick={() => setEditing({ mode: "figure" })}>
                         <UserRound size={18} />
-                        {t("newFigure")}
+                        {t("common.newFigure")}
                     </button>
                     <button className="btn soft" onClick={() => setEditing({ mode: "cover" })}>
                         <ImagePlus size={18} />
-                        {t("newCover")}
+                        {t("models.newCover")}
                     </button>
                 </div>
             )}
             {/* changes the pictures of all custom tonies */}
             {access.admin && (
-                <button className="btn ghost small" style={{ marginBottom: 14, padding: "0 4px" }} onClick={() => setOptimize(true)}>
+                <button
+                    className="btn ghost small"
+                    style={{ marginBottom: 14, padding: "0 4px" }}
+                    onClick={() => setOptimize(true)}
+                >
                     <ImageDown size={16} />
-                    {t("optimizeImages")}
+                    {t("models.optimizeImages")}
                 </button>
             )}
             {kind === "pictures" && <PicturesList models={models.data ?? []} />}
             {kind !== "pictures" && models.isLoading && <Loading />}
             {models.error && <ErrorBox error={models.error} retry={() => models.refetch()} />}
-            {kind !== "pictures" && models.data && list.length === 0 && <Empty icon={<Shapes size={28} />} title={query ? t("nothingFound") : t("noModels")} />}
+            {kind !== "pictures" && models.data && list.length === 0 && (
+                <Empty
+                    icon={<Shapes size={28} />}
+                    title={query ? t("common.nothingFound") : t("models.noModels")}
+                />
+            )}
             {kind !== "pictures" && list.length > 0 && view === "grid" && (
                 <div className="grid-tonies">
                     {list.map((m) => (
-                        <div key={m.model} className="tonie-tile" role="button" tabIndex={0} onClick={() => setEditing({ mode: "edit", model: structuredClone(m) })}>
+                        <div
+                            key={m.model}
+                            className="tonie-tile"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setEditing({ mode: "edit", model: structuredClone(m) })}
+                        >
                             <div className="pic">
                                 <TonieImage src={m.pic} />
                             </div>
                             <div className="flags">
                                 <span />
-                                <span className={`badge ${m.audio_id.length ? "ok" : "accent"}`}>{m.audio_id.length ? t("cover") : t("figure")}</span>
+                                <span className={`badge ${m.audio_id.length ? "ok" : "accent"}`}>
+                                    {m.audio_id.length ? t("models.cover") : t("common.figure")}
+                                </span>
                             </div>
                             <div className="meta">
                                 <div className="series">{m.series || m.title || m.model}</div>
@@ -132,7 +184,11 @@ export function ModelsPage() {
                             leading={<TonieImage src={m.pic} size={46} />}
                             title={m.series || m.title || m.model}
                             sub={m.episodes || undefined}
-                            right={<span className={`badge ${m.audio_id.length ? "ok" : "accent"}`}>{m.audio_id.length ? t("cover") : t("figure")}</span>}
+                            right={
+                                <span className={`badge ${m.audio_id.length ? "ok" : "accent"}`}>
+                                    {m.audio_id.length ? t("models.cover") : t("common.figure")}
+                                </span>
+                            }
                             onClick={() => setEditing({ mode: "edit", model: structuredClone(m) })}
                             chevron
                         />
@@ -140,8 +196,16 @@ export function ModelsPage() {
                 </div>
             )}
             <ModelEditor start={editing} onClose={() => setEditing(null)} />
-            <ModelPicker open={pickOriginal} onClose={() => setPickOriginal(false)} onPick={override} />
-            <ImageOptimizer open={optimize} onClose={() => setOptimize(false)} models={models.data ?? []} />
+            <ModelPicker
+                open={pickOriginal}
+                onClose={() => setPickOriginal(false)}
+                onPick={override}
+            />
+            <ImageOptimizer
+                open={optimize}
+                onClose={() => setOptimize(false)}
+                models={models.data ?? []}
+            />
         </Page>
     );
 }

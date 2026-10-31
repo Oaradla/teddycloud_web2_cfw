@@ -9,11 +9,20 @@ import { tc } from "../api/tc";
 export function useDeepSearch(root: string, query: string, enabled: boolean) {
     const q = query.trim().toLowerCase();
     const active = enabled && q.length >= 2;
-    const tree = useQuery({ queryKey: ["walkTree", root], queryFn: () => tc.walkTree(root), enabled: active, staleTime: 60_000 });
+    const tree = useQuery({
+        queryKey: ["walkTree", root],
+        queryFn: () => tc.walkTree(root),
+        enabled: active,
+        staleTime: 60_000,
+    });
     const hits = useMemo(
         () =>
             (tree.data ?? [])
-                .filter(({ entry }) => `${entry.name} ${entry.tonieInfo?.series ?? ""} ${entry.tonieInfo?.episode ?? ""}`.toLowerCase().includes(q))
+                .filter(({ entry }) =>
+                    `${entry.name} ${entry.tonieInfo?.series ?? ""} ${entry.tonieInfo?.episode ?? ""}`
+                        .toLowerCase()
+                        .includes(q),
+                )
                 .slice(0, 300),
         [tree.data, q],
     );

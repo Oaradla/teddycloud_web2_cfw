@@ -1,52 +1,78 @@
 import { useQuery } from "@tanstack/react-query";
-import { CFW_MESSAGES } from "../boxupdate/cfwMessages";
-import { ESP32_TEXTS } from "../setup/esp32/texts";
-import { SETUP_KEYS } from "../setup/texts";
-import { LANGS, t, TEXT_KEYS } from "../../lib/i18n";
+import { type Lang, LANGS, loadTexts, t } from "../../lib/i18n";
 import { Loading, Page, Section } from "../../ui/kit";
 import { Share } from "../more/TonieStats";
-import de from "../../lib/settings.de.json";
 
-const texts = import.meta.glob("../../lib/lang/[a-z][a-z].json", { import: "default" }) as Record<string, () => Promise<Record<string, string>>>;
-const settings = import.meta.glob("../../lib/lang/settings.*.json", { import: "default" }) as Record<string, () => Promise<{ options?: object }>>;
+type Texts = Record<string, unknown> & { settings?: { options?: object } };
 
-/** every text of the app with the key a further language has it under */
-const ALL = [...TEXT_KEYS, ...SETUP_KEYS.map((k) => `setup.${k}`), ...CFW_MESSAGES.map((k) => `cfw.${k}`), ...Object.keys(ESP32_TEXTS).map((k) => `esp32.${k}`)];
+/** the keys of the app's texts, without the names of the settings */
+const textKeys = (o: unknown, at = ""): string[] =>
+    typeof o === "string"
+        ? [at]
+        : at === "settings.options" || at === "settings.groups" || at === "settings.values"
+          ? []
+          : Object.entries(o as object).flatMap(([k, v]) => textKeys(v, at ? `${at}.${k}` : k));
+const settingsCount = (texts: Texts) => Object.keys(texts.settings?.options ?? {}).length;
 
-/** how complete each language is: the app's texts and the names of the settings */
+/** how complete each language is, measured against German: the app's texts and the names of the settings */
 export function TranslationsPage() {
     const counts = useQuery({
         queryKey: ["translationCounts"],
-        queryFn: () =>
-            Promise.all(
-                Object.keys(LANGS)
+        queryFn: async () => {
+            const de = (await loadTexts("de")) as Texts;
+            const all = textKeys(de);
+            const langs = await Promise.all(
+                (Object.keys(LANGS) as Lang[])
                     .filter((l) => l !== "de" && l !== "en")
                     .map(async (l) => {
-                        const own = await texts[`../../lib/lang/${l}.json`]?.();
-                        const set = await settings[`../../lib/lang/settings.${l}.json`]?.();
-                        return { l, texts: ALL.filter((k) => own?.[k]).length, settings: Object.keys(set?.options ?? {}).length };
+                        const own = (await loadTexts(l)) as Texts;
+                        const keys = new Set(textKeys(own));
+                        return {
+                            l,
+                            texts: all.filter((k) => keys.has(k)).length,
+                            settings: settingsCount(own),
+                        };
                     }),
-            ),
+            );
+            return { texts: all.length, settings: settingsCount(de), langs };
+        },
     });
-    const settingsTotal = Object.keys(de.options).length;
+    const total = counts.data;
     return (
-        <Page title={t("translations")} subtitle={t("translationsIntro")} back="/community" narrow>
+        <Page
+            title={t("community.translations")}
+            subtitle={t("community.translationsIntro")}
+            back="/community"
+            narrow
+        >
             {counts.isLoading && <Loading />}
-            {counts.data && (
+            {total && (
                 <>
-                    <Section title={t("translationsTexts")}>
+                    <Section title={t("community.translationsTexts")}>
                         <div className="shares">
-                            <Share label={`${LANGS.de}, ${LANGS.en}`} n={ALL.length} of={ALL.length} />
-                            {counts.data.map((c) => (
-                                <Share key={c.l} label={LANGS[c.l as keyof typeof LANGS]} n={c.texts} of={ALL.length} />
+                            <Share
+                                label={`${LANGS.de}, ${LANGS.en}`}
+                                n={total.texts}
+                                of={total.texts}
+                            />
+                            {total.langs.map((c) => (
+                                <Share key={c.l} label={LANGS[c.l]} n={c.texts} of={total.texts} />
                             ))}
                         </div>
                     </Section>
-                    <Section title={t("translationsSettings")} footer={t("translationsSettingsHint")}>
+                    <Section
+                        title={t("community.translationsSettings")}
+                        footer={t("community.translationsSettingsHint")}
+                    >
                         <div className="shares">
-                            <Share label={LANGS.de} n={settingsTotal} of={settingsTotal} />
-                            {counts.data.map((c) => (
-                                <Share key={c.l} label={LANGS[c.l as keyof typeof LANGS]} n={Math.min(c.settings, settingsTotal)} of={settingsTotal} />
+                            <Share label={LANGS.de} n={total.settings} of={total.settings} />
+                            {total.langs.map((c) => (
+                                <Share
+                                    key={c.l}
+                                    label={LANGS[c.l]}
+                                    n={Math.min(c.settings, total.settings)}
+                                    of={total.settings}
+                                />
                             ))}
                         </div>
                     </Section>

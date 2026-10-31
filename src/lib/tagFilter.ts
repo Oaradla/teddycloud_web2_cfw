@@ -32,7 +32,8 @@ export const FILTER_FIELDS = Object.keys(FIELDS);
 export class FilterError extends Error {}
 
 const tokenize = (s: string) => {
-    const re = /\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|&&|\|\||==|!=|>=|<=|[()!,=~<>]|[^\s()!,=~<>"']+)/gy;
+    const re =
+        /\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|&&|\|\||==|!=|>=|<=|[()!,=~<>]|[^\s()!,=~<>"']+)/gy;
     const out: string[] = [];
     let end = 0;
     for (let m = re.exec(s); m; m = re.exec(s)) {
@@ -43,7 +44,8 @@ const tokenize = (s: string) => {
     return out;
 };
 
-const unquote = (tok: string) => (/^["']/.test(tok) ? tok.slice(1, -1).replace(/\\(.)/g, "$1") : tok);
+const unquote = (tok: string) =>
+    /^["']/.test(tok) ? tok.slice(1, -1).replace(/\\(.)/g, "$1") : tok;
 const lower = (v: Value) => (Array.isArray(v) ? v.join(" ") : String(v)).toLowerCase();
 
 /** compiles the query into a predicate; throws FilterError naming the token that does not fit */
@@ -61,7 +63,9 @@ export function compileFilter(query: string, all: Tag[]): Pred {
     };
     const field = () => {
         const name = next();
-        const f = FIELDS[name] ?? FIELDS[Object.keys(FIELDS).find((k) => k.toLowerCase() === name.toLowerCase()) ?? ""];
+        const f =
+            FIELDS[name] ??
+            FIELDS[Object.keys(FIELDS).find((k) => k.toLowerCase() === name.toLowerCase()) ?? ""];
         if (!f) throw new FilterError(name);
         return f;
     };
@@ -95,7 +99,8 @@ export function compileFilter(query: string, all: Tag[]): Pred {
         if (op === "startswith" || op === "endswith") {
             i++;
             const v = unquote(next()).toLowerCase();
-            return (x) => (op === "startswith" ? lower(f(x)).startsWith(v) : lower(f(x)).endsWith(v));
+            return (x) =>
+                op === "startswith" ? lower(f(x)).startsWith(v) : lower(f(x)).endsWith(v);
         }
         if (op === "in" || (op === "not" && toks[i + 1]?.toLowerCase() === "in")) {
             const not = op === "not";
@@ -131,7 +136,9 @@ export function compileFilter(query: string, all: Tag[]): Pred {
                 const eq = (x: Tag) => {
                     const v = f(x);
                     const w = lower(value(x));
-                    return one && Array.isArray(v) ? v.some((s) => s.toLowerCase() === w) : lower(v) === w;
+                    return one && Array.isArray(v)
+                        ? v.some((s) => s.toLowerCase() === w)
+                        : lower(v) === w;
                 };
                 return op === "!=" ? (x) => !eq(x) : eq;
             }

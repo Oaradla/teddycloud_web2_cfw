@@ -40,12 +40,18 @@ self.onmessage = async (e) => {
     }
 };`;
 
+const isTouch = () => window.matchMedia("(pointer: coarse)").matches;
+
 /** how many files are encoded at the same time: cores, fewer on phones (memory) */
 export const poolSize = () => {
     const cores = navigator.hardwareConcurrency || 2;
-    const touch = window.matchMedia("(pointer: coarse)").matches;
-    return Math.max(1, Math.min(cores - 1, touch ? 3 : 6));
+    return Math.max(1, Math.min(cores - 1, isTouch() ? 3 : 6));
 };
+
+/** decoded audio (11.5 MB per minute) waiting in the workers at most; one file always goes */
+const pcmBudget = () => (isTouch() ? 256 : 768) * 1024 * 1024;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Encodes the files into one TAF each, in parallel. onProgress gets the overall fraction and
@@ -66,6 +72,20 @@ export async function encodeFilesParallel(
     let done = 0;
     let next = 0;
     let failed: Error | null = null;
+    // one file is decoded at a time, and only while the decoded ones in the workers fit the budget
+    const budget = pcmBudget();
+    let inflight = 0;
+    let decoding: Promise<unknown> = Promise.resolve();
+    const decode = (file: File) => {
+        const pcm = decoding.then(async () => {
+            while (inflight > 0 && inflight >= budget) await sleep(100);
+            const samples = await toPcmSamples(file);
+            inflight += samples.byteLength;
+            return samples;
+        });
+        decoding = pcm.catch(() => undefined);
+        return pcm;
+    };
     const report = () => onProgress?.(progress.reduce((a, b) => a + b, 0) / files.length, done);
 
     const run = (w: Worker) =>
@@ -73,9 +93,11 @@ export async function encodeFilesParallel(
             const take = async () => {
                 if (failed || next >= files.length) return resolve();
                 const i = next++;
+                let bytes = 0;
                 try {
                     // decoding takes a little while too: count it as the first 10 %
-                    const pcm = await toPcmSamples(files[i]);
+                    const pcm = await decode(files[i]);
+                    bytes = pcm.byteLength;
                     progress[i] = 0.1;
                     report();
                     const taf = await new Promise<Uint8Array>((res, rej) => {
@@ -90,15 +112,20 @@ export async function encodeFilesParallel(
                             }
                         };
                         w.onerror = (e) => rej(new Error(e.message || "worker failed"));
-                        w.postMessage({ id: i, pcm, audioId: baseAudioId - i, bitrate }, [pcm.buffer]);
+                        w.postMessage({ id: i, pcm, audioId: baseAudioId - i, bitrate }, [
+                            pcm.buffer,
+                        ]);
                     });
-                    results[i] = new Blob([taf as Uint8Array<ArrayBuffer>], { type: "application/octet-stream" });
+                    results[i] = new Blob([taf as Uint8Array<ArrayBuffer>], {
+                        type: "application/octet-stream",
+                    });
                     progress[i] = 1;
                     done++;
                     report();
                 } catch (e) {
                     failed = e as Error;
                 }
+                inflight -= bytes;
                 take();
             };
             take();

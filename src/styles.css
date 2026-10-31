@@ -32,7 +32,8 @@
     --covered-bottom: 0px;
     --mini-h: 0px;
     --sidebar-w: 248px;
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
+    --font:
+        -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue",
         Arial, sans-serif;
     color-scheme: light;
 }
@@ -190,7 +191,9 @@ svg {
 .app-main {
     padding-left: var(--safe-left);
     padding-right: var(--safe-right);
-    padding-bottom: calc(var(--tabbar-h) + var(--mini-h) + var(--safe-bottom) + var(--covered-bottom) + 24px);
+    padding-bottom: calc(
+        var(--tabbar-h) + var(--mini-h) + var(--safe-bottom) + var(--covered-bottom) + 24px
+    );
 }
 .page {
     max-width: 1100px;
@@ -776,7 +779,9 @@ a.row:active,
 .segmented button.active {
     background: var(--bg-elev);
     color: var(--fg);
-    box-shadow: var(--shadow-1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        var(--shadow-1),
+        0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 input[type="range"].slider {
@@ -2872,7 +2877,11 @@ input[type="range"].slider::-moz-range-thumb {
     padding: 12px;
     border-radius: var(--radius-s);
     background: var(--bg-sunken);
-    font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font:
+        12.5px/1.5 ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
     white-space: pre-wrap;
     word-break: break-all;
     overflow: auto;

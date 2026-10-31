@@ -1,22 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 import { zipSync } from "fflate";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import { Notice, Segmented, useUi } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
 import nwpBootloaderUrl from "./cc3200/rbtl3100s.dll?url";
-import { Cc3200 } from "./cc3200/protocol";
+import { Cc3200, Cc3200Error } from "./cc3200/protocol";
 import { Cc3200Card, packageFiles, saveZip } from "./Cc3200Card";
 import { StatusLine, Steps, UartHint, Warnings, useBusyGuard } from "./parts";
-import { st } from "./texts";
+import { t, type Key } from "../../lib/i18n";
 
-const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
+const equal = (a: Uint8Array, b: Uint8Array) =>
+    a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** a HackieboxNG preloader names the SD bootloader it starts; the box's original bootloader does not */
+const isPreloader = (image: Uint8Array) =>
+    new TextDecoder("latin1").decode(image).includes("/revvox/boot/ngbootloader.bin");
 
 /** the 12 hex digits of the box ID in the common name of its client certificate */
 const macOfCertificate = (der: Uint8Array): string => {
     for (let i = 0; i + 7 < der.length; i++) {
         // OID 2.5.4.3 (common name), then a string
-        if (der[i] === 0x06 && der[i + 1] === 0x03 && der[i + 2] === 0x55 && der[i + 3] === 0x04 && der[i + 4] === 0x03) {
+        if (
+            der[i] === 0x06 &&
+            der[i + 1] === 0x03 &&
+            der[i + 2] === 0x55 &&
+            der[i + 3] === 0x04 &&
+            der[i + 4] === 0x03
+        ) {
             const length = der[i + 6];
             const cn = String.fromCharCode(...der.subarray(i + 7, i + 7 + length));
             const hex = cn.match(/[0-9a-fA-F]{12}/);
@@ -34,7 +45,9 @@ const macOfCertificate = (der: Uint8Array): string => {
 export function Cc3200Browser() {
     const ui = useUi();
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, retry: false });
-    const releases = (firmware.data?.images ?? []).filter((i) => i.package && i.platform !== "esp32").sort((a, b) => b.build - a.build);
+    const releases = (firmware.data?.images ?? [])
+        .filter((i) => i.package && i.platform !== "esp32")
+        .sort((a, b) => b.build - a.build);
     const [build, setBuild] = useState<number | null>(null);
     const release = releases.find((r) => r.build === build) ?? releases[0];
 
@@ -58,6 +71,7 @@ export function Cc3200Browser() {
     const [bootloaderDone, setBootloaderDone] = useState(false);
 
     useBusyGuard(busy);
+    useEffect(() => () => void box.current?.close(), []);
     const addLog = (line: string) => setLog((l) => [...l.slice(-300), line]);
     /** runs one action on the box; what it returns is shown as done, nothing (e.g. cancelled) keeps the last result */
     const run = async (what: () => Promise<string | void>) => {
@@ -67,7 +81,10 @@ export function Cc3200Browser() {
             const done = await what();
             if (done) setResult({ ok: true, text: done });
         } catch (e) {
-            const message = (e as Error).message;
+            const message =
+                e instanceof Cc3200Error
+                    ? t(`setup.cc3200Errors.${e.key}` as Key, e.values)
+                    : (e as Error).message;
             addLog(`error: ${message}`);
             ui.toast("error", message);
             setResult({ ok: false, text: message });
@@ -81,33 +98,53 @@ export function Cc3200Browser() {
     const connectAndBackUp = () =>
         run(async () => {
             const port = await navigator.serial.requestPort();
-            setStatus(st("cc3200Connecting"));
+            setStatus(t("setup.cc3200Connecting"));
             const cc = await Cc3200.connect(port, {
                 gateway,
                 reset,
                 log: addLog,
                 askReset: async () => {
-                    await ui.confirm({ title: st("cc3200Reset"), text: st("cc3200ResetAsk"), confirm: "OK" });
+                    await ui.confirm({
+                        title: t("setup.cc3200Reset"),
+                        text: t("setup.cc3200ResetAsk"),
+                        confirm: "OK",
+                    });
                 },
-                loadNwpBootloader: async () => new Uint8Array(await (await fetch(nwpBootloaderUrl)).arrayBuffer()),
+                loadNwpBootloader: async () =>
+                    new Uint8Array(await (await fetch(nwpBootloaderUrl)).arrayBuffer()),
             });
             box.current = cc;
             setConnected(true);
-            setStatus(st("cc3200ReadingFlash"));
-            const flash = await cc.readFlash((done, total) => setProgress(done / total));
-            const all = await cc.readAllFiles((name, i, n) => {
-                setStatus(st("cc3200ReadingFile", { name, i: i + 1, n }));
-                setProgress((i + 1) / n);
-            });
+            // closed on a failed read, so that Connect reads again
+            const closeOnError = async (e: unknown): Promise<never> => {
+                await closeBox();
+                throw e;
+            };
+            setStatus(t("setup.cc3200ReadingFlash"));
+            const flash = await cc
+                .readFlash((done, total) => setProgress(done / total))
+                .catch(closeOnError);
+            const all = await cc
+                .readAllFiles((name, i, n) => {
+                    setStatus(t("setup.cc3200ReadingFile", { name, i: i + 1, n }));
+                    setProgress((i + 1) / n);
+                })
+                .catch(closeOnError);
             backup.current = { flash, files: all.files };
             setFailed(all.failed);
             const client = all.files.get("/cert/client.der");
             const found = client ? macOfCertificate(client) : "";
             setMac(found);
-            const done = st("cc3200BackupDone", { files: all.files.size, kb: Math.round(flash.length / 1024), mac: found || "?" });
+            const done = t("setup.cc3200BackupDone", {
+                files: all.files.size,
+                kb: Math.round(flash.length / 1024),
+                mac: found || "?",
+            });
             addLog(done);
             // the flash dump also stays on the server, as with the ESP32 box
-            const stored = await tc.storeFlashDump(`CC3200_${found || "unknown"}`, flash).catch(() => "");
+            const stored = await tc
+                .storeFlashDump(`CC3200_${found || "unknown"}`, flash)
+                .catch(() => "");
             setBackupStored(stored);
             if (stored) {
                 setBackupSaved(true);
@@ -119,7 +156,8 @@ export function Cc3200Browser() {
     const downloadBackup = () => {
         const b = backup.current!;
         const entries: Record<string, Uint8Array> = { "backup.bin": b.flash };
-        for (const [name, data] of b.files) entries[`ExtractedFromBox${name.startsWith("/") ? "" : "/"}${name}`] = data;
+        for (const [name, data] of b.files)
+            entries[`ExtractedFromBox${name.startsWith("/") ? "" : "/"}${name}`] = data;
         saveZip(zipSync(entries, { level: 0 }), `toniebox-${mac || "cc3200"}-backup.zip`);
         setBackupSaved(true);
     };
@@ -127,43 +165,60 @@ export function Cc3200Browser() {
     const certificates = () =>
         run(async () => {
             const files = backup.current!.files;
-            const certs = ["ca.der", "client.der", "private.der"].map((name) => ({ name, data: files.get(`/cert/${name}`) }));
+            const certs = ["ca.der", "client.der", "private.der"].map((name) => ({
+                name,
+                data: files.get(`/cert/${name}`),
+            }));
             const missing = certs.filter((c) => !c.data).map((c) => c.name);
-            if (missing.length) throw new Error(`missing on the box: ${missing.join(", ")}`);
+            if (missing.length)
+                throw new Error(
+                    t("setup.cc3200Errors.certsMissing", { names: missing.join(", ") }),
+                );
             await tc.uploadCertsByMac(mac, certs as { name: string; data: Uint8Array }[]);
             addLog(`certificates stored for ${mac}`);
             await box.current!.writeFile("/cert/c2.der", await tc.caReplacement());
             addLog("/cert/c2.der written");
             setCertsDone(true);
-            ui.toast("ok", st("cc3200CertsDone"));
-            return st("cc3200CertsDone");
+            ui.toast("ok", t("setup.cc3200CertsDone"));
+            return t("setup.cc3200CertsDone");
         });
 
     const bootloader = () =>
         run(async () => {
-            if (!(await ui.confirm({ title: st("cc3200BootloaderConfirm"), text: st("cc3200BootloaderConfirmText"), confirm: st("cc3200BootloaderRun"), danger: true }))) return;
+            if (
+                !(await ui.confirm({
+                    title: t("setup.cc3200BootloaderConfirm"),
+                    text: t("setup.cc3200BootloaderConfirmText"),
+                    confirm: t("setup.cc3200BootloaderRun"),
+                    danger: true,
+                }))
+            )
+                return;
             const cc = box.current!;
-            const preloader = packageFiles(await tc.cfwPackage(release!.build), "cc3200/flash/")["sys/mcuimg.bin"];
-            if (!preloader) throw new Error("the package has no preloader");
+            const preloader = packageFiles(await tc.cfwPackage(release!.build), "cc3200/flash/")[
+                "sys/mcuimg.bin"
+            ];
+            if (!preloader) throw new Error(t("setup.cc3200Errors.noPreloader"));
             const current = backup.current!.files.get("/sys/mcuimg.bin");
-            if (await cc.exists("/sys/pre-img.bin")) {
-                // HackieboxNG is there: /sys/mcuimg.bin is its preloader already, the original stays in pre-img.bin
-                addLog(st("cc3200HasHackiebox"));
-                if (current && equal(current, preloader)) {
-                    ui.toast("ok", st("cc3200BootloaderUpToDate"));
+            if (!current) throw new Error(t("setup.cc3200Errors.noMcuimg"));
+            if (isPreloader(current)) {
+                // HackieboxNG is there: the original stays in pre-img.bin
+                addLog(t("setup.cc3200HasHackiebox"));
+                if (equal(current, preloader)) {
+                    ui.toast("ok", t("setup.cc3200BootloaderUpToDate"));
                     setBootloaderDone(true);
-                    return st("cc3200BootloaderUpToDate");
+                    return t("setup.cc3200BootloaderUpToDate");
                 }
             } else {
-                if (!current) throw new Error("/sys/mcuimg.bin was not in the backup");
+                // also over a pre-img.bin an earlier, failed run left behind
                 await cc.writeFile("/sys/pre-img.bin", current);
                 addLog("original bootloader moved to /sys/pre-img.bin");
             }
             await cc.writeFile("/sys/mcuimg.bin", preloader);
             addLog("preloader written to /sys/mcuimg.bin");
             setBootloaderDone(true);
-            ui.toast("ok", st("cc3200BootloaderDone"));
-            return st("cc3200BootloaderDone");
+            ui.toast("ok", t("setup.cc3200BootloaderDone"));
+            return t("setup.cc3200BootloaderDone");
         });
 
     /** after the card content: the box is done with the serial port */
@@ -175,20 +230,24 @@ export function Cc3200Browser() {
         }
     };
 
-    if (!("serial" in navigator)) return <Notice>{st("esp32NoSerial")}</Notice>;
-    if (window.location.protocol !== "https:") return <Notice>{st("esp32Https")}</Notice>;
+    if (!("serial" in navigator)) return <Notice>{t("setup.esp32NoSerial")}</Notice>;
+    if (window.location.protocol !== "https:") return <Notice>{t("setup.esp32Https")}</Notice>;
 
     const steps = [
         <>
-            <p>{st("cc3200BrowserIntro")}</p>
+            <p>{t("setup.cc3200BrowserIntro")}</p>
             <Warnings factoryReset="cc3200" />
             <UartHint />
             {releases.length === 0 ? (
-                <Notice>{st("cc3200ReleaseNone")}</Notice>
+                <Notice>{t("setup.cc3200ReleaseNone")}</Notice>
             ) : (
                 <div className="field">
-                    <label>{st("cc3200Release")}</label>
-                    <select className="select" value={release?.build} onChange={(e) => setBuild(Number(e.target.value))}>
+                    <label>{t("setup.cc3200Release")}</label>
+                    <select
+                        className="select"
+                        value={release?.build}
+                        onChange={(e) => setBuild(Number(e.target.value))}
+                    >
                         {releases.map((r) => (
                             <option key={r.build} value={r.build}>
                                 {r.version || r.build} ({r.channel})
@@ -197,71 +256,130 @@ export function Cc3200Browser() {
                     </select>
                 </div>
             )}
-            <label className="small muted">{st("hwTool")}</label>
-            <Segmented value={gateway ? "gw" : "uart"} onChange={(v) => setGateway(v === "gw")} options={[{ value: "uart", label: st("hwUart") }, { value: "gw", label: st("hwEsp32c3") }]} />
+            <label className="small muted">{t("setup.hwTool")}</label>
+            <Segmented
+                value={gateway ? "gw" : "uart"}
+                onChange={(v) => setGateway(v === "gw")}
+                options={[
+                    { value: "uart", label: t("setup.hwUart") },
+                    { value: "gw", label: t("setup.hwEsp32c3") },
+                ]}
+            />
             {!gateway && (
                 <>
-                    <label className="small muted">{st("cc3200Reset")}</label>
-                    <Segmented value={reset} onChange={setReset} options={[{ value: "dtr", label: st("cc3200ResetDtr") }, { value: "manual", label: st("cc3200ResetManual") }]} />
+                    <label className="small muted">{t("setup.cc3200Reset")}</label>
+                    <Segmented
+                        value={reset}
+                        onChange={setReset}
+                        options={[
+                            { value: "dtr", label: t("setup.cc3200ResetDtr") },
+                            { value: "manual", label: t("setup.cc3200ResetManual") },
+                        ]}
+                    />
                 </>
             )}
-            <p className="small muted">{st("debugPortText")}</p>
+            <p className="small muted">{t("setup.debugPortText")}</p>
             {(
                 [
-                    ["risk", "esp32AckRisk"],
-                    ["fw", "esp32AckFw"],
-                    ["uart", "uartAck"],
+                    ["risk", "setup.esp32AckRisk"],
+                    ["fw", "setup.esp32AckFw"],
+                    ["uart", "setup.uartAck"],
                 ] as const
             ).map(([key, text]) => (
                 <label key={key} className="check-row">
-                    <input type="checkbox" checked={acks[key]} onChange={(e) => setAcks({ ...acks, [key]: e.target.checked })} />
-                    {st(text)}
+                    <input
+                        type="checkbox"
+                        checked={acks[key]}
+                        onChange={(e) => setAcks({ ...acks, [key]: e.target.checked })}
+                    />
+                    {t(text)}
                 </label>
             ))}
         </>,
         <>
-            <p>{st("cc3200ConnectText")}</p>
+            <p>{t("setup.cc3200ConnectText")}</p>
             <button className="btn primary" disabled={busy || connected} onClick={connectAndBackUp}>
-                {st("cc3200Connect")}
+                {t("setup.cc3200Connect")}
             </button>
             {backup.current && (
                 <>
-                    {failed.length > 0 && <Notice>{st("cc3200BackupFailed", { list: failed.join("; ") })}</Notice>}
+                    {failed.length > 0 && (
+                        <Notice>
+                            {t("setup.cc3200BackupFailed", { list: failed.join("; ") })}
+                        </Notice>
+                    )}
                     <div className="field mt">
-                        <label>{st("cc3200Mac")}</label>
-                        <input className="input mono" value={mac} onChange={(e) => setMac(e.target.value.replace(/[^0-9a-fA-F]/g, "").toLowerCase().slice(0, 12))} />
-                        <div className="hint">{st("cc3200MacHint")}</div>
+                        <label>{t("setup.cc3200Mac")}</label>
+                        <input
+                            className="input mono"
+                            value={mac}
+                            onChange={(e) =>
+                                setMac(
+                                    e.target.value
+                                        .replace(/[^0-9a-fA-F]/g, "")
+                                        .toLowerCase()
+                                        .slice(0, 12),
+                                )
+                            }
+                        />
+                        <div className="hint">{t("setup.cc3200MacHint")}</div>
                     </div>
-                    {backupStored && <Notice info>{st("cc3200BackupStored", { name: backupStored })}</Notice>}
+                    {backupStored && (
+                        <Notice info>
+                            {t("setup.cc3200BackupStored", { name: backupStored })}
+                        </Notice>
+                    )}
                     <button className="btn" onClick={downloadBackup}>
-                        {st("cc3200DownloadBackup")}
+                        {t("setup.cc3200DownloadBackup")}
                     </button>
                 </>
             )}
         </>,
         <>
-            <p>{st("cc3200CertsText")}</p>
-            <button className="btn primary" disabled={busy || !connected || certsDone || mac.length !== 12} onClick={certificates}>
-                {st("cc3200CertsRun")}
+            <p>{t("setup.cc3200CertsText")}</p>
+            <button
+                className="btn primary"
+                disabled={busy || !connected || certsDone || mac.length !== 12}
+                onClick={certificates}
+            >
+                {t("setup.cc3200CertsRun")}
             </button>
         </>,
         <>
-            <p>{st("cc3200BootloaderText")}</p>
-            <button className="btn primary" disabled={busy || !connected || bootloaderDone} onClick={bootloader}>
-                {st("cc3200BootloaderRun")}
+            <p>{t("setup.cc3200BootloaderText")}</p>
+            <button
+                className="btn primary"
+                disabled={busy || !connected || bootloaderDone}
+                onClick={bootloader}
+            >
+                {t("setup.cc3200BootloaderRun")}
             </button>
         </>,
         <>
             <Cc3200Card build={release?.build} mac={mac} onSaved={closeBox} />
-            <Notice info>{st("showBoxesHint")}</Notice>
+            <Notice info>{t("setup.showBoxesHint")}</Notice>
         </>,
     ];
 
     // each step needs the one before done: the first two always, certificates and bootloader can be
     // skipped on purpose (done before, e.g. by hand), after a question
-    const canGo = [releases.length > 0 && Object.values(acks).every(Boolean), backupSaved && mac.length === 12, certsDone, bootloaderDone, true];
-    const blocked = [st("cc3200AcksFirst"), !backupSaved ? st("cc3200BackupFirst") : st("cc3200MacFirst")];
-    const skip = [null, null, { title: st("cc3200CertsSkip"), text: st("cc3200CertsSkipText") }, { title: st("cc3200BootloaderSkip"), text: st("cc3200BootloaderSkipText") }];
+    const canGo = [
+        releases.length > 0 && Object.values(acks).every(Boolean),
+        backupSaved && mac.length === 12,
+        certsDone,
+        bootloaderDone,
+        true,
+    ];
+    const blocked = [
+        t("setup.cc3200AcksFirst"),
+        !backupSaved ? t("setup.cc3200BackupFirst") : t("setup.cc3200MacFirst"),
+    ];
+    const skip = [
+        null,
+        null,
+        { title: t("setup.cc3200CertsSkip"), text: t("setup.cc3200CertsSkipText") },
+        { title: t("setup.cc3200BootloaderSkip"), text: t("setup.cc3200BootloaderSkipText") },
+    ];
     const goTo = async (n: number) => {
         for (let i = step; i < n; i++) {
             if (canGo[i]) continue;
@@ -271,7 +389,15 @@ export function Cc3200Browser() {
                 return ui.toast("info", blocked[i]);
             }
             setStep(i);
-            if (!(await ui.confirm({ title: ask.title, text: ask.text, confirm: st("skipAnyway"), danger: true }))) return;
+            if (
+                !(await ui.confirm({
+                    title: ask.title,
+                    text: ask.text,
+                    confirm: t("setup.skipAnyway"),
+                    danger: true,
+                }))
+            )
+                return;
         }
         setStep(n);
     };
@@ -279,13 +405,19 @@ export function Cc3200Browser() {
     return (
         <>
             <Steps
-                titles={[st("esp32S1"), st("cc3200Connect"), st("cc3200Certs"), st("cc3200Bootloader"), st("cc3200Card")]}
+                titles={[
+                    t("setup.esp32S1"),
+                    t("setup.cc3200Connect"),
+                    t("setup.cc3200Certs"),
+                    t("setup.cc3200Bootloader"),
+                    t("setup.cc3200Card"),
+                ]}
                 step={step}
                 busy={busy}
                 setStep={(n) => (n <= step ? setStep(n) : goTo(n))}
                 last={
                     <a className="btn primary" href="#/">
-                        {st("showBoxes")}
+                        {t("setup.showBoxes")}
                     </a>
                 }
             >
@@ -293,7 +425,9 @@ export function Cc3200Browser() {
                 <StatusLine busy={busy} text={status} progress={progress} result={result} />
             </Steps>
             <div className="list mt">
-                <Fold title={`${st("log")} · ${connected ? "●" : st("cc3200NotConnected")}`}>
+                <Fold
+                    title={`${t("setup.log")} · ${connected ? "●" : t("setup.cc3200NotConnected")}`}
+                >
                     <div className="log-view mono">
                         {log.map((l, i) => (
                             <div key={i}>{l}</div>
@@ -308,7 +442,7 @@ export function Cc3200Browser() {
                                 setConnected(false);
                             }}
                         >
-                            {st("cc3200Disconnect")}
+                            {t("setup.cc3200Disconnect")}
                         </button>
                     )}
                 </Fold>

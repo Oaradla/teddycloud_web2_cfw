@@ -24,15 +24,17 @@ export default defineConfig(({ mode }) => {
     // dev server: forward the API to a running teddyCloud, e.g. TEDDYCLOUD=http://teddycloud.local
     const target = env.TEDDYCLOUD || "http://localhost";
     const proxy = Object.fromEntries(
-        ["/api", "/content", "/cache", "/custom_img", "/library", "/img_", "/v1", "/reverse"].map((p) => [
-            p,
-            { target, changeOrigin: true },
-        ]),
+        ["/api", "/content", "/cache", "/custom_img", "/library", "/img_", "/v1", "/reverse"].map(
+            (p) => [p, { target, changeOrigin: true }],
+        ),
     );
     return {
         base: "./",
         plugins: [react()],
-        define: { __APP_VERSION__: JSON.stringify(pkg.version), __CHANGES__: JSON.stringify(changes) },
+        define: {
+            __APP_VERSION__: JSON.stringify(pkg.version),
+            __CHANGES__: JSON.stringify(changes),
+        },
         build: {
             outDir: "dist",
             assetsDir: "assets",

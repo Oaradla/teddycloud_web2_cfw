@@ -45,29 +45,33 @@ export function TonieStats() {
     const shown = top.slice(0, 7);
     const other = top.slice(7).reduce((n, [, c]) => n + c, 0);
     return (
-        <Section title={t("tonieStats")}>
+        <Section title={t("more.tonieStats")}>
             <div className="stats-tiles">
                 <div>
                     <strong>{list.length}</strong>
-                    <span>{t("tonies")}</span>
+                    <span>{t("common.tonies")}</span>
                 </div>
                 <div>
                     <strong>{boxes.data?.length ?? "–"}</strong>
-                    <span>{t("boxes")}</span>
+                    <span>{t("common.boxes")}</span>
                 </div>
             </div>
             <div className="shares">
-                <Share label={t("statCloudOn")} n={count((x) => !x.nocloud)} of={list.length} />
-                <Share label={t("live")} n={count((x) => x.live)} of={list.length} />
-                <Share label={t("statClaimed")} n={count((x) => x.claimed)} of={list.length} />
+                <Share
+                    label={t("more.statCloudOn")}
+                    n={count((x) => !x.nocloud)}
+                    of={list.length}
+                />
+                <Share label={t("common.live")} n={count((x) => x.live)} of={list.length} />
+                <Share label={t("more.statClaimed")} n={count((x) => x.claimed)} of={list.length} />
             </div>
             {shown.length > 0 && (
                 <div className="shares">
-                    <div className="choice-label">{t("language")}</div>
+                    <div className="choice-label">{t("common.language")}</div>
                     {shown.map(([code, n]) => (
                         <Share key={code} label={languageName(code)} n={n} of={list.length} />
                     ))}
-                    {other > 0 && <Share label={t("statOther")} n={other} of={list.length} />}
+                    {other > 0 && <Share label={t("more.statOther")} n={other} of={list.length} />}
                 </div>
             )}
         </Section>

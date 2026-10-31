@@ -22,18 +22,35 @@ interface Page {
 }
 
 export function buildPdf(pages: Page[]): Uint8Array {
-    const objects: Uint8Array[][] = [[], [ascii("<< /Type /Catalog /Pages 2 0 R /ViewerPreferences << /PrintScaling /None >> >>")]];
-    objects[2] = [ascii(`<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ")}] >>`)];
+    const objects: Uint8Array[][] = [
+        [],
+        [ascii("<< /Type /Catalog /Pages 2 0 R /ViewerPreferences << /PrintScaling /None >> >>")],
+    ];
+    objects[2] = [
+        ascii(
+            `<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ")}] >>`,
+        ),
+    ];
     pages.forEach((p, i) => {
         const id = 3 + i * 3;
         const content = ascii(`q\n${p.widthPt} 0 0 ${p.heightPt} 0 0 cm\n/Im0 Do\nQ\n`);
-        objects[id] = [ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${p.widthPt} ${p.heightPt}] /Resources << /XObject << /Im0 ${id + 1} 0 R >> >> /Contents ${id + 2} 0 R >>`)];
+        objects[id] = [
+            ascii(
+                `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${p.widthPt} ${p.heightPt}] /Resources << /XObject << /Im0 ${id + 1} 0 R >> >> /Contents ${id + 2} 0 R >>`,
+            ),
+        ];
         objects[id + 1] = [
-            ascii(`<< /Type /XObject /Subtype /Image /Width ${p.width} /Height ${p.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`),
+            ascii(
+                `<< /Type /XObject /Subtype /Image /Width ${p.width} /Height ${p.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`,
+            ),
             p.jpeg,
             ascii("\nendstream"),
         ];
-        objects[id + 2] = [ascii(`<< /Length ${content.length} >>\nstream\n`), content, ascii("endstream")];
+        objects[id + 2] = [
+            ascii(`<< /Length ${content.length} >>\nstream\n`),
+            content,
+            ascii("endstream"),
+        ];
     });
     const chunks: Uint8Array[] = [ascii("%PDF-1.4\n")];
     let offset = chunks[0].length;
@@ -44,8 +61,17 @@ export function buildPdf(pages: Page[]): Uint8Array {
         chunks.push(...parts);
         offset += parts.reduce((n, c) => n + c.length, 0);
     }
-    const xref = ["xref", `0 ${objects.length}`, "0000000000 65535 f ", ...offsets.slice(1).map((o) => `${String(o).padStart(10, "0")} 00000 n `)];
-    chunks.push(ascii(`${xref.join("\n")}\ntrailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${offset}\n%%EOF\n`));
+    const xref = [
+        "xref",
+        `0 ${objects.length}`,
+        "0000000000 65535 f ",
+        ...offsets.slice(1).map((o) => `${String(o).padStart(10, "0")} 00000 n `),
+    ];
+    chunks.push(
+        ascii(
+            `${xref.join("\n")}\ntrailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${offset}\n%%EOF\n`,
+        ),
+    );
     const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
     let at = 0;
     for (const c of chunks) {
@@ -74,7 +100,14 @@ const image = (url: string) => {
     return images.get(url)!;
 };
 
-const labelPath = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, round: boolean) => {
+const labelPath = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    round: boolean,
+) => {
     ctx.beginPath();
     if (round) ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     else ctx.roundRect(x, y, w, h, px(2));
@@ -95,7 +128,13 @@ const wrap = (ctx: CanvasRenderingContext2D, text: string, max: number) => {
 };
 
 /** text along the upper arc of a round label */
-const arcText = (ctx: CanvasRenderingContext2D, text: string, cx: number, cy: number, r: number) => {
+const arcText = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    cx: number,
+    cy: number,
+    r: number,
+) => {
     const total = ctx.measureText(text).width / r;
     let angle = -Math.PI / 2 - total / 2;
     for (const ch of text) {
@@ -113,7 +152,15 @@ const arcText = (ctx: CanvasRenderingContext2D, text: string, cx: number, cy: nu
 type Label = ReturnType<typeof labelList>[number];
 
 /** draws one label; a picture that does not load is noted in missing */
-async function drawLabel(ctx: CanvasRenderingContext2D, { item, e, kind }: Label, s: StudioSettings, x: number, y: number, w: number, h: number) {
+async function drawLabel(
+    ctx: CanvasRenderingContext2D,
+    { item, e, kind }: Label,
+    s: StudioSettings,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+) {
     const round = s.shape === "round";
     ctx.save();
     labelPath(ctx, x, y, w, h, round);
@@ -132,9 +179,21 @@ async function drawLabel(ctx: CanvasRenderingContext2D, { item, e, kind }: Label
             const scale = e.imageScale / 100;
             const dw = img.width * k * scale;
             const dh = img.height * k * scale;
-            const cx = bx + bw / 2 + (bx + (bw - img.width * k) * fx + (img.width * k) / 2 - (bx + bw / 2)) * scale;
-            const cy = by + bh / 2 + (by + (bh - img.height * k) * fy + (img.height * k) / 2 - (by + bh / 2)) * scale;
-            ctx.drawImage(img, cx - dw / 2 + px(e.imageOffsetX), cy - dh / 2 - px(e.imageOffsetY), dw, dh);
+            const cx =
+                bx +
+                bw / 2 +
+                (bx + (bw - img.width * k) * fx + (img.width * k) / 2 - (bx + bw / 2)) * scale;
+            const cy =
+                by +
+                bh / 2 +
+                (by + (bh - img.height * k) * fy + (img.height * k) / 2 - (by + bh / 2)) * scale;
+            ctx.drawImage(
+                img,
+                cx - dw / 2 + px(e.imageOffsetX),
+                cy - dh / 2 - px(e.imageOffsetY),
+                dw,
+                dh,
+            );
         }
         if (e.seriesOnImage && item.title) {
             ctx.font = `bold ${ptPx(e.seriesFontSize)}px ${e.font}`;
@@ -143,7 +202,14 @@ async function drawLabel(ctx: CanvasRenderingContext2D, { item, e, kind }: Label
             ctx.lineWidth = ptPx(e.seriesFontSize) / 5;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            if (round && e.rotateSeries) arcText(ctx, item.title, x + w / 2, y + h / 2, w / 2 - ptPx(e.seriesFontSize) * 0.9);
+            if (round && e.rotateSeries)
+                arcText(
+                    ctx,
+                    item.title,
+                    x + w / 2,
+                    y + h / 2,
+                    w / 2 - ptPx(e.seriesFontSize) * 0.9,
+                );
             else {
                 ctx.strokeText(item.title, x + w / 2, y + h * 0.12, w * 0.8);
                 ctx.fillText(item.title, x + w / 2, y + h * 0.12, w * 0.8);
@@ -154,13 +220,19 @@ async function drawLabel(ctx: CanvasRenderingContext2D, { item, e, kind }: Label
         const inner = (round ? w * 0.8 : w) - 2 * pad;
         const size = ptPx(e.fontSize);
         const blocks: { text: string; bold?: boolean; size: number }[] = [];
-        if (e.text === "tracks" && item.tracks.length) item.tracks.forEach((tr, i) => blocks.push({ text: `${i + 1}. ${tr}`, size: size * 0.8 }));
+        if (e.text === "tracks" && item.tracks.length)
+            item.tracks.forEach((tr, i) =>
+                blocks.push({ text: `${i + 1}. ${tr}`, size: size * 0.8 }),
+            );
         else {
             blocks.push({ text: item.title, bold: true, size });
             if (item.episode) blocks.push({ text: item.episode, size });
         }
         if (e.showModel && item.model) blocks.push({ text: item.model, size: size * 0.75 });
-        const flag = e.flag && item.language ? await flagUrl(item.language).then((u) => (u ? image(u) : null)) : null;
+        const flag =
+            e.flag && item.language
+                ? await flagUrl(item.language).then((u) => (u ? image(u) : null))
+                : null;
         const flagH = flag ? px(4) : 0;
         // smaller until it fits (a round label is narrower at the top and bottom)
         const room = (round ? h * 0.85 : h) - 2 * pad - (flag ? flagH + px(1) : 0);
@@ -196,7 +268,10 @@ async function drawLabel(ctx: CanvasRenderingContext2D, { item, e, kind }: Label
 let missing = new Set<string>();
 
 /** the sheets as a PDF, and how many pictures it lacks (other servers that do not allow it, CORS) */
-export async function studioPdf(items: StudioItem[], s: StudioSettings): Promise<{ blob: Blob; missing: number }> {
+export async function studioPdf(
+    items: StudioItem[],
+    s: StudioSettings,
+): Promise<{ blob: Blob; missing: number }> {
     missing = new Set();
     const labels = labelList(items, s);
     await loadFonts(labels.map((l) => l.e.font));
@@ -216,9 +291,20 @@ export async function studioPdf(items: StudioItem[], s: StudioSettings): Promise
             const ly = px(s.marginTop + Math.floor(i / cols) * (h + s.gapY));
             await drawLabel(ctx, onPage[i], s, lx, ly, px(w), px(h));
         }
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+        const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.92),
+        );
         if (!blob) throw new Error("canvas");
-        pages.push({ jpeg: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height, widthPt: Math.round((pw * 72) / 25.4), heightPt: Math.round((ph * 72) / 25.4) });
+        pages.push({
+            jpeg: new Uint8Array(await blob.arrayBuffer()),
+            width: canvas.width,
+            height: canvas.height,
+            widthPt: Math.round((pw * 72) / 25.4),
+            heightPt: Math.round((ph * 72) / 25.4),
+        });
     }
-    return { blob: new Blob([buildPdf(pages) as BlobPart], { type: "application/pdf" }), missing: missing.size };
+    return {
+        blob: new Blob([buildPdf(pages) as BlobPart], { type: "application/pdf" }),
+        missing: missing.size,
+    };
 }

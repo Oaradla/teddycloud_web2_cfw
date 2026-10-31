@@ -2,11 +2,17 @@
 
 type PatchByte = number | null;
 
-const hex = (list: PatchByte[]) => list.map((b) => (b === null ? '"??"' : `"${b.toString(16).padStart(2, "0")}"`)).join(", ");
+const hex = (list: PatchByte[]) =>
+    list.map((b) => (b === null ? '"??"' : `"${b.toString(16).padStart(2, "0")}"`)).join(", ");
 const ascii = (text: string): number[] => [...text].map((c) => c.charCodeAt(0));
-const bytes = (pattern: string): PatchByte[] => pattern.split(" ").map((b) => (b === "??" ? null : parseInt(b, 16)));
+const bytes = (pattern: string): PatchByte[] =>
+    pattern.split(" ").map((b) => (b === "??" ? null : parseInt(b, 16)));
 
-const patchFile = (desc: string, fwVer: string, items: { desc: string; search: PatchByte[]; replace: PatchByte[] }[]) => `{
+const patchFile = (
+    desc: string,
+    fwVer: string,
+    items: { desc: string; search: PatchByte[]; replace: PatchByte[] }[],
+) => `{
     "general": {
         "_desc": "${desc}",
         "_memPos": "",
@@ -67,7 +73,12 @@ export const altPortPatch = (port: number): string => {
             offset: 8,
             replace: thumbMovw(3, htons(port)),
         },
-        { desc: "connect 3.3.0/3.4.0: sockaddr literal AF_INET:port", search: bytes("02 00 01 bb"), offset: 2, replace: [port >> 8, port & 0xff] },
+        {
+            desc: "connect 3.3.0/3.4.0: sockaddr literal AF_INET:port",
+            search: bytes("02 00 01 bb"),
+            offset: 2,
+            replace: [port >> 8, port & 0xff],
+        },
         {
             desc: "log BF2/3.3.0/3.4.0: connect failed, movw r3, #port",
             search: bytes("8b 48 87 4a 40 f2 bb 13 ?? ?? ?? ?? 89 49 b4 f9 00 00"),
@@ -76,7 +87,9 @@ export const altPortPatch = (port: number): string => {
         },
         {
             desc: "log BF2/3.3.0/3.4.0: cloud request, movw sl, #port",
-            search: bytes("40 f2 bb 1a 02 46 cd f8 04 a0 40 f2 11 30 cd f8 00 80 ?? ?? ?? ?? 1c 22 00 21 11 a8 ?? ?? ?? ?? ?? 4a 4e f6 60 23"),
+            search: bytes(
+                "40 f2 bb 1a 02 46 cd f8 04 a0 40 f2 11 30 cd f8 00 80 ?? ?? ?? ?? 1c 22 00 21 11 a8 ?? ?? ?? ?? ?? 4a 4e f6 60 23",
+            ),
             offset: 0,
             replace: thumbMovw(10, port),
         },

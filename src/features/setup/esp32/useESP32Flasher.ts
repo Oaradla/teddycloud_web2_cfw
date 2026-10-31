@@ -3,19 +3,20 @@
 // (revision 5227a59); maintained here since.
 import { useEffect, useRef, useState } from "react";
 import { RevvoxFlasher } from "./revvox_flasher";
-import { useTranslation, TeddyCloudApi, defaultAPIConfig, useTeddyCloud, NotificationTypeEnum, scrollToTop, type TFunction } from "./shims";
-import { isWebSerialSupported } from "./webSerial";
 import {
-    ESP32_CHIPNAME,
-    ESP32_FLASH_STEPS,
-    ESP32_FLASHSIZE,
-} from "./esp32Constants";
+    useTranslation,
+    TeddyCloudApi,
+    defaultAPIConfig,
+    useTeddyCloud,
+    NotificationTypeEnum,
+    scrollToTop,
+    type TFunction,
+} from "./shims";
+import { isWebSerialSupported } from "./webSerial";
+import { ESP32_CHIPNAME, ESP32_FLASH_STEPS, ESP32_FLASHSIZE } from "./esp32Constants";
 import { useGetSettingLogLevel } from "./useGetSettingLogLevel";
 import { checkAssetsCertPartition } from "./checkAssetsCertPartition";
-import {
-    installConsoleLogCapture,
-    uninstallConsoleLogCapture,
-} from "./log";
+import { installConsoleLogCapture, uninstallConsoleLogCapture } from "./log";
 
 const api = new TeddyCloudApi(defaultAPIConfig());
 
@@ -303,7 +304,7 @@ export const useESP32Flasher = (
         }));
 
         console.info("[ESP32][Revvox] prepare: openPort...");
-        await flasher.openPort(state.port);
+        await flasher.openPort(state.port, baudRate);
 
         console.info("[ESP32][Revvox] prepare: sync...");
         await flasher.sync();
@@ -408,15 +409,6 @@ export const useESP32Flasher = (
         getHttpsUrl().catch((e) => console.error("[ESP32] getHttpsUrl failed", e));
     }, []);
 
-    // auto-reset path
-    useEffect(() => {
-        if (state.resetBox && state.patchedFlash) {
-            console.info("[ESP32] auto resetFlash triggered", logCtx());
-            resetFlash();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [state.resetBox, state.patchedFlash]);
-
     // auto-next when proceed
     useEffect(() => {
         if (!state.resetBox && state.proceed) {
@@ -474,6 +466,12 @@ export const useESP32Flasher = (
                 port: port,
             }));
 
+            // a cancelled file dialog ends the action as well
+            fileInputRef.current?.addEventListener(
+                "cancel",
+                () => setState((prev) => ({ ...prev, actionInProgress: false })),
+                { once: true },
+            );
             fileInputRef.current?.click();
         } catch (err: any) {
             console.error("[ESP32] startLoadFlash: openPort failed", err);
@@ -572,8 +570,11 @@ export const useESP32Flasher = (
                     patchedFlash: arrayBuffer,
                     showFlash: true,
                     connected: false,
-                    flashName: "from file",
+                    flashName: file.name,
+                    actionInProgress: false,
                 }));
+                // written after the confirmation on the write step
+                setCurrentStep(ESP32_FLASH_STEPS.WRITE);
             } else {
                 const flasher = getRevvoxFlasher();
 
@@ -588,7 +589,7 @@ export const useESP32Flasher = (
                     }));
 
                     console.info("[ESP32][Revvox] loadFlashFile: openPort");
-                    await flasher.openPort(state.port);
+                    await flasher.openPort(state.port, baudRate);
 
                     console.info("[ESP32][Revvox] loadFlashFile: sync");
                     setState((prev) => ({
@@ -638,20 +639,19 @@ export const useESP32Flasher = (
                 await uploadFlashData(flashData, sanitizedName);
 
                 console.info("[ESP32] loadFlashFile: done (revvox)", { downloadLinkCreated: true });
+                // flashed is only what the patch step makes of it
                 setState((prev) => ({
                     ...prev,
-                    patchedFlash: arrayBuffer,
-                    showFlash: true,
+                    showFlash: false,
                     connected: false,
                     flashName: "from file",
                     downloadLink: url,
+                    actionInProgress: false,
                 }));
             }
         };
 
         reader.readAsArrayBuffer(file);
-
-        setState((prev) => ({ ...prev, actionInProgress: false }));
         e.target.value = "";
     };
 
@@ -1076,6 +1076,11 @@ export const useESP32Flasher = (
                 mac,
                 chip: flasher.current_chip,
             });
+            // a backup named after another box would give this one that box's identity
+            const fileMac = /[0-9a-f]{12}/i.exec(state.flashName)?.[0].toLowerCase();
+            const chipMac = (mac ?? "").replace(/:/g, "").toLowerCase();
+            if (fileMac && chipMac && fileMac !== chipMac)
+                throw new Error(t("setup.esp32ResetOtherBox", { file: fileMac, box: chipMac }));
 
             if (mac) {
                 setState((prev) => ({

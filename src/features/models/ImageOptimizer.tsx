@@ -20,14 +20,24 @@ interface Big {
 }
 
 /** finds big pictures of the custom models and replaces them by small copies (originals stay) */
-export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClose: () => void; models: CustomModel[] }) {
+export function ImageOptimizer({
+    open,
+    onClose,
+    models,
+}: {
+    open: boolean;
+    onClose: () => void;
+    models: CustomModel[];
+}) {
     const ui = useUi();
     const qc = useQueryClient();
     const invalidateTags = useInvalidateTags();
     const [scan, setScan] = useState<{ done: number; total: number } | null>(null);
     const [big, setBig] = useState<Big[] | null>(null);
     const [work, setWork] = useState<{ done: number; total: number } | null>(null);
-    const [saved, setSaved] = useState<{ count: number; before: number; after: number } | null>(null);
+    const [saved, setSaved] = useState<{ count: number; before: number; after: number } | null>(
+        null,
+    );
 
     useEffect(() => {
         if (!open) return;
@@ -35,7 +45,9 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
         setBig(null);
         setSaved(null);
         const byPic = new Map<string, CustomModel[]>();
-        for (const m of models) if (m.pic?.startsWith("/custom_img/")) byPic.set(m.pic, [...(byPic.get(m.pic) ?? []), m]);
+        for (const m of models)
+            if (m.pic?.startsWith("/custom_img/"))
+                byPic.set(m.pic, [...(byPic.get(m.pic) ?? []), m]);
         const pics = [...byPic.keys()];
         setScan({ done: 0, total: pics.length });
         (async () => {
@@ -58,7 +70,8 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
         return () => {
             cancelled = true;
         };
-    }, [open, models]);
+        // once per opening: the models reload after saving, which must not scan again
+    }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const run = async () => {
         if (!big) return;
@@ -73,7 +86,11 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
                 const blob = await r.blob();
                 const rel = b.pic.slice("/custom_img/".length);
                 const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "";
-                const name = rel.split("/").pop()!.replace(/\.[^.]+$/, "") + ".web";
+                const name =
+                    rel
+                        .split("/")
+                        .pop()!
+                        .replace(/\.[^.]+$/, "") + ".web";
                 const small = await shrinkImage(blob, name + ".x");
                 if (small.size < blob.size) {
                     await tc.uploadCustomImage(small, dir);
@@ -86,10 +103,10 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
             } catch (e) {
                 if (count === 0) {
                     // nothing could be written: the picture folder is read-only, no use going on
-                    ui.toast("error", t("optimizeFailed"), t("imageFolderReadOnly"));
+                    ui.toast("error", t("models.optimizeFailed"), t("common.imageFolderReadOnly"));
                     break;
                 }
-                ui.toast("error", t("actionFailed"), `${b.pic}: ${(e as Error).message}`);
+                ui.toast("error", t("common.actionFailed"), `${b.pic}: ${(e as Error).message}`);
             }
             setWork({ done: i + 1, total: big.length });
         }
@@ -104,13 +121,13 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
         <Sheet
             open={open}
             onClose={onClose}
-            title={t("optimizeImages")}
+            title={t("models.optimizeImages")}
             full
             footer={
                 work ? (
                     <div style={{ flex: 1 }}>
                         <div className="small muted" style={{ marginBottom: 6 }}>
-                            {t("optimizingN", { n: work.done, total: work.total })}
+                            {t("models.optimizingN", { n: work.done, total: work.total })}
                         </div>
                         <div className="progressbar">
                             <div style={{ width: `${(work.done / work.total) * 100}%` }} />
@@ -118,16 +135,18 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
                     </div>
                 ) : saved ? (
                     <button className="btn primary" onClick={onClose}>
-                        {t("done")}
+                        {t("common.done")}
                     </button>
                 ) : (
                     <>
                         <button className="btn" onClick={onClose}>
-                            {t("cancel")}
+                            {t("common.cancel")}
                         </button>
                         <button className="btn primary" disabled={!big?.length} onClick={run}>
                             <ImageDown size={17} />
-                            {big?.length ? t("shrinkN", { n: big.length }) : t("optimizeImages")}
+                            {big?.length
+                                ? t("models.shrinkN", { n: big.length })
+                                : t("models.optimizeImages")}
                         </button>
                     </>
                 )
@@ -136,27 +155,38 @@ export function ImageOptimizer({ open, onClose, models }: { open: boolean; onClo
             {saved ? (
                 <div style={{ textAlign: "center", padding: "24px 0" }}>
                     <CheckCircle2 size={44} color="var(--ok)" style={{ margin: "0 auto 10px" }} />
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{t("imagesOptimized", { n: saved.count })}</div>
-                    <p className="muted">{t("savedFromTo", { from: bytes(saved.before), to: bytes(saved.after) })}</p>
+                    <div style={{ fontWeight: 700, fontSize: 18 }}>
+                        {t("models.imagesOptimized", { n: saved.count })}
+                    </div>
+                    <p className="muted">
+                        {t("models.savedFromTo", {
+                            from: bytes(saved.before),
+                            to: bytes(saved.after),
+                        })}
+                    </p>
                 </div>
             ) : (
                 <>
                     <p className="small muted" style={{ margin: "0 2px 14px" }}>
-                        {t("optimizeImagesHint")}
+                        {t("models.optimizeImagesHint")}
                     </p>
                     {scan && (
                         <>
                             <Loading />
                             <p className="small muted" style={{ textAlign: "center" }}>
-                                {t("checkingN", { n: scan.done, total: scan.total })}
+                                {t("models.checkingN", { n: scan.done, total: scan.total })}
                             </p>
                         </>
                     )}
-                    {big && big.length === 0 && <p className="muted" style={{ textAlign: "center" }}>{t("allImagesSmall")}</p>}
+                    {big && big.length === 0 && (
+                        <p className="muted" style={{ textAlign: "center" }}>
+                            {t("models.allImagesSmall")}
+                        </p>
+                    )}
                     {big && big.length > 0 && (
                         <>
                             <p className="small" style={{ margin: "0 2px 8px" }}>
-                                {t("bigImagesFound", { n: big.length, size: bytes(total) })}
+                                {t("models.bigImagesFound", { n: big.length, size: bytes(total) })}
                             </p>
                             <div className="list">
                                 {big.map((b) => (

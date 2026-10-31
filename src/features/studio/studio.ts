@@ -75,7 +75,10 @@ export const DEFAULTS: StudioSettings = {
 
 export const PAPER_MM = { A4: [210, 297], A5: [148, 210], Letter: [216, 279] } as const;
 
-export const effective = (s: StudioSettings, item: StudioItem): StudioSettings => ({ ...s, ...item.overrides });
+export const effective = (s: StudioSettings, item: StudioItem): StudioSettings => ({
+    ...s,
+    ...item.overrides,
+});
 
 /**
  * how many labels fit on a sheet: columns and rows between the margins (the right and bottom

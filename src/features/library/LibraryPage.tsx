@@ -14,6 +14,7 @@ import {
     ImagePlus,
     LayoutGrid,
     List,
+    FolderInput,
     ListMusic,
     MoreHorizontal,
     Pencil,
@@ -31,16 +32,29 @@ import {
     Braces,
     Copy,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { backendUrl } from "../../api/client";
 import { tc } from "../../api/tc";
 import type { FileEntry } from "../../api/types";
-import { ago, baseName, bytes, isAudio, isImage, isTaf, isTap, joinPath, lengthText, parentPath, stripExt } from "../../lib/format";
+import {
+    ago,
+    baseName,
+    bytes,
+    isAudio,
+    isImage,
+    isTaf,
+    isTap,
+    joinPath,
+    lengthText,
+    parentPath,
+    stripExt,
+} from "../../lib/format";
 import { ShareSheet, useCanShare, type ShareTarget } from "../users/ShareSheet";
 import { t } from "../../lib/i18n";
 import { filePlayItem, libraryFileUrl } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
+import { useAccess } from "../../lib/access";
 import { keys, useFiles, useInvalidateTags, usePrefetchSubfolders } from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { Empty, ErrorBox, Loading, Page, Row, SearchField, Spinner, useUi } from "../../ui/kit";
@@ -85,11 +99,14 @@ type Dir = "asc" | "desc";
 type View = "list" | "grid";
 type Show = "all" | "tonie" | "audio" | "unheard";
 
-const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+const cmp = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 /** the title shown for a file: what the server knows about it, else the file name */
 const fileTitle = (x: FileEntry, names: boolean) =>
-    !names && x.tonieInfo?.series ? `${x.tonieInfo.series}${x.tonieInfo.episode ? " – " + x.tonieInfo.episode : ""}` : x.name;
+    !names && x.tonieInfo?.series
+        ? `${x.tonieInfo.series}${x.tonieInfo.episode ? " – " + x.tonieInfo.episode : ""}`
+        : x.name;
 
 export function LibraryPage() {
     const [params, setParams] = useSearchParams();
@@ -99,7 +116,11 @@ export function LibraryPage() {
     const [filter, setFilter] = useState("");
     const [sort, setSort] = useState<Sort>(() => getPref("lib.sort", "name") as Sort);
     const [zoom, setZoom] = useState<LightboxItem | null>(null);
-    const canSplit = useQuery({ queryKey: ["hasTapBuild"], queryFn: tc.hasTapBuild, staleTime: Infinity });
+    const canSplit = useQuery({
+        queryKey: ["hasTapBuild"],
+        queryFn: tc.hasTapBuild,
+        staleTime: Infinity,
+    });
     const [dir, setDir] = useState<Dir>(() => getPref("lib.dir", "asc") as Dir);
     const [view, setView] = useState<View>(() => getPref("lib.view", "list") as View);
     const [show, setShow] = useState<Show>("all");
@@ -109,14 +130,17 @@ export function LibraryPage() {
     const [menu, setMenu] = useState(false);
     const menuBtn = useRef<HTMLButtonElement>(null);
     const [assignFor, setAssignFor] = useState<string | null>(null);
-    const [moveFor, setMoveFor] = useState<FileEntry | null>(null);
+    const [moveFor, setMoveFor] = useState<FileEntry[] | null>(null);
     const [coverFor, setCoverFor] = useState<ModelEditorStart | null>(null);
     const [details, setDetails] = useState<FileEntry | null>(null);
+    /** the search a hit was opened from, to return to when its details are closed */
+    const [searchBack, setSearchBack] = useState<{ path: string; filter: string } | null>(null);
     const [oggFor, setOggFor] = useState<FileEntry | null>(null);
     const [playlist, setPlaylist] = useState<PlaylistStart | null>(null);
     const [text, setText] = useState<{ title: string; text: string; hint?: string } | null>(null);
     const [unusedOpen, setUnusedOpen] = useState(false);
     const ui = useUi();
+    const access = useAccess();
     const qc = useQueryClient();
     const canShare = useCanShare();
     const [shareFor, setShareFor] = useState<ShareTarget | null>(null);
@@ -135,7 +159,12 @@ export function LibraryPage() {
         setFilter("");
         setParams(p === "/" ? {} : { path: p });
     };
-    const prefetch = (p: string) => qc.prefetchQuery({ queryKey: keys.files(p), queryFn: () => tc.files(p), staleTime: 30_000 });
+    const prefetch = (p: string) =>
+        qc.prefetchQuery({
+            queryKey: keys.files(p),
+            queryFn: () => tc.files(p),
+            staleTime: 30_000,
+        });
     const refresh = () => {
         qc.invalidateQueries({ queryKey: ["files"] });
         qc.invalidateQueries({ queryKey: ["walkTree"] });
@@ -152,7 +181,13 @@ export function LibraryPage() {
                 if (show === "unheard") return x.isDir || (isTaf(x.name) && !x.listened);
                 return true;
             })
-            .filter((x) => !f || `${x.name} ${x.tonieInfo?.series ?? ""} ${x.tonieInfo?.episode ?? ""}`.toLowerCase().includes(f))
+            .filter(
+                (x) =>
+                    !f ||
+                    `${x.name} ${x.tonieInfo?.series ?? ""} ${x.tonieInfo?.episode ?? ""}`
+                        .toLowerCase()
+                        .includes(f),
+            )
             .sort((a, b) => {
                 // playlists first (a folder's playlist is what one looks for), then folders, then files
                 const rank = (x: FileEntry) => (!x.isDir && isTap(x.name) ? 0 : x.isDir ? 1 : 2);
@@ -160,63 +195,103 @@ export function LibraryPage() {
                 let r = 0;
                 if (sort === "date") r = a.date - b.date;
                 else if (sort === "size") r = a.size - b.size;
-                else if (sort === "length") r = (a.tafHeader?.lengthSeconds ?? 0) - (b.tafHeader?.lengthSeconds ?? 0);
+                else if (sort === "length")
+                    r = (a.tafHeader?.lengthSeconds ?? 0) - (b.tafHeader?.lengthSeconds ?? 0);
                 return sign * (r || cmp(fileTitle(a, names), fileTitle(b, names)));
             });
     }, [files.data, filter, sort, dir, show, names]);
 
     const crumbs = path.split("/").filter(Boolean);
 
+    /** a name within this folder: no slashes, not "." or ".." */
+    const entryName = (s: string | null) =>
+        (s ?? "")
+            .replace(/[\\/]+/g, "_")
+            .replace(/^\.+$/, "")
+            .trim();
+
     const newFolder = async () => {
-        const name = await ui.prompt({ title: t("newFolder"), label: t("name") });
+        const name = entryName(
+            await ui.prompt({ title: t("library.newFolder"), label: t("common.name") }),
+        );
         if (!name) return;
-        await ui.run(() => tc.dirCreate(joinPath(path, name)), t("folderCreated"));
+        await ui.run(() => tc.dirCreate(joinPath(path, name)), t("library.folderCreated"));
         refresh();
     };
 
     const rename = async (x: FileEntry) => {
-        const name = await ui.prompt({ title: t("rename"), label: t("name"), value: x.name });
+        const name = entryName(
+            await ui.prompt({
+                title: t("library.rename"),
+                label: t("common.name"),
+                value: x.name,
+            }),
+        );
         if (!name || name === x.name) return;
-        await ui.run(() => tc.fileMove(joinPath(path, x.name), joinPath(path, name)), t("renamed"));
+        await ui.run(
+            () => tc.fileMove(joinPath(path, x.name), joinPath(path, name)),
+            t("library.renamed"),
+        );
         refresh();
     };
 
     /** deletes files and folders (with content), asking for the custom tonies used only by them */
     const removeMany = async (xs: FileEntry[]) => {
         let count = 0;
-        for (const x of xs) if (x.isDir) count += (await tc.walkTree(joinPath(path, x.name)).catch(() => [])).length;
-        const models = await tc.orphanModels(xs.map((x) => joinPath(path, x.name))).catch(() => [] as string[]);
+        for (const x of xs)
+            if (x.isDir)
+                count += (await tc.walkTree(joinPath(path, x.name)).catch(() => [])).length;
+        const models = await tc
+            .orphanModels(xs.map((x) => joinPath(path, x.name)))
+            .catch(() => [] as string[]);
         const one = xs.length === 1 ? xs[0] : null;
         const { ok, checked } = await ui.confirmCheck({
-            title: one ? (one.isDir ? t("deleteFolder") : t("deleteFile")) : t("deleteN", { n: xs.length }),
-            text: one ? (count ? t("deleteFolderText", { name: one.name, n: count }) : t("deleteText", { name: one.name })) : t("deleteNText"),
-            confirm: t("delete"),
+            title: one
+                ? one.isDir
+                    ? t("library.deleteFolder")
+                    : t("library.deleteFile")
+                : t("library.deleteN", { n: xs.length }),
+            text: one
+                ? count
+                    ? t("library.deleteFolderText", { name: one.name, n: count })
+                    : t("common.deleteText", { name: one.name })
+                : t("library.deleteNText"),
+            confirm: t("common.delete"),
             danger: true,
-            check: models.length ? { label: t("deleteModelsToo", { n: models.length }), value: true } : undefined,
+            check: models.length
+                ? { label: t("library.deleteModelsToo", { n: models.length }), value: true }
+                : undefined,
         });
         if (!ok) return;
         let failed = 0;
         for (const x of xs) {
             const p = joinPath(path, x.name);
-            await (x.isDir ? tc.deleteTree(p, "library", checked) : tc.fileDelete(p, false, "library", undefined, checked)).catch(() => failed++);
+            await (
+                x.isDir
+                    ? tc.deleteTree(p, "library", checked)
+                    : tc.fileDelete(p, false, "library", undefined, checked)
+            ).catch(() => failed++);
         }
         if (checked && models.length) {
             qc.invalidateQueries({ queryKey: ["customModels"] });
             qc.invalidateQueries({ queryKey: ["aclMine"] });
             invalidateTags();
         }
-        if (failed) ui.toast("error", t("bulkFailed", { n: failed }));
-        else ui.toast("ok", t("deleted"));
+        if (failed) ui.toast("error", t("library.failedN", { n: failed }));
+        else ui.toast("ok", t("common.deleted"));
         refresh();
     };
     const remove = (x: FileEntry) => removeMany([x]);
 
     const move = async (target: string) => {
-        if (!moveFor) return;
-        const from = joinPath(path, moveFor.name);
-        const to = joinPath(target, moveFor.name);
-        if (from === to) return;
-        await ui.run(() => tc.fileMove(from, to), t("moved"));
+        if (!moveFor || joinPath(target) === joinPath(path)) return;
+        let failed = 0;
+        for (const x of moveFor)
+            await tc
+                .fileMove(joinPath(path, x.name), joinPath(target, x.name))
+                .catch(() => failed++);
+        if (failed) ui.toast("error", t("library.failedN", { n: failed }));
+        else ui.toast("ok", t("library.moved"));
         refresh();
     };
 
@@ -228,17 +303,29 @@ export function LibraryPage() {
     };
 
     const encode = async (x: FileEntry) => {
-        const name = await ui.prompt({ title: t("convertToTaf"), label: t("targetFile"), value: stripExt(x.name) + ".taf" });
+        const name = await ui.prompt({
+            title: t("library.convertToTaf"),
+            label: t("library.targetFile"),
+            value: stripExt(x.name) + ".taf",
+        });
         if (!name) return;
-        ui.toast("info", t("converting"));
-        await ui.run(() => tc.encodeFiles([joinPath(path, x.name)], joinPath(path, name.endsWith(".taf") ? name : name + ".taf")), t("converted"));
+        ui.toast("info", t("library.converting"));
+        await ui.run(
+            () =>
+                tc.encodeFiles(
+                    [joinPath(path, x.name)],
+                    joinPath(path, name.endsWith(".taf") ? name : name + ".taf"),
+                ),
+            t("library.converted"),
+        );
         refresh();
     };
 
     const open = (x: FileEntry) => {
         const p = joinPath(path, x.name);
         if (x.isDir) return go(p);
-        if (isImage(x.name)) return setZoom({ src: backendUrl(libraryFileUrl(p, false)), alt: x.name });
+        if (isImage(x.name))
+            return setZoom({ src: backendUrl(libraryFileUrl(p, false)), alt: x.name });
         if (isTap(x.name)) return setPlaylist({ edit: p });
         setDetails(x);
     };
@@ -246,13 +333,16 @@ export function LibraryPage() {
     /** every chapter as a TAF of its own and a playlist, in a folder named like the TAF; the TAF moves there too */
     const split = async (x: FileEntry) => {
         const ok = await ui.confirm({
-            title: t("splitTaf"),
-            text: t("splitTafText", { n: x.tafHeader?.trackSeconds?.length ?? 0 }),
-            confirm: t("splitTafRun"),
+            title: t("library.splitTaf"),
+            text: t("library.splitTafText", { n: x.tafHeader?.trackSeconds?.length ?? 0 }),
+            confirm: t("library.splitTafRun"),
         });
         if (!ok) return;
-        ui.toast("info", t("splitting"));
-        const r = await ui.run(() => tc.splitTaf(joinPath(path, x.name), []), t("splitDone"));
+        ui.toast("info", t("library.splitting"));
+        const r = await ui.run(
+            () => tc.splitTaf(joinPath(path, x.name), []),
+            t("library.splitDone"),
+        );
         refresh();
         if (r) go("/" + r.folder);
     };
@@ -264,55 +354,132 @@ export function LibraryPage() {
 
     /** a copy of a playlist; it builds a TAF of its own */
     const duplicateTap = async (x: FileEntry) => {
-        const name = await ui.prompt({ title: t("duplicatePlaylist"), label: t("name"), value: `${stripExt(x.name)} (2).tap` });
+        const name = await ui.prompt({
+            title: t("library.duplicatePlaylist"),
+            label: t("common.name"),
+            value: `${stripExt(x.name)} (2).tap`,
+        });
         if (!name) return;
         const fileName = name.endsWith(".tap") ? name : name + ".tap";
         await ui.run(async () => {
             const tap = await tc.readTap(joinPath(path, x.name));
-            const copy = { ...tap, audio_id: Math.floor(Date.now() / 1000), filepath: "lib://" + joinPath(path, fileName + ".taf").replace(/^\//, "") };
+            const copy = {
+                ...tap,
+                audio_id: Math.floor(Date.now() / 1000),
+                filepath: "lib://" + joinPath(path, fileName + ".taf").replace(/^\//, ""),
+            };
             await tc.saveTap(copy, path, fileName);
-        }, t("duplicated"));
+        }, t("library.duplicated"));
         refresh();
     };
 
-    const snippet = (xs: FileEntry[]) => setText({ title: t("customJsonSnippet"), text: customJsonSnippet(xs), hint: t("customJsonSnippetHint") });
+    const snippet = (xs: FileEntry[]) =>
+        setText({
+            title: t("library.customJsonSnippet"),
+            text: customJsonSnippet(xs),
+            hint: t("library.customJsonSnippetHint"),
+        });
 
     const actions = (x: FileEntry) => {
         const p = joinPath(path, x.name);
         const playable = isTaf(x.name) || isAudio(x.name);
         const tonieFile = isTaf(x.name) || isTap(x.name);
         ui.actions(x.name, [
-            { label: t("details"), icon: <Info size={17} />, onSelect: () => setDetails(x), hidden: x.isDir },
-            { label: t("play"), icon: <Play size={17} />, onSelect: () => player.play(filePlayItem(p, x)), hidden: !playable },
-            { label: t("assignToTonie"), icon: <Disc3 size={17} />, onSelect: () => setAssignFor(p), hidden: !tonieFile },
-            { label: t("editPlaylist"), icon: <ListMusic size={17} />, onSelect: () => setPlaylist({ edit: p }), hidden: !isTap(x.name) },
-            { label: t("duplicatePlaylist"), icon: <Copy size={17} />, onSelect: () => duplicateTap(x), hidden: !isTap(x.name) },
-            { label: t("showJson"), icon: <Braces size={17} />, onSelect: () => showJson(x), hidden: !isTap(x.name) && !/\.json$/i.test(x.name) },
             {
-                label: t("showTafHeader"),
+                label: t("library.details"),
+                icon: <Info size={17} />,
+                onSelect: () => setDetails(x),
+                hidden: x.isDir,
+            },
+            {
+                label: t("common.play"),
+                icon: <Play size={17} />,
+                onSelect: () => player.play(filePlayItem(p, x)),
+                hidden: !playable,
+            },
+            {
+                label: t("common.assignToTonie"),
+                icon: <Disc3 size={17} />,
+                onSelect: () => setAssignFor(p),
+                hidden: !tonieFile,
+            },
+            {
+                label: t("library.editPlaylist"),
+                icon: <ListMusic size={17} />,
+                onSelect: () => setPlaylist({ edit: p }),
+                hidden: !isTap(x.name),
+            },
+            {
+                label: t("library.duplicatePlaylist"),
+                icon: <Copy size={17} />,
+                onSelect: () => duplicateTap(x),
+                hidden: !isTap(x.name),
+            },
+            {
+                label: t("library.showJson"),
                 icon: <Braces size={17} />,
-                onSelect: () => setText({ title: x.name, text: JSON.stringify(x.tafHeader, null, 2) }),
+                onSelect: () => showJson(x),
+                hidden: !isTap(x.name) && !/\.json$/i.test(x.name),
+            },
+            {
+                label: t("library.showTafHeader"),
+                icon: <Braces size={17} />,
+                onSelect: () =>
+                    setText({ title: x.name, text: JSON.stringify(x.tafHeader, null, 2) }),
                 hidden: !x.tafHeader,
             },
             {
-                label: t("splitTaf"),
+                label: t("library.splitTaf"),
                 icon: <Scissors size={17} />,
                 onSelect: () => split(x),
-                hidden: !isTaf(x.name) || !canSplit.data || (x.tafHeader?.trackSeconds?.length ?? 0) < 2,
+                hidden:
+                    !isTaf(x.name) ||
+                    !canSplit.data ||
+                    (x.tafHeader?.trackSeconds?.length ?? 0) < 2,
             },
             {
-                label: x.tonieInfo?.series ? t("changeCover") : t("setCover"),
+                label: x.tonieInfo?.series ? t("library.changeCover") : t("library.setCover"),
                 icon: <ImagePlus size={17} />,
                 onSelect: () => setCoverFor({ mode: "cover", file: p }),
                 hidden: !tonieFile,
             },
-            { label: t("convertToTaf"), icon: <Wand2 size={17} />, onSelect: () => encode(x), hidden: !isAudio(x.name) },
-            { label: t("share"), icon: <Share2 size={17} />, onSelect: () => setShareFor({ type: "folder", id: p.replace(/^\/+/, ""), title: x.name }), hidden: !x.isDir || !canShare("folder", p.replace(/^\/+/, "")) },
-            { label: t("rename"), icon: <Pencil size={17} />, onSelect: () => rename(x) },
-            { label: t("move"), icon: <ArrowRightLeft size={17} />, onSelect: () => setMoveFor(x) },
-            { label: t("download"), icon: <Download size={17} />, onSelect: () => download(x), hidden: x.isDir },
-            { label: t("downloadOgg"), icon: <Download size={17} />, onSelect: () => setOggFor(x), hidden: !isTaf(x.name) },
-            { label: t("delete"), icon: <Trash2 size={17} />, danger: true, onSelect: () => remove(x) },
+            {
+                label: t("library.convertToTaf"),
+                icon: <Wand2 size={17} />,
+                onSelect: () => encode(x),
+                hidden: !isAudio(x.name),
+            },
+            {
+                label: t("common.share"),
+                icon: <Share2 size={17} />,
+                onSelect: () =>
+                    setShareFor({ type: "folder", id: p.replace(/^\/+/, ""), title: x.name }),
+                hidden: !x.isDir || !canShare("folder", p.replace(/^\/+/, "")),
+            },
+            { label: t("library.rename"), icon: <Pencil size={17} />, onSelect: () => rename(x) },
+            {
+                label: t("library.move"),
+                icon: <ArrowRightLeft size={17} />,
+                onSelect: () => setMoveFor([x]),
+            },
+            {
+                label: t("common.download"),
+                icon: <Download size={17} />,
+                onSelect: () => download(x),
+                hidden: x.isDir,
+            },
+            {
+                label: t("common.downloadOgg"),
+                icon: <Download size={17} />,
+                onSelect: () => setOggFor(x),
+                hidden: !isTaf(x.name),
+            },
+            {
+                label: t("common.delete"),
+                icon: <Trash2 size={17} />,
+                danger: true,
+                onSelect: () => remove(x),
+            },
         ]);
     };
 
@@ -326,17 +493,29 @@ export function LibraryPage() {
     };
     /** the cover of a file, or the one picture of what is in a folder */
     const picture = (x: FileEntry) => x.tonieInfo?.picture || x.folderPicture;
-    const kind = (x: FileEntry) => (x.isDir ? "folder" : isTaf(x.name) || isTap(x.name) ? "taf" : "");
+    const kind = (x: FileEntry) =>
+        x.isDir ? "folder" : isTaf(x.name) || isTap(x.name) ? "taf" : "";
     const sub = (x: FileEntry) =>
         x.isDir
             ? ago(x.date * 1000)
-            : [lengthText(x.tafHeader?.lengthSeconds), bytes(x.size), sort === "date" ? ago(x.date * 1000) : ""].filter(Boolean).join(" · ");
+            : [
+                  lengthText(x.tafHeader?.lengthSeconds),
+                  bytes(x.size),
+                  sort === "date" ? ago(x.date * 1000) : "",
+              ]
+                  .filter(Boolean)
+                  .join(" · ");
     const dirProps = (x: FileEntry) =>
-        x.isDir ? { onPointerEnter: () => prefetch(joinPath(path, x.name)), onTouchStart: () => prefetch(joinPath(path, x.name)) } : {};
+        x.isDir
+            ? {
+                  onPointerEnter: () => prefetch(joinPath(path, x.name)),
+                  onTouchStart: () => prefetch(joinPath(path, x.name)),
+              }
+            : {};
     const moreBtn = (x: FileEntry, className: string, size: number) => (
         <button
             className={className}
-            aria-label={t("more")}
+            aria-label={t("common.more")}
             onClick={(e) => {
                 e.stopPropagation();
                 actions(x);
@@ -347,17 +526,23 @@ export function LibraryPage() {
     );
 
     const byName = new Map(list.map((x) => [x.name, x]));
-    const sel = useSelection((name) => {
-        const x = byName.get(name);
-        if (x) open(x);
-    }, list.map((x) => x.name));
+    const sel = useSelection(
+        (name) => {
+            const x = byName.get(name);
+            if (x) open(x);
+        },
+        list.map((x) => x.name),
+    );
+    // names are only unique in one folder: another folder starts without a selection
+    const clearSelection = sel.clear;
+    useEffect(() => clearSelection(), [path, clearSelection]);
     const selectedFiles = list.filter((x) => sel.selected.has(x.name));
     const playlistFiles = selectedFiles.filter((x) => isTaf(x.name) || isAudio(x.name));
     const checkbox = (name: string) => (
         <button
             type="button"
             className={`select-box ${sel.selected.has(name) ? "checked" : ""}`}
-            aria-label={t("select")}
+            aria-label={t("common.select")}
             onClick={(e) => {
                 e.stopPropagation();
                 sel.toggle(name, e.shiftKey);
@@ -372,36 +557,54 @@ export function LibraryPage() {
         sel.clear();
     };
 
-    const showLabels: Record<Show, string> = { all: t("all"), tonie: t("tonieFiles"), audio: t("audioFiles"), unheard: t("unheard") };
+    const showLabels: Record<Show, string> = {
+        all: t("common.all"),
+        tonie: t("library.tonieFiles"),
+        audio: t("library.audioFiles"),
+        unheard: t("library.unheard"),
+    };
     const active = show !== "all" ? [{ label: showLabels[show], clear: () => setShow("all") }] : [];
 
     return (
         <Page
-            title={path === "/" ? t("library") : baseName(path)}
+            title={path === "/" ? t("common.library") : baseName(path)}
             back={path === "/" ? undefined : true}
             right={
                 <>
                     {files.isFetching && files.data && (
-                        <span className="refreshing" title={t("refreshing")}>
+                        <span className="refreshing" title={t("library.refreshing")}>
                             <Spinner small />
                         </span>
                     )}
                     {sel.selecting ? (
                         <button className="btn ghost" onClick={sel.clear}>
-                            {t("done")}
+                            {t("common.done")}
                         </button>
                     ) : (
                         <>
-                            <button className="icon-btn" onClick={() => sel.setSelecting(true)} aria-label={t("select")} title={t("selectHint")}>
+                            <button
+                                className="icon-btn"
+                                onClick={() => sel.setSelecting(true)}
+                                aria-label={t("common.select")}
+                                title={t("common.selectHint")}
+                            >
                                 <CheckSquare size={20} />
                             </button>
                             <button
                                 className="icon-btn"
-                                aria-label={t("create")}
+                                aria-label={t("library.create")}
                                 onClick={() =>
-                                    ui.actions(t("create"), [
-                                        { label: t("newFolder"), icon: <FolderPlus size={17} />, onSelect: newFolder },
-                                        { label: t("newPlaylist"), icon: <ListMusic size={17} />, onSelect: () => setPlaylist({ dir: path }) },
+                                    ui.actions(t("library.create"), [
+                                        {
+                                            label: t("library.newFolder"),
+                                            icon: <FolderPlus size={17} />,
+                                            onSelect: newFolder,
+                                        },
+                                        {
+                                            label: t("library.newPlaylist"),
+                                            icon: <ListMusic size={17} />,
+                                            onSelect: () => setPlaylist({ dir: path }),
+                                        },
                                     ])
                                 }
                             >
@@ -411,21 +614,39 @@ export function LibraryPage() {
                     )}
                     <button
                         className="icon-btn"
-                        aria-label={t("tools")}
+                        aria-label={t("common.tools")}
                         onClick={() =>
-                            ui.actions(t("tools"), [
-                                { label: t("unusedTafs"), icon: <FileAudio size={17} />, onSelect: () => setUnusedOpen(true) },
+                            ui.actions(t("common.tools"), [
+                                // only an admin sees every tonie and playlist that uses a TAF
+                                ...(access.admin
+                                    ? [
+                                          {
+                                              label: t("library.unusedTafs"),
+                                              icon: <FileAudio size={17} />,
+                                              onSelect: () => setUnusedOpen(true),
+                                          },
+                                      ]
+                                    : []),
                                 {
-                                    label: selectedFiles.length ? t("customJsonSnippetSelected", { n: selectedFiles.length }) : t("customJsonSnippet"),
+                                    label: selectedFiles.length
+                                        ? t("library.customJsonSnippetSelected", {
+                                              n: selectedFiles.length,
+                                          })
+                                        : t("library.customJsonSnippet"),
                                     icon: <Braces size={17} />,
-                                    onSelect: () => snippet(selectedFiles.length ? selectedFiles : list),
+                                    onSelect: () =>
+                                        snippet(selectedFiles.length ? selectedFiles : list),
                                 },
                             ])
                         }
                     >
                         <Wrench size={20} />
                     </button>
-                    <button className="icon-btn" onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)} aria-label={t("upload")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}
+                        aria-label={t("common.upload")}
+                    >
                         <Upload size={21} />
                     </button>
                 </>
@@ -434,17 +655,27 @@ export function LibraryPage() {
             <div className="sticky-tools">
                 {path !== "/" && (
                     <div className="breadcrumbs">
-                        <button onClick={() => go("/")}>{t("library")}</button>
+                        <button onClick={() => go("/")}>{t("common.library")}</button>
                         {crumbs.map((c, i) => (
                             <span key={i} className="row-gap" style={{ gap: 2 }}>
                                 <span className="sep">/</span>
-                                <button onClick={() => go("/" + crumbs.slice(0, i + 1).join("/"))}>{c}</button>
+                                <button onClick={() => go("/" + crumbs.slice(0, i + 1).join("/"))}>
+                                    {c}
+                                </button>
                             </span>
                         ))}
                     </div>
                 )}
                 <div className="toolbar">
-                    <SearchField value={filter} onChange={setFilter} placeholder={deep ? t("searchSubfoldersPlaceholder") : t("filterFolder")} />
+                    <SearchField
+                        value={filter}
+                        onChange={setFilter}
+                        placeholder={
+                            deep
+                                ? t("library.searchSubfoldersPlaceholder")
+                                : t("library.filterFolder")
+                        }
+                    />
                     <button
                         className={`icon-btn filled ${deep ? "on" : ""}`}
                         onClick={() => {
@@ -452,19 +683,26 @@ export function LibraryPage() {
                             setPref("lib.deep", deep ? "" : "1");
                         }}
                         aria-pressed={deep}
-                        aria-label={t("searchSubfolders")}
-                        title={t("searchSubfolders")}
+                        aria-label={t("library.searchSubfolders")}
+                        title={t("library.searchSubfolders")}
                     >
                         <FolderTree size={19} />
                     </button>
                     <button
                         className="icon-btn filled"
-                        onClick={() => pref<View>("lib.view", setView)(view === "list" ? "grid" : "list")}
-                        aria-label={view === "list" ? t("viewGrid") : t("viewList")}
+                        onClick={() =>
+                            pref<View>("lib.view", setView)(view === "list" ? "grid" : "list")
+                        }
+                        aria-label={view === "list" ? t("common.viewGrid") : t("common.viewList")}
                     >
                         {view === "list" ? <LayoutGrid size={19} /> : <List size={19} />}
                     </button>
-                    <button ref={menuBtn} className="icon-btn filled filter-btn" onClick={() => setMenu((v) => !v)} aria-label={t("filterAndView")}>
+                    <button
+                        ref={menuBtn}
+                        className="icon-btn filled filter-btn"
+                        onClick={() => setMenu((v) => !v)}
+                        aria-label={t("common.filterAndView")}
+                    >
                         <SlidersHorizontal size={19} />
                         {active.length > 0 && <span className="count">{active.length}</span>}
                     </button>
@@ -485,58 +723,75 @@ export function LibraryPage() {
                 open={menu}
                 onClose={() => setMenu(false)}
                 anchor={menuBtn}
-                title={t("filterAndView")}
+                title={t("common.filterAndView")}
                 footer={
                     <button className="btn primary" onClick={() => setMenu(false)}>
-                        {t("showN", { n: list.length })}
+                        {t("common.showN", { n: list.length })}
                     </button>
                 }
             >
                 <ChoiceGroup
-                    label={t("view")}
+                    label={t("common.view")}
                     value={view}
                     onChange={pref<View>("lib.view", setView)}
                     options={[
-                        { value: "list", label: <><List size={15} /> {t("viewList")}</> },
-                        { value: "grid", label: <><LayoutGrid size={15} /> {t("viewGrid")}</> },
+                        {
+                            value: "list",
+                            label: (
+                                <>
+                                    <List size={15} /> {t("common.viewList")}
+                                </>
+                            ),
+                        },
+                        {
+                            value: "grid",
+                            label: (
+                                <>
+                                    <LayoutGrid size={15} /> {t("common.viewGrid")}
+                                </>
+                            ),
+                        },
                     ]}
                 />
                 <ChoiceGroup
-                    label={t("sortBy")}
+                    label={t("common.sortBy")}
                     value={sort}
                     onChange={pref<Sort>("lib.sort", setSort)}
                     options={[
-                        { value: "name", label: t("name") },
-                        { value: "date", label: t("date") },
-                        { value: "size", label: t("size") },
-                        { value: "length", label: t("length") },
+                        { value: "name", label: t("common.name") },
+                        { value: "date", label: t("library.date") },
+                        { value: "size", label: t("library.size") },
+                        { value: "length", label: t("common.length") },
                     ]}
                 />
                 <ChoiceGroup
-                    label={t("order")}
+                    label={t("library.order")}
                     value={dir}
                     onChange={pref<Dir>("lib.dir", setDir)}
                     options={[
-                        { value: "asc", label: sort === "name" ? "A–Z" : t("ascending") },
-                        { value: "desc", label: sort === "name" ? "Z–A" : t("descending") },
+                        { value: "asc", label: sort === "name" ? "A–Z" : t("library.ascending") },
+                        { value: "desc", label: sort === "name" ? "Z–A" : t("library.descending") },
                     ]}
                 />
                 <ChoiceGroup
-                    label={t("showFiles")}
+                    label={t("library.showFiles")}
                     value={show}
                     onChange={setShow}
-                    options={(Object.keys(showLabels) as Show[]).map((k) => ({ value: k, label: showLabels[k] }))}
+                    options={(Object.keys(showLabels) as Show[]).map((k) => ({
+                        value: k,
+                        label: showLabels[k],
+                    }))}
                 />
                 <ChoiceGroup
-                    label={t("titles")}
+                    label={t("library.titles")}
                     value={names ? "1" : ""}
                     onChange={(v) => {
                         setNames(v === "1");
                         setPref("lib.names", v);
                     }}
                     options={[
-                        { value: "", label: t("titlesFromTonie") },
-                        { value: "1", label: t("titlesFileNames") },
+                        { value: "", label: t("library.titlesFromTonie") },
+                        { value: "1", label: t("library.titlesFileNames") },
                     ]}
                 />
             </Popover>
@@ -546,24 +801,36 @@ export function LibraryPage() {
                     loading={deepSearch.loading}
                     hits={deepSearch.hits}
                     root={path}
+                    grid={view === "grid"}
                     onOpen={(p, entry) => {
                         go(entry.isDir ? p : parentPath(p));
-                        if (!entry.isDir) setDetails(entry);
+                        if (entry.isDir) return;
+                        setDetails(entry);
+                        setSearchBack({ path, filter });
                     }}
                 />
             )}
             {!deepSearch.active && files.isLoading && <Loading />}
-            {!deepSearch.active && files.error && !files.data && <ErrorBox error={files.error} retry={() => files.refetch()} />}
+            {!deepSearch.active && files.error && !files.data && (
+                <ErrorBox error={files.error} retry={() => files.refetch()} />
+            )}
             {!deepSearch.active && files.data && list.length === 0 && (
                 <Empty
                     icon={<Folder size={28} />}
-                    title={filter || show !== "all" ? t("nothingFound") : t("folderEmpty")}
+                    title={
+                        filter || show !== "all"
+                            ? t("common.nothingFound")
+                            : t("library.folderEmpty")
+                    }
                     action={
                         !filter &&
                         show === "all" && (
-                            <button className="btn primary" onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}>
+                            <button
+                                className="btn primary"
+                                onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}
+                            >
                                 <Upload size={18} />
-                                {t("uploadHere")}
+                                {t("library.uploadHere")}
                             </button>
                         )
                     }
@@ -572,41 +839,62 @@ export function LibraryPage() {
             {!deepSearch.active && list.length > 0 && view === "list" && (
                 <div className="list">
                     {list.map((x) => (
-                        <div key={x.name} className="row-wrap" role="button" tabIndex={0} {...sel.itemProps(x.name)} {...dirProps(x)}>
+                        <div
+                            key={x.name}
+                            className="row-wrap"
+                            role="button"
+                            tabIndex={0}
+                            {...sel.itemProps(x.name)}
+                            {...dirProps(x)}
+                        >
                             <Row
                                 className={sel.selected.has(x.name) ? "checked" : ""}
                                 leading={
                                     <>
-                                    {sel.selecting && checkbox(x.name)}
-                                    {picture(x) ? (
-                                        <span className={`file-icon ${x.isDir ? "folder-pic" : ""}`}>
-                                            <img src={backendUrl(picture(x)!)} alt="" loading="lazy" />
-                                            {x.isDir && <Folder size={13} className="folder-badge" />}
-                                        </span>
-                                    ) : (
-                                        <span className={`file-icon ${kind(x)}`}>{icon(x)}</span>
-                                    )}
+                                        {sel.selecting && checkbox(x.name)}
+                                        {picture(x) ? (
+                                            <span
+                                                className={`file-icon ${x.isDir ? "folder-pic" : ""}`}
+                                            >
+                                                <img
+                                                    src={backendUrl(picture(x)!)}
+                                                    alt=""
+                                                    loading="lazy"
+                                                />
+                                                {x.isDir && (
+                                                    <Folder size={13} className="folder-badge" />
+                                                )}
+                                            </span>
+                                        ) : (
+                                            <span className={`file-icon ${kind(x)}`}>
+                                                {icon(x)}
+                                            </span>
+                                        )}
                                     </>
                                 }
                                 title={fileTitle(x, names)}
                                 sub={sub(x)}
                                 chevron={x.isDir && !sel.selecting}
                                 right={
-                                    sel.selecting ? undefined : <>
-                                        {(isTaf(x.name) || isAudio(x.name)) && (
-                                            <button
-                                                className="icon-btn"
-                                                aria-label={t("play")}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    player.play(filePlayItem(joinPath(path, x.name), x));
-                                                }}
-                                            >
-                                                <Play size={19} fill="currentColor" />
-                                            </button>
-                                        )}
-                                        {moreBtn(x, "icon-btn muted", 20)}
-                                    </>
+                                    sel.selecting ? undefined : (
+                                        <>
+                                            {(isTaf(x.name) || isAudio(x.name)) && (
+                                                <button
+                                                    className="icon-btn"
+                                                    aria-label={t("common.play")}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        player.play(
+                                                            filePlayItem(joinPath(path, x.name), x),
+                                                        );
+                                                    }}
+                                                >
+                                                    <Play size={19} fill="currentColor" />
+                                                </button>
+                                            )}
+                                            {moreBtn(x, "icon-btn muted", 20)}
+                                        </>
+                                    )
                                 }
                             />
                         </div>
@@ -626,8 +914,14 @@ export function LibraryPage() {
                         >
                             {checkbox(x.name)}
                             <div className={`pic ${kind(x)}`}>
-                                {picture(x) ? <img src={backendUrl(picture(x)!)} alt="" loading="lazy" /> : icon(x, 44)}
-                                {x.isDir && picture(x) && <Folder size={16} className="folder-badge" />}
+                                {picture(x) ? (
+                                    <img src={backendUrl(picture(x)!)} alt="" loading="lazy" />
+                                ) : (
+                                    icon(x, 44)
+                                )}
+                                {x.isDir && picture(x) && (
+                                    <Folder size={16} className="folder-badge" />
+                                )}
                             </div>
                             <div className="meta">
                                 <div className="name">{fileTitle(x, names)}</div>
@@ -641,64 +935,122 @@ export function LibraryPage() {
 
             {sel.selecting && (
                 <div className="select-bar" role="toolbar">
-                    <button className="icon-btn" onClick={sel.clear} aria-label={t("cancel")}>
+                    <button
+                        className="icon-btn"
+                        onClick={sel.clear}
+                        aria-label={t("common.cancel")}
+                    >
                         <X size={20} />
                     </button>
-                    <span className="count">{selectedFiles.length ? t("nSelected", { n: selectedFiles.length }) : t("selectFiles")}</span>
-                    <button className="icon-btn" disabled={!selectedFiles.length} onClick={deleteSelected} aria-label={t("delete")}>
+                    <span className="count">
+                        {selectedFiles.length
+                            ? t("common.nSelected", { n: selectedFiles.length })
+                            : t("library.selectFiles")}
+                    </span>
+                    <button
+                        className="icon-btn"
+                        disabled={!selectedFiles.length}
+                        onClick={deleteSelected}
+                        aria-label={t("common.delete")}
+                    >
                         <Trash2 size={19} />
+                    </button>
+                    <button
+                        className="icon-btn"
+                        disabled={!selectedFiles.length}
+                        onClick={() => setMoveFor(selectedFiles)}
+                        aria-label={t("library.move")}
+                    >
+                        <FolderInput size={19} />
                     </button>
                     <button
                         className="btn primary small"
                         disabled={!playlistFiles.length}
                         onClick={() => {
-                            setPlaylist({ dir: path, files: playlistFiles.map((x) => ({ path: joinPath(path, x.name), entry: x })) });
+                            setPlaylist({
+                                dir: path,
+                                files: playlistFiles.map((x) => ({
+                                    path: joinPath(path, x.name),
+                                    entry: x,
+                                })),
+                            });
                             sel.clear();
                         }}
                     >
                         <ListMusic size={15} />
-                        {t("toPlaylist")}
+                        {t("library.toPlaylist")}
                     </button>
                 </div>
             )}
             <PlaylistEditor start={playlist} onClose={() => setPlaylist(null)} />
-            <TextSheet title={text?.title ?? ""} text={text?.text ?? null} hint={text?.hint} onClose={() => setText(null)} />
+            <TextSheet
+                title={text?.title ?? ""}
+                text={text?.text ?? null}
+                hint={text?.hint}
+                onClose={() => setText(null)}
+            />
             <UnusedTafsSheet open={unusedOpen} onClose={() => setUnusedOpen(false)} />
             {zoom && <Lightbox items={[zoom]} index={0} onClose={() => setZoom(null)} />}
             <TagPicker
                 open={assignFor !== null}
                 onClose={() => setAssignFor(null)}
-                title={t("assignToTonie")}
+                title={t("common.assignToTonie")}
                 onPick={async (tag) => {
                     const source = "lib://" + (assignFor ?? "").replace(/^\//, "");
-                    await ui.run(() => tc.assignSource(tag, source, tag.overlay || undefined), t("contentAssigned"));
+                    await ui.run(
+                        () => tc.assignSource(tag, source, tag.overlay || undefined),
+                        t("common.contentAssigned"),
+                    );
                     invalidateTags();
                 }}
             />
             <ShareSheet target={shareFor} onClose={() => setShareFor(null)} />
-            <LibraryPicker open={moveFor !== null} onClose={() => setMoveFor(null)} folderMode startPath={path} title={t("moveTo")} onPick={move} />
+            <LibraryPicker
+                open={moveFor !== null}
+                onClose={() => setMoveFor(null)}
+                folderMode
+                startPath={path}
+                title={t("library.moveTo")}
+                onPick={async (target) => {
+                    await move(target);
+                    sel.clear();
+                }}
+            />
             <ModelEditor start={coverFor} onClose={() => setCoverFor(null)} onSaved={refresh} />
             <DownloadSheet
                 open={oggFor !== null}
                 onClose={() => setOggFor(null)}
                 title={oggFor ? fileTitle(oggFor, false).replace(/\.taf$/i, "") : ""}
                 wholeUrl={oggFor ? libraryFileUrl(joinPath(path, oggFor.name), true) : ""}
-                trackUrl={oggFor ? (n) => `${libraryFileUrl(joinPath(path, oggFor.name), true)}&tracks=${n}` : undefined}
+                trackUrl={
+                    oggFor
+                        ? (n) => `${libraryFileUrl(joinPath(path, oggFor.name), true)}&tracks=${n}`
+                        : undefined
+                }
                 chapters={oggFor?.tafHeader?.trackSeconds ?? []}
                 chapterTitles={oggFor?.tonieInfo?.tracks ?? []}
             />
             <FileDetailsSheet
                 path={path}
                 file={details}
-                onClose={() => setDetails(null)}
+                onClose={(forAction) => {
+                    setDetails(null);
+                    setSearchBack(null);
+                    if (!searchBack || forAction) return;
+                    go(searchBack.path);
+                    setFilter(searchBack.filter);
+                }}
                 actions={{
                     assign: () => details && setAssignFor(joinPath(path, details.name)),
-                    cover: () => details && setCoverFor({ mode: "cover", file: joinPath(path, details.name) }),
+                    cover: () =>
+                        details &&
+                        setCoverFor({ mode: "cover", file: joinPath(path, details.name) }),
                     rename: () => details && rename(details),
-                    move: () => details && setMoveFor(details),
+                    move: () => details && setMoveFor([details]),
                     download: () => details && download(details),
                     downloadOgg: () => details && setOggFor(details),
-                    editPlaylist: () => details && setPlaylist({ edit: joinPath(path, details.name) }),
+                    editPlaylist: () =>
+                        details && setPlaylist({ edit: joinPath(path, details.name) }),
                     remove: () => details && remove(details),
                 }}
             />

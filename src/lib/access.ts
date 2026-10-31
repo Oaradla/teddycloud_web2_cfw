@@ -1,20 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { ADMIN_MINE, AclMineEntry, AclScope, auth, listAllows } from "../api/auth";
+import { ADMIN_MINE, AclScope, NO_RIGHTS, auth } from "../api/auth";
+import { folderEntry, mineAllows } from "./aclRights";
 import { tc } from "../api/tc";
 import { keys } from "./queries";
 
-/** the entry of a library folder itself or of its nearest parent */
-function folderEntry(folders: Record<string, AclMineEntry>, path: string): AclMineEntry | undefined {
-    let probe = path.replace(/^\/+|\/+$/g, "");
-    for (;;) {
-        if (folders[probe]) return folders[probe];
-        if (probe === "") return undefined;
-        const slash = probe.lastIndexOf("/");
-        probe = slash < 0 ? "" : probe.slice(0, slash);
-    }
-}
-
-export const useAuthStatus = () => useQuery({ queryKey: keys.auth, queryFn: tc.authStatus, staleTime: 60_000 });
+export const useAuthStatus = () =>
+    useQuery({ queryKey: keys.auth, queryFn: tc.authStatus, staleTime: 60_000 });
 
 /**
  * What the logged-in user may do. Without the web login everyone is admin (as in the classic
@@ -29,7 +20,7 @@ export function useAccess() {
         enabled: active,
         staleTime: 60_000,
     });
-    const m = active ? (mine.data ?? ADMIN_MINE) : ADMIN_MINE;
+    const m = active ? (mine.data ?? NO_RIGHTS) : ADMIN_MINE;
     // also those used only where the user may change things (folders, tonies)
     const changeable = useQuery({
         queryKey: ["aclMine", status.data?.username ?? "", "models"],
@@ -41,12 +32,7 @@ export function useAccess() {
     const can = (scope: AclScope | "system", id: string, right: string) => {
         if (m.admin) return true;
         if (scope === "system") return m.system.includes(right);
-        if (scope === "box") return Boolean(m.boxes[id]?.rights?.includes(right));
-        const entry = scope === "tonie" ? m.tonies[id.toUpperCase()] : folderEntry(m.folders, id);
-        if (entry?.owner) return !listAllows(m.deny, right);
-        if (entry?.granted) return listAllows(entry.granted, right) && !listAllows(m.deny, right);
-        if (scope === "tonie" && !entry) return listAllows(m.unassigned.tonie, right);
-        return false;
+        return mineAllows(m, scope, id, right);
     };
     const owns = (scope: AclScope, id: string) => {
         if (m.admin) return true;
@@ -66,11 +52,17 @@ export function useAccess() {
         canServerSettings: m.admin || m.system.includes("system.settings"),
         canCreateModels: m.admin || m.system.includes("model.create"),
         /** the box update page: the update right on at least one box */
-        canUpdateBoxes: m.admin || Object.values(m.boxes).some((b) => b.rights?.includes("box.update")),
+        canUpdateBoxes:
+            m.admin || Object.values(m.boxes).some((b) => b.rights?.includes("box.update")),
         /** custom tonies the user added, or used only where the user may change things */
         mayChangeModel: (model: string) =>
-            m.admin || Boolean(m.models?.[model.toLowerCase()]?.owner) || Boolean(changeable.data?.models.some((x) => x.toLowerCase() === model.toLowerCase())),
+            m.admin ||
+            Boolean(m.models?.[model.toLowerCase()]?.owner) ||
+            Boolean(changeable.data?.models.some((x) => x.toLowerCase() === model.toLowerCase())),
         /** pictures in custom_img the user added, or shown only by custom tonies the user may change */
-        mayDeleteImage: (name: string) => m.admin || Boolean(m.images?.[name]?.owner) || Boolean(changeable.data?.images.includes(name)),
+        mayDeleteImage: (name: string) =>
+            m.admin ||
+            Boolean(m.images?.[name]?.owner) ||
+            Boolean(changeable.data?.images.includes(name)),
     };
 }

@@ -40,6 +40,8 @@ export interface Tag {
     hasCloudAuth: boolean;
     hide: boolean;
     claimed: boolean;
+    /** boxes the tag was placed on */
+    boxes?: string[];
     source: string;
     trackSeconds: number[];
     lengthSeconds?: number;
@@ -135,7 +137,13 @@ export interface AuthStatus {
     recoveryCodesLeft?: number;
     passwordMinLength?: number;
     /** this connection as the server sees it */
-    client?: { ip: string; lan: boolean; secure: boolean; viaTrustedProxy: boolean; forwardedForIgnored?: boolean };
+    client?: {
+        ip: string;
+        lan: boolean;
+        secure: boolean;
+        viaTrustedProxy: boolean;
+        forwardedForIgnored?: boolean;
+    };
 }
 
 /* ---------- custom firmware (only on servers with CFW support) ---------- */
@@ -188,6 +196,11 @@ export interface CfwBox {
     capabilities: number;
     updateResult?: number;
     rolledBackBuild?: number;
+    /** why: box (the bootloader went back after a failed trial start), left (it ran, then an older
+     * build started again), attempts (offered several times, never ran) */
+    rolledBackReason?: "" | "box" | "left" | "attempts";
+    /** when, in seconds since 1970; 0: unknown */
+    rolledBackTime?: number;
     helloTime?: number;
     lastOfferedBuild?: number;
     lastOfferTime?: number;
@@ -294,7 +307,13 @@ export interface CfwGithubRelease {
 export interface CfwFirmware {
     images: CfwImage[];
     defaultPage?: { page: number; label: string; requires?: string };
-    github: { repo: string; autoDownload: number; lastCheck: number; message: string; releases: CfwGithubRelease[] };
+    github: {
+        repo: string;
+        autoDownload: number;
+        lastCheck: number;
+        message: string;
+        releases: CfwGithubRelease[];
+    };
 }
 
 export interface CfwResult {

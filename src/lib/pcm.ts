@@ -6,7 +6,12 @@ type Ctx = typeof AudioContext;
 
 /** 48 kHz stereo interleaved 16 bit samples of an audio file */
 export async function toPcmSamples(file: File): Promise<Int16Array> {
-    const w = window as unknown as { AudioContext: Ctx; webkitAudioContext?: Ctx; OfflineAudioContext: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext };
+    const w = window as unknown as {
+        AudioContext: Ctx;
+        webkitAudioContext?: Ctx;
+        OfflineAudioContext: typeof OfflineAudioContext;
+        webkitOfflineAudioContext?: typeof OfflineAudioContext;
+    };
     const Audio = w.AudioContext || w.webkitAudioContext;
     const Offline = w.OfflineAudioContext || w.webkitOfflineAudioContext;
     if (!Audio || !Offline) throw new Error("Web Audio API not available");

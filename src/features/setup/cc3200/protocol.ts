@@ -75,12 +75,28 @@ const OTHER_FILES = [
     "/sys/smartconfigkeys.cfg",
 ];
 
-export class Cc3200Error extends Error {}
+/** an error of the box or the link; key and values name its translated text */
+export class Cc3200Error extends Error {
+    key: string;
+    values: Record<string, string | number>;
+
+    constructor(key: string, values: Record<string, string | number> = {}) {
+        super(key);
+        this.key = key;
+        this.values = values;
+    }
+}
 
 const sleep = (ms: number) => new Promise((r) => globalThis.setTimeout(r, ms));
 const be32 = (n: number) => [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff];
+const writerOf = (port: SerialPort) => {
+    if (!port.writable) throw new Cc3200Error("adapterDisconnected");
+    return port.writable.getWriter();
+};
+
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
-const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
+const equal = (a: Uint8Array, b: Uint8Array) =>
+    a.length === b.length && a.every((x, i) => x === b[i]);
 
 export type Log = (line: string) => void;
 
@@ -105,7 +121,10 @@ class Receiver {
     private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
     private stopped = false;
 
-    constructor(private readonly port: SerialPort, private readonly onData: (chunk: Uint8Array) => void = (c) => this.push(c)) {}
+    constructor(
+        private readonly port: SerialPort,
+        private readonly onData: (chunk: Uint8Array) => void = (c) => this.push(c),
+    ) {}
 
     start() {
         void (async () => {
@@ -164,7 +183,7 @@ class DirectLink implements Link {
         this.rx.start();
     }
     async write(data: Uint8Array) {
-        const writer = this.port.writable!.getWriter();
+        const writer = writerOf(this.port);
         try {
             await writer.write(data);
         } finally {
@@ -195,7 +214,10 @@ class DirectLink implements Link {
 class GatewayLink implements Link {
     private rx: Receiver;
     private frame: number[] = [];
-    constructor(private readonly port: SerialPort, private readonly log: Log) {
+    constructor(
+        private readonly port: SerialPort,
+        private readonly log: Log,
+    ) {
         this.rx = new Receiver(port, (chunk) => this.parse(chunk));
         this.rx.start();
     }
@@ -241,7 +263,7 @@ class GatewayLink implements Link {
     }
 
     private async raw(data: Uint8Array) {
-        const writer = this.port.writable!.getWriter();
+        const writer = writerOf(this.port);
         try {
             await writer.write(data);
         } finally {
@@ -256,7 +278,8 @@ class GatewayLink implements Link {
     }
 
     async write(data: Uint8Array) {
-        for (let pos = 0; pos < data.length; pos += 65530) await this.raw(GatewayLink.packet(data.subarray(pos, pos + 65530), 0));
+        for (let pos = 0; pos < data.length; pos += 65530)
+            await this.raw(GatewayLink.packet(data.subarray(pos, pos + 65530), 0));
     }
     read(n: number, timeoutMs: number) {
         return this.rx.take(n, timeoutMs);
@@ -293,15 +316,20 @@ export function parseFat(table: Uint8Array, meta2: Uint8Array): Cc3200File[] {
     const files: Cc3200File[] = [];
     for (let i = 0; i < 128; i++) {
         const m = table.subarray((i + 1) * 4, (i + 2) * 4);
-        if ((m[0] === 0xff && m[1] === 0xff && m[2] === 0xff && m[3] === 0xff) || (m[0] === 0xff && m[1] === i && m[2] === 0xff && m[3] === 0x7f)) continue;
-        if (m[0] !== i) throw new Cc3200Error(`incorrect FAT entry (index ${m[0]} != ${i})`);
+        if (
+            (m[0] === 0xff && m[1] === 0xff && m[2] === 0xff && m[3] === 0xff) ||
+            (m[0] === 0xff && m[1] === i && m[2] === 0xff && m[3] === 0x7f)
+        )
+            continue;
+        if (m[0] !== i) throw new Cc3200Error("fatEntry", { index: m[0], expected: i });
         const flags = m[3] >> 4;
         const startBlock = ((m[3] & 0xf) << 8) + m[2];
         const nameOffset = meta2[i * 4] | (meta2[i * 4 + 1] << 8);
         const nameLength = meta2[i * 4 + 2] | (meta2[i * 4 + 3] << 8);
         const at = FAT_NAME_ARRAY_OFFSET + nameOffset;
         const raw = meta2.subarray(at, at + nameLength);
-        const name = raw.every((c) => c < 0x80) ? String.fromCharCode(...raw) : "<invalid>";
+        // an unreadable name counts as none: the file is then asked for by a known name
+        const name = raw.every((c) => c < 0x80) ? String.fromCharCode(...raw) : "";
         files.push({ index: i, name, startBlock, sizeBlocks: m[1], mirrored: (flags & 0x4) === 0 });
     }
     return files;
@@ -341,14 +369,26 @@ export class Cc3200 {
      * break); askReset is called when the reset is done by hand.
      */
     static async connect(port: SerialPort, opts: ConnectOptions): Promise<Cc3200> {
-        await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: "none", flowControl: "none", bufferSize: 65536 });
+        await port.open({
+            baudRate: BAUD,
+            dataBits: 8,
+            stopBits: 1,
+            parity: "none",
+            flowControl: "none",
+            bufferSize: 65536,
+        });
         const link = opts.gateway ? await GatewayLink.open(port, opts.log) : new DirectLink(port);
         return Cc3200.start(link, opts);
     }
 
     /** the handshake on an open link (also what the tests drive) */
     static async start(link: Link, opts: ConnectOptions): Promise<Cc3200> {
-        const cc = new Cc3200(link, opts.log, opts.gateway || opts.reset === "dtr", opts.loadNwpBootloader);
+        const cc = new Cc3200(
+            link,
+            opts.log,
+            opts.gateway || opts.reset === "dtr",
+            opts.loadNwpBootloader,
+        );
         try {
             link.flushInput();
             if (opts.gateway || opts.reset === "dtr") {
@@ -361,7 +401,9 @@ export class Cc3200 {
             await sleep(1000);
             await cc.tryBreaking();
             const version = await cc.getVersion();
-            opts.log(`bootloader ${version.bootloader.join(".")}, chip ${version.chipType.map((x) => x.toString(16)).join(" ")}`);
+            opts.log(
+                `bootloader ${version.bootloader.join(".")}, chip ${version.chipType.map((x) => x.toString(16)).join(" ")}`,
+            );
             if (version.isCc3200) await cc.switchToNwpBootloader(version);
             return cc;
         } catch (e) {
@@ -383,13 +425,16 @@ export class Cc3200 {
     /* packets: big-endian length (counting the checksum and itself), a checksum byte, the data; answered by 00 CC */
 
     private async readAck(timeoutMs = TIMEOUT): Promise<boolean> {
+        // one deadline for all bytes: a line that keeps sending noise ends as well
+        const deadline = Date.now() + timeoutMs;
         let last = -1;
-        for (;;) {
-            const b = await this.link.read(1, timeoutMs);
+        while (Date.now() < deadline) {
+            const b = await this.link.read(1, deadline - Date.now());
             if (b.length === 0) return false;
             if (last === 0x00 && b[0] === 0xcc) return true;
             last = b[0];
         }
+        return false;
     }
 
     private async sendPacket(data: number[] | Uint8Array, timeoutMs = TIMEOUT) {
@@ -400,16 +445,18 @@ export class Cc3200 {
         out.set([length >> 8, length & 0xff, sum], 0);
         out.set(bytes, 3);
         await this.link.write(out);
-        if (!(await this.readAck(timeoutMs))) throw new Cc3200Error(`no ACK for opcode 0x${bytes[0].toString(16)}`);
+        if (!(await this.readAck(timeoutMs)))
+            throw new Cc3200Error("noAck", { opcode: bytes[0].toString(16) });
     }
 
     private async readPacket(timeoutMs = TIMEOUT): Promise<Uint8Array> {
         const header = await this.link.read(3, timeoutMs);
-        if (header.length !== 3) throw new Cc3200Error("timeout waiting for a packet");
+        if (header.length !== 3) throw new Cc3200Error("packetTimeout");
         const length = ((header[0] << 8) | header[1]) - 2;
         const data = await this.link.read(length, timeoutMs);
-        if (data.length !== length) throw new Cc3200Error("packet incomplete");
-        if ((data.reduce((s, b) => s + b, 0) & 0xff) !== header[2]) throw new Cc3200Error("packet checksum wrong");
+        if (data.length !== length) throw new Cc3200Error("packetIncomplete");
+        if ((data.reduce((s, b) => s + b, 0) & 0xff) !== header[2])
+            throw new Cc3200Error("packetChecksum");
         await this.link.write(Uint8Array.from([0x00, 0xcc]));
         return data;
     }
@@ -424,19 +471,26 @@ export class Cc3200 {
             await this.link.sendBreak(200);
             if (await this.readAck(1000)) return;
         }
-        throw new Cc3200Error("no ACK on the break condition: is the box in its bootloader (SOP2, reset)?");
+        throw new Cc3200Error("noBreakAck");
     }
 
     async getVersion(): Promise<VersionInfo> {
         await this.sendPacket([OP.getVersionInfo]);
         const d = await this.readPacket();
-        if (d.length !== 28) throw new Cc3200Error(`version info should be 28 bytes, got ${d.length}`);
+        if (d.length !== 28) throw new Cc3200Error("versionLength", { length: d.length });
         const chipType = [...d.subarray(16, 20)];
-        return { bootloader: [...d.subarray(0, 4)], chipType, isCc3200: (chipType[0] & 0x10) !== 0 };
+        return {
+            bootloader: [...d.subarray(0, 4)],
+            chipType,
+            isCc3200: (chipType[0] & 0x10) !== 0,
+        };
     }
 
     private async switchToNwpBootloader(version: VersionInfo) {
-        if (version.bootloader[1] < 4) throw new Cc3200Error(`bootloader ${version.bootloader.join(".")} is not supported`);
+        if (version.bootloader[1] < 4)
+            throw new Cc3200Error("bootloaderUnsupported", {
+                version: version.bootloader.join("."),
+            });
         this.log("switching to the NWP bootloader");
         await this.getVersion(); // asked again, as cc3200tool does
         await this.sendPacket([OP.switchToApps, ...be32(26666667)]);
@@ -446,49 +500,66 @@ export class Cc3200 {
         const dll = await this.loadNwpBootloader();
         await this.rawWrite(0, dll, STORAGE_SRAM);
         await this.sendPacket([OP.execFromRam]);
-        if (!(await this.readAck())) throw new Cc3200Error("no ACK after starting the NWP bootloader");
+        if (!(await this.readAck())) throw new Cc3200Error("nwpNoAck");
     }
 
     private async storageList(): Promise<number> {
         await this.sendPacket([OP.getStorageList]);
         const b = await this.link.read(1, 500);
-        if (b.length !== 1) throw new Cc3200Error("no storage list");
+        if (b.length !== 1) throw new Cc3200Error("noStorageList");
         return b[0];
     }
 
     private async storageInfo(storage: number) {
         await this.sendPacket([OP.getStorageInfo, ...be32(storage)]);
         const d = await this.readPacket();
-        if (d.length < 4) throw new Cc3200Error("storage info too short");
+        if (d.length < 4) throw new Cc3200Error("storageInfoShort");
         return { blockSize: (d[0] << 8) | d[1], blockCount: (d[2] << 8) | d[3] };
     }
 
     private async checkStorage(storage: number) {
         const list = await this.storageList();
-        if (storage === STORAGE_SFLASH && !(list & 0x04)) throw new Cc3200Error("no serial flash");
-        if (storage === STORAGE_SRAM && !(list & 0x80)) throw new Cc3200Error("no SRAM");
+        if (storage === STORAGE_SFLASH && !(list & 0x04)) throw new Cc3200Error("noSerialFlash");
+        if (storage === STORAGE_SRAM && !(list & 0x80)) throw new Cc3200Error("noSram");
     }
 
     private async rawWrite(offset: number, data: Uint8Array, storage: number) {
         await this.checkStorage(storage);
         for (let sent = 0; sent < data.length; sent += 4080) {
             const chunk = data.subarray(sent, sent + 4080);
-            await this.sendPacket([OP.rawStorageWrite, ...be32(storage), ...be32(offset + sent), ...be32(chunk.length), ...chunk]);
+            await this.sendPacket([
+                OP.rawStorageWrite,
+                ...be32(storage),
+                ...be32(offset + sent),
+                ...be32(chunk.length),
+                ...chunk,
+            ]);
         }
     }
 
-    private async rawRead(offset: number, size: number, storage: number, progress?: Progress): Promise<Uint8Array> {
+    private async rawRead(
+        offset: number,
+        size: number,
+        storage: number,
+        progress?: Progress,
+    ): Promise<Uint8Array> {
         await this.checkStorage(storage);
         const info = await this.storageInfo(storage);
         const total = info.blockCount * info.blockSize;
         if (size < 1) size = total - offset;
-        if (offset + size > total) throw new Cc3200Error(`${size} bytes at ${offset} are beyond the ${total} bytes of the storage`);
+        if (offset + size > total) throw new Cc3200Error("beyondStorage", { size, offset, total });
         const out = new Uint8Array(size);
-        for (let done = 0; done < size; ) {
+        for (let done = 0; done < size;) {
             const n = Math.min(4096, size - done);
-            await this.sendPacket([OP.rawStorageRead, ...be32(storage), ...be32(offset + done), ...be32(n)]);
+            await this.sendPacket([
+                OP.rawStorageRead,
+                ...be32(storage),
+                ...be32(offset + done),
+                ...be32(n),
+            ]);
             const chunk = await this.readPacket();
-            if (chunk.length !== n) throw new Cc3200Error(`got ${chunk.length} bytes, asked for ${n}`);
+            if (chunk.length !== n)
+                throw new Cc3200Error("shortRead", { length: chunk.length, size: n });
             out.set(chunk, done);
             done += n;
             progress?.(done, size);
@@ -500,7 +571,7 @@ export class Cc3200 {
     async readFlash(progress?: Progress): Promise<Uint8Array> {
         const first = await this.rawRead(0, 0, STORAGE_SFLASH, (d, t) => progress?.(d, 2 * t));
         const second = await this.rawRead(0, 0, STORAGE_SFLASH, (d, t) => progress?.(t + d, 2 * t));
-        if (!equal(first, second)) throw new Cc3200Error("the two reads of the flash differ; check the wiring and read again");
+        if (!equal(first, second)) throw new Cc3200Error("flashReadsDiffer");
         return first;
     }
 
@@ -516,48 +587,70 @@ export class Cc3200 {
         const t2 = tables.subarray(info.blockSize);
         const r1 = header(t1);
         const r2 = header(t2);
-        if (r1 < 0 && r2 < 0) throw new Cc3200Error("no valid file table");
+        if (r1 < 0 && r2 < 0) throw new Cc3200Error("noFileTable");
         // the newer table is the active one and its names are in its own block (cc3200tool takes the
         // names of the second block whenever that one is valid, also when the first one is newer)
         const second = r2 > r1;
         this.log(`file tables: revisions ${r1} / ${r2}, using the ${second ? "second" : "first"}`);
         const meta2Offset = FAT_META2_OFFSET + (second ? FAT_PART_OFFSET : 0);
         // as cc3200tool reads it: from the offset, offset + length bytes
-        const meta2 = await this.rawRead(meta2Offset, meta2Offset + FAT_META2_LENGTH, STORAGE_SFLASH);
+        const meta2 = await this.rawRead(
+            meta2Offset,
+            meta2Offset + FAT_META2_LENGTH,
+            STORAGE_SFLASH,
+        );
         return parseFat(second ? t2 : t1, meta2);
     }
 
     private async fileInfo(name: string) {
         await this.sendPacket([OP.getFileInfo, ...be32(name.length), ...ascii(name)]);
         const d = await this.readPacket();
-        if (d.length < 5) throw new Cc3200Error("file info too short");
-        return { exists: d[0] === 1, size: ((d[4] << 24) | (d[5] << 16) | (d[6] << 8) | d[7]) >>> 0 };
+        if (d.length < 8) throw new Cc3200Error("fileInfoShort");
+        return {
+            exists: d[0] === 1,
+            size: ((d[4] << 24) | (d[5] << 16) | (d[6] << 8) | d[7]) >>> 0,
+        };
     }
 
     private async openFile(name: string, flags: number, timeoutMs = TIMEOUT) {
-        await this.sendPacket([OP.startUpload, ...be32(flags), ...be32(0), ...ascii(name), 0, 0], timeoutMs);
+        await this.sendPacket(
+            [OP.startUpload, ...be32(flags), ...be32(0), ...ascii(name), 0, 0],
+            timeoutMs,
+        );
         const token = await this.link.read(4, timeoutMs);
-        if (token.length !== 4) throw new Cc3200Error(`opening ${name} failed`);
+        if (token.length !== 4) throw new Cc3200Error("openFailed", { name });
     }
 
     private async closeFile() {
-        await this.sendPacket([OP.finishUpload, ...new Array(63).fill(0), ...new Array(256).fill(0x46), 0]);
+        await this.sendPacket([
+            OP.finishUpload,
+            ...new Array(63).fill(0),
+            ...new Array(256).fill(0x46),
+            0,
+        ]);
         const status = await this.lastStatus();
-        if (status !== STATUS_OK) throw new Cc3200Error(`closing the file failed (0x${status.toString(16)})`);
+        if (status !== STATUS_OK)
+            throw new Cc3200Error("closeFailed", { status: status.toString(16) });
     }
 
     private async readFileOnce(name: string): Promise<Uint8Array> {
         const info = await this.fileInfo(name);
-        if (!info.exists) throw new Cc3200Error(`${name} does not exist on the box`);
+        if (!info.exists) throw new Cc3200Error("fileMissing", { name });
         await this.openFile(name, 0);
         const out = new Uint8Array(info.size);
-        for (let pos = 0; pos < info.size; ) {
-            const n = Math.min(info.size - pos, SLFS_BLOCK_SIZE);
-            await this.sendPacket([OP.readFileChunk, ...be32(pos), ...be32(n)]);
-            const chunk = await this.readPacket();
-            if (chunk.length !== n) throw new Cc3200Error(`reading ${name} failed`);
-            out.set(chunk, pos);
-            pos += n;
+        try {
+            for (let pos = 0; pos < info.size;) {
+                const n = Math.min(info.size - pos, SLFS_BLOCK_SIZE);
+                await this.sendPacket([OP.readFileChunk, ...be32(pos), ...be32(n)]);
+                const chunk = await this.readPacket();
+                if (chunk.length !== n) throw new Cc3200Error("readFailed", { name });
+                out.set(chunk, pos);
+                pos += n;
+            }
+        } catch (e) {
+            // left open, the next file of the backup could not be opened
+            await this.closeFile().catch(() => undefined);
+            throw e;
         }
         await this.closeFile();
         return out;
@@ -566,7 +659,8 @@ export class Cc3200 {
     /** a file of the box, read twice and compared */
     async readFile(name: string): Promise<Uint8Array> {
         const first = await this.readFileOnce(name);
-        if (!equal(first, await this.readFileOnce(name))) throw new Cc3200Error(`the two reads of ${name} differ`);
+        if (!equal(first, await this.readFileOnce(name)))
+            throw new Cc3200Error("fileReadsDiffer", { name });
         return first;
     }
 
@@ -601,7 +695,9 @@ export class Cc3200 {
             if (found < unnamed)
                 failed.push(
                     `${unnamed - found} files have no name in the file table and no known name` +
-                        (notFound.length ? ` (the box does not find ${notFound.join(", ")} by name)` : ""),
+                        (notFound.length
+                            ? ` (the box does not find ${notFound.join(", ")} by name)`
+                            : ""),
                 );
         }
         const out = new Map<string, Uint8Array>();
@@ -619,26 +715,36 @@ export class Cc3200 {
 
     /** writes a file (an existing one is erased first) and reads it back to compare */
     async writeFile(name: string, data: Uint8Array) {
-        if (!data.length) throw new Cc3200Error(`${name}: nothing to write`);
+        if (!data.length) throw new Cc3200Error("nothingToWrite", { name });
         if ((await this.fileInfo(name)).exists) {
             // asked once more before erasing, as cc3200tool does
             await this.fileInfo(name);
             await this.sendPacket([OP.eraseFile, ...be32(0), ...ascii(name), 0]);
             const status = await this.lastStatus();
-            if (status !== STATUS_OK) throw new Cc3200Error(`erasing ${name} failed (0x${status.toString(16)})`);
+            if (status !== STATUS_OK)
+                throw new Cc3200Error("eraseFailed", { name, status: status.toString(16) });
         }
         const index = FLASH_BLOCK_SIZES.findIndex((b) => b * 255 >= data.length);
-        if (index < 0) throw new Cc3200Error(`${name} is too big`);
+        if (index < 0) throw new Cc3200Error("tooBig", { name });
         const blocks = Math.ceil(data.length / FLASH_BLOCK_SIZES[index]);
-        const flags = ((SLFS_MODE_OPEN_WRITE_CREATE_IF_NOT_EXIST & 0xf) << 12) | ((index & 0xf) << 8) | (blocks & 0xff);
-        const timeout = data.length > 200000 ? Math.max(TIMEOUT, 5000 * (data.length / 200000 + 1)) : TIMEOUT;
+        const flags =
+            ((SLFS_MODE_OPEN_WRITE_CREATE_IF_NOT_EXIST & 0xf) << 12) |
+            ((index & 0xf) << 8) |
+            (blocks & 0xff);
+        const timeout =
+            data.length > 200000 ? Math.max(TIMEOUT, 5000 * (data.length / 200000 + 1)) : TIMEOUT;
         await this.openFile(name, flags, timeout);
         for (let pos = 0; pos < data.length; pos += SLFS_BLOCK_SIZE) {
-            await this.sendPacket([OP.fileChunk, ...be32(pos), ...data.subarray(pos, pos + SLFS_BLOCK_SIZE)]);
+            await this.sendPacket([
+                OP.fileChunk,
+                ...be32(pos),
+                ...data.subarray(pos, pos + SLFS_BLOCK_SIZE),
+            ]);
             const status = await this.lastStatus();
-            if (status !== STATUS_OK) throw new Cc3200Error(`writing ${name} at ${pos} failed`);
+            if (status !== STATUS_OK) throw new Cc3200Error("writeFailed", { name, pos });
         }
         await this.closeFile();
-        if (!equal(await this.readFileOnce(name), data)) throw new Cc3200Error(`${name} reads back different from what was written`);
+        if (!equal(await this.readFileOnce(name), data))
+            throw new Cc3200Error("verifyFailed", { name });
     }
 }

@@ -9,11 +9,13 @@ export const getPref = (key: string, fallback: string): string => {
     }
 };
 
-export const setPref = (key: string, value: string) => {
+/** false when the value could not be stored (no storage, quota exceeded) */
+export const setPref = (key: string, value: string): boolean => {
     try {
         localStorage.setItem(PREFIX + key, value);
+        return true;
     } catch {
-        /* ignore */
+        return false;
     }
 };
 
@@ -23,7 +25,8 @@ export const allPrefs = (): Record<string, string> => {
     try {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i)!;
-            if (key.startsWith(PREFIX)) out[key.slice(PREFIX.length)] = localStorage.getItem(key) ?? "";
+            if (key.startsWith(PREFIX))
+                out[key.slice(PREFIX.length)] = localStorage.getItem(key) ?? "";
         }
     } catch {
         /* ignore */
@@ -39,9 +42,15 @@ export const applyTheme = (theme: Theme) => {
     else root.setAttribute("data-theme", theme);
     const dark =
         theme === "dark" ||
-        theme === "matrix" || (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        theme === "matrix" ||
+        (theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document
         .querySelectorAll('meta[name="theme-color"]')
-        .forEach((m) => m.setAttribute("content", theme === "matrix" ? "#000000" : dark ? "#111214" : "#f6f5f2"));
+        .forEach((m) =>
+            m.setAttribute(
+                "content",
+                theme === "matrix" ? "#000000" : dark ? "#111214" : "#f6f5f2",
+            ),
+        );
     window.dispatchEvent(new Event("themechange"));
 };

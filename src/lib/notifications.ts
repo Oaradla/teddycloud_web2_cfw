@@ -28,8 +28,10 @@ const save = (next: Notification[]) => {
 };
 
 export const notifications = {
-    add: (n: Omit<Notification, "id" | "time">) => save([{ ...n, id: Date.now() + Math.random(), time: Date.now() }, ...list].slice(0, MAX)),
-    markRead: (ids?: number[]) => save(list.map((n) => (!ids || ids.includes(n.id) ? { ...n, read: true } : n))),
+    add: (n: Omit<Notification, "id" | "time">) =>
+        save([{ ...n, id: Date.now() + Math.random(), time: Date.now() }, ...list].slice(0, MAX)),
+    markRead: (ids?: number[]) =>
+        save(list.map((n) => (!ids || ids.includes(n.id) ? { ...n, read: true } : n))),
     remove: (ids?: number[]) => save(ids ? list.filter((n) => !ids.includes(n.id)) : []),
 };
 

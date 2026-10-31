@@ -12,7 +12,11 @@ import { CfwProfileFields, EMPTY_PROFILE } from "./CfwProfileFields";
 export function CfwTagSettings({ ruid }: { ruid: string }) {
     const ui = useUi();
     const qc = useQueryClient();
-    const tag = useQuery({ queryKey: ["cfwTag", ruid], queryFn: () => tc.cfwTag(ruid), retry: false });
+    const tag = useQuery({
+        queryKey: ["cfwTag", ruid],
+        queryFn: () => tc.cfwTag(ruid),
+        retry: false,
+    });
     const [draft, setDraft] = useState<CfwTag | null>(null);
     const [saving, setSaving] = useState(false);
     useEffect(() => {
@@ -28,33 +32,43 @@ export function CfwTagSettings({ ruid }: { ruid: string }) {
     const save = async () => {
         setSaving(true);
         const body: Omit<CfwTag, "ruid"> =
-            draft.kind === "profile" ? { kind: "profile", profile } : draft.kind === "event" ? { kind: "event", event: draft.event ?? EMPTY_EVENT } : { kind: "none" };
+            draft.kind === "profile"
+                ? { kind: "profile", profile }
+                : draft.kind === "event"
+                  ? { kind: "event", event: draft.event ?? EMPTY_EVENT }
+                  : { kind: "none" };
         const r = await ui.run(() => tc.cfwSetTag(ruid, body));
         setSaving(false);
-        if (r && r.ok === false) ui.toast("error", t("saveFailed"), r.message);
+        if (r && r.ok === false) ui.toast("error", t("common.saveFailed"), r.message);
         else if (r) {
-            ui.toast("ok", t("saved"));
+            ui.toast("ok", t("common.saved"));
             qc.invalidateQueries({ queryKey: ["cfwTag", ruid] });
         }
     };
 
     return (
         <Section
-            title={t("cfwTagSettings")}
-            footer={dirty ? undefined : t("cfwTagSettingsHint")}
+            title={t("tonies.cfwTagSettings")}
+            footer={dirty ? undefined : t("tonies.cfwTagSettingsHint")}
             plain
         >
             <div className="list">
                 <div className="row-wrap">
-                    <Row icon={<Sparkles size={17} />} title={t("cfwKind")} />
+                    <Row icon={<Sparkles size={17} />} title={t("tonies.cfwKind")} />
                     <div style={{ padding: "0 16px 12px" }}>
                         <Segmented
                             value={draft.kind}
-                            onChange={(kind) => setDraft({ ...draft, kind, profile: kind === "profile" ? profile : draft.profile })}
+                            onChange={(kind) =>
+                                setDraft({
+                                    ...draft,
+                                    kind,
+                                    profile: kind === "profile" ? profile : draft.profile,
+                                })
+                            }
                             options={[
-                                { value: "none", label: t("cfwKindNone") },
-                                { value: "profile", label: t("cfwKindProfile") },
-                                { value: "event", label: t("cfwKindEvent") },
+                                { value: "none", label: t("tonies.cfwKindNone") },
+                                { value: "profile", label: t("tonies.cfwKindProfile") },
+                                { value: "event", label: t("tonies.cfwKindEvent") },
                             ]}
                         />
                     </div>
@@ -63,16 +77,19 @@ export function CfwTagSettings({ ruid }: { ruid: string }) {
             </div>
             {draft.kind === "event" && (
                 <div className="list mt" style={{ padding: "12px 16px" }}>
-                    <CfwEventFields event={draft.event ?? EMPTY_EVENT} onChange={(event) => setDraft({ ...draft, kind: "event", event })} />
+                    <CfwEventFields
+                        event={draft.event ?? EMPTY_EVENT}
+                        onChange={(event) => setDraft({ ...draft, kind: "event", event })}
+                    />
                 </div>
             )}
             {dirty && (
                 <div className="btn-row mt">
                     <button className="btn" onClick={() => setDraft(tag.data!)}>
-                        {t("discard")}
+                        {t("tonies.discard")}
                     </button>
                     <button className="btn primary" onClick={save} disabled={saving}>
-                        {t("save")}
+                        {t("common.save")}
                     </button>
                 </div>
             )}

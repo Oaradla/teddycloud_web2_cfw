@@ -1,14 +1,24 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, CheckCircle2, Disc3, FileAudio, Folder, FolderOpen, ImagePlus, Trash2, UploadCloud } from "lucide-react";
+import {
+    ArrowDown,
+    ArrowUp,
+    CheckCircle2,
+    Disc3,
+    FileAudio,
+    Folder,
+    FolderOpen,
+    ImagePlus,
+    Trash2,
+    UploadCloud,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { tc } from "../../api/tc";
 import { baseName, bytes, isAudio, joinPath, parentPath, stripExt } from "../../lib/format";
 import { t } from "../../lib/i18n";
-import { ApiError } from "../../api/client";
 import { shrinkImage } from "../../lib/image";
 import { newModelId } from "../models/ModelEditor";
-import { uploadAudio } from "./uploadAudio";
+import { BrowserEncodeError, uploadAudio, uploadEntry } from "./uploadAudio";
 import { useAccess } from "../../lib/access";
 import { useInvalidateTags, useSetting } from "../../lib/queries";
 import { Notice, Page, Row, Section, Segmented, useUi } from "../../ui/kit";
@@ -60,11 +70,25 @@ export function UploadPage() {
     const plain = !canTaf;
 
     const add = (files: FileList | File[]) => {
-        const list = [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        if (running.current) return; // a drop while an upload runs
+        const list = [...files].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { numeric: true }),
+        );
         setDone(null);
         setItems((cur) => {
-            const next = [...cur, ...list.map((file) => ({ id: nextId.current++, file, title: stripExt(file.name) }))];
-            if (!name && next.length) setName(next.length === 1 ? stripExt(next[0].file.name) : safeName(next[0].file.webkitRelativePath.split("/")[0] || stripExt(next[0].file.name)));
+            const next = [
+                ...cur,
+                ...list.map((file) => ({ id: nextId.current++, file, title: stripExt(file.name) })),
+            ];
+            if (!name && next.length)
+                setName(
+                    next.length === 1
+                        ? stripExt(next[0].file.name)
+                        : safeName(
+                              next[0].file.webkitRelativePath.split("/")[0] ||
+                                  stripExt(next[0].file.name),
+                          ),
+                );
             return next;
         });
     };
@@ -80,8 +104,9 @@ export function UploadPage() {
         const dir = parentPath(tafPath);
         await qc.invalidateQueries({ queryKey: ["files", dir] });
         // the TAF of a playlist is not in the file list, its header comes with the upload
-        const header = known ?? (await tc.files(dir)).find((f) => f.name === baseName(tafPath))?.tafHeader;
-        if (!header) throw new Error(t("noAudioId"));
+        const header =
+            known ?? (await tc.files(dir)).find((f) => f.name === baseName(tafPath))?.tafHeader;
+        if (!header) throw new Error(t("common.noAudioId"));
         let pic = "";
         if (picture) {
             try {
@@ -91,7 +116,7 @@ export function UploadPage() {
                 pic = `/custom_img/${fileName}`;
             } catch {
                 // the chapter names are saved anyway
-                ui.toast("error", t("coverNotSaved"), t("imageFolderReadOnly"));
+                ui.toast("error", t("upload.coverNotSaved"), t("common.imageFolderReadOnly"));
             }
         }
         const models = await tc.customModels().catch(() => []);
@@ -131,11 +156,15 @@ export function UploadPage() {
         if (running.current) return;
         running.current = true;
         // show at once: preparing the first file takes a moment
-        setBusy({ step: t("starting"), progress: 0 });
+        setBusy({ step: t("upload.starting"), progress: 0 });
         try {
             if (plain) {
-                setBusy({ step: t("uploading"), progress: 0 });
-                await tc.uploadFiles(items.map((i) => i.file), folder, (p) => setBusy({ step: t("uploading"), progress: p }));
+                setBusy({ step: t("upload.uploading"), progress: 0 });
+                await tc.uploadFiles(
+                    items.map((i) => i.file),
+                    folder,
+                    (p) => setBusy({ step: t("upload.uploading"), progress: p }),
+                );
                 setDone(items.length === 1 ? joinPath(folder, items[0].file.name) : "");
             } else {
                 const titles = items.map((i) => i.title.trim() || stripExt(i.file.name));
@@ -148,23 +177,42 @@ export function UploadPage() {
                     encoder,
                     bitrate: Number(bitrate.data) || 96,
                 };
+                const entry = uploadEntry(job);
+                const existing = await tc.files(folder).catch(() => []);
+                if (
+                    existing.some((f) => f.name === entry) &&
+                    !(await ui.confirm({
+                        title: t("upload.replace"),
+                        text: t("upload.exists", { name: entry }),
+                        confirm: t("upload.replace"),
+                        danger: true,
+                    }))
+                )
+                    return;
                 const step = (text: string, progress: number) => setBusy({ step: text, progress });
                 let result;
                 try {
                     result = await uploadAudio(job, step);
                 } catch (e) {
-                    if (e instanceof ApiError || encoder === "server") throw e;
+                    if (!(e instanceof BrowserEncodeError)) throw e;
                     // the browser could not encode (old browser, no memory): let the server do it
-                    ui.toast("info", t("browserEncodeFailed"), String((e as Error).message));
+                    ui.toast("info", t("upload.browserEncodeFailed"), String((e as Error).message));
                     result = await uploadAudio({ ...job, encoder: "server" }, step);
                 }
                 // picture and chapter names: an album cover model linked to the TAF
                 if ((cover || items.length > 1) && access.canCreateModels) {
-                    step(t("savingCover"), 1);
+                    step(t("upload.savingCover"), 1);
                     try {
-                        await saveAlbum(result.taf, job.name, titles, cover, result.source.endsWith(".tap") ? result.source : undefined, result.header);
+                        await saveAlbum(
+                            result.taf,
+                            job.name,
+                            titles,
+                            cover,
+                            result.source.endsWith(".tap") ? result.source : undefined,
+                            result.header,
+                        );
                     } catch (e) {
-                        ui.toast("error", t("coverFailed"), String((e as Error).message));
+                        ui.toast("error", t("upload.coverFailed"), String((e as Error).message));
                     }
                 }
                 setDone(result.source);
@@ -175,7 +223,7 @@ export function UploadPage() {
             setCover(null);
             qc.invalidateQueries({ queryKey: ["files"] });
         } catch (e) {
-            ui.toast("error", t("uploadFailed"), String((e as Error).message));
+            ui.toast("error", t("upload.uploadFailed"), String((e as Error).message));
         } finally {
             setBusy(null);
             running.current = false;
@@ -183,36 +231,53 @@ export function UploadPage() {
     };
 
     return (
-        <Page title={t("upload")} back={params.get("path") ? true : undefined} narrow>
+        <Page title={t("common.upload")} back={params.get("path") ? true : undefined} narrow>
             {done !== null && (
-                <div className="card" style={{ padding: 18, marginBottom: 20, textAlign: "center" }}>
+                <div
+                    className="card"
+                    style={{ padding: 18, marginBottom: 20, textAlign: "center" }}
+                >
                     <CheckCircle2 size={40} color="var(--ok)" style={{ margin: "0 auto 8px" }} />
-                    <div style={{ fontWeight: 700, fontSize: 18 }}>{t("uploadDone")}</div>
-                    {done && <div className="small muted mono" style={{ marginTop: 4, wordBreak: "break-all" }}>{done}</div>}
+                    <div style={{ fontWeight: 700, fontSize: 18 }}>{t("upload.uploadDone")}</div>
+                    {done && (
+                        <div
+                            className="small muted mono"
+                            style={{ marginTop: 4, wordBreak: "break-all" }}
+                        >
+                            {done}
+                        </div>
+                    )}
                     <div className="btn-row mt">
                         {done && /\.ta[fp]$/i.test(done) && (
                             <button className="btn primary" onClick={() => setAssign(true)}>
                                 <Disc3 size={18} />
-                                {t("assignToTonie")}
+                                {t("common.assignToTonie")}
                             </button>
                         )}
-                        <button className="btn" onClick={() => navigate(`/library?path=${encodeURIComponent(doneFolder ?? folder)}`)}>
+                        <button
+                            className="btn"
+                            onClick={() =>
+                                navigate(
+                                    `/library?path=${encodeURIComponent(doneFolder ?? folder)}`,
+                                )
+                            }
+                        >
                             <FolderOpen size={18} />
-                            {t("openFolder")}
+                            {t("upload.openFolder")}
                         </button>
                     </div>
                 </div>
             )}
 
-            <Section title={t("targetFolder")}>
+            <Section title={t("upload.targetFolder")}>
                 <Row
                     leading={
                         <span className="file-icon folder">
                             <Folder size={20} />
                         </span>
                     }
-                    title={folder === "/" ? t("library") : folder}
-                    sub={t("tapToChange")}
+                    title={folder === "/" ? t("common.library") : folder}
+                    sub={t("upload.tapToChange")}
                     onClick={() => setPickFolder(true)}
                     chevron
                 />
@@ -220,6 +285,7 @@ export function UploadPage() {
 
             <div
                 className={`drop-zone ${over ? "over" : ""}`}
+                inert={!!busy}
                 onClick={() => input.current?.click()}
                 onDragOver={(e) => {
                     e.preventDefault();
@@ -235,8 +301,8 @@ export function UploadPage() {
                 <div className="dz-icon">
                     <UploadCloud size={28} />
                 </div>
-                <div style={{ fontWeight: 650, color: "var(--fg)" }}>{t("chooseFiles")}</div>
-                <div className="small">{t("chooseFilesHint")}</div>
+                <div style={{ fontWeight: 650, color: "var(--fg)" }}>{t("common.chooseFiles")}</div>
+                <div className="small">{t("upload.chooseFilesHint")}</div>
                 <input
                     ref={input}
                     type="file"
@@ -252,39 +318,53 @@ export function UploadPage() {
 
             {items.length > 0 && (
                 <>
-                    <div className="section mt">
+                    {/* the running upload took its items: nothing to change until it ends */}
+                    <div className="section mt" inert={!!busy}>
                         {canTaf && (
                             <div style={{ marginBottom: 14 }}>
                                 <Segmented
                                     value={mode}
                                     onChange={setMode}
                                     options={[
-                                        { value: "taf", label: t("modeTaf") },
-                                        { value: "split", label: t("modeSplit") },
+                                        { value: "taf", label: t("upload.modeTaf") },
+                                        { value: "split", label: t("upload.modeSplit") },
                                     ]}
                                 />
                                 <p className="small muted" style={{ margin: "8px 4px 12px" }}>
-                                    {mode === "taf" ? t("modeTafHint") : t("splitToPlaylistHint")}
+                                    {mode === "taf"
+                                        ? t("upload.modeTafHint")
+                                        : t("upload.splitToPlaylistHint")}
                                 </p>
-                                <div className="choice-label">{t("encodingWhere")}</div>
+                                <div className="choice-label">{t("upload.encodingWhere")}</div>
                                 <Segmented
                                     value={encoder}
                                     onChange={setEncoder}
                                     options={[
-                                        { value: "browser", label: t("encodeBrowser") },
-                                        { value: "server", label: t("encodeServer") },
+                                        { value: "browser", label: t("upload.encodeBrowser") },
+                                        { value: "server", label: t("upload.encodeServer") },
                                     ]}
                                 />
                                 <p className="small muted" style={{ margin: "8px 4px 0" }}>
-                                    {encoder === "browser" ? t("encodeBrowserHint") : t("encodeServerHint")}
+                                    {encoder === "browser"
+                                        ? t("upload.encodeBrowserHint")
+                                        : t("upload.encodeServerHint")}
                                 </p>
                             </div>
                         )}
                         {!plain && (
                             <div className="field">
-                                <label>{t("tafName")}</label>
-                                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("tafNamePlaceholder")} />
-                                <div className="hint">{mode === "split" ? t("splitNameHint") : t("tafNameHint")}</div>
+                                <label>{t("upload.tafName")}</label>
+                                <input
+                                    className="input"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder={t("upload.tafNamePlaceholder")}
+                                />
+                                <div className="hint">
+                                    {mode === "split"
+                                        ? t("upload.splitNameHint")
+                                        : t("upload.tafNameHint")}
+                                </div>
                             </div>
                         )}
                         {!plain && access.canCreateModels && (
@@ -292,21 +372,30 @@ export function UploadPage() {
                                 <Row
                                     leading={
                                         cover ? (
-                                            <img src={coverUrl} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 10 }} />
+                                            <img
+                                                src={coverUrl}
+                                                alt=""
+                                                style={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    objectFit: "cover",
+                                                    borderRadius: 10,
+                                                }}
+                                            />
                                         ) : (
                                             <span className="file-icon">
                                                 <ImagePlus size={20} />
                                             </span>
                                         )
                                     }
-                                    title={cover ? t("coverChosen") : t("addCover")}
-                                    sub={cover ? cover.name : t("addCoverHint")}
+                                    title={cover ? t("upload.coverChosen") : t("upload.addCover")}
+                                    sub={cover ? cover.name : t("upload.addCoverHint")}
                                     onClick={() => coverInput.current?.click()}
                                     right={
                                         cover ? (
                                             <button
                                                 className="icon-btn muted"
-                                                aria-label={t("remove")}
+                                                aria-label={t("common.remove")}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setCover(null);
@@ -332,24 +421,39 @@ export function UploadPage() {
                         )}
                         <div className="section-head">
                             <h2 className="section-title">
-                                {!plain ? t("chaptersInOrder") : t("files")} ({items.length})
+                                {!plain ? t("upload.chaptersInOrder") : t("upload.files")} (
+                                {items.length})
                             </h2>
                             <button className="btn ghost small" onClick={() => setItems([])}>
-                                {t("clear")}
+                                {t("common.clear")}
                             </button>
                         </div>
                         <div className="list">
                             {items.map((it, i) => (
                                 <div key={it.id} className="row">
-                                    {!plain ? <span className="track-no">{i + 1}</span> : <FileAudio size={18} color="var(--fg-3)" />}
+                                    {!plain ? (
+                                        <span className="track-no">{i + 1}</span>
+                                    ) : (
+                                        <FileAudio size={18} color="var(--fg-3)" />
+                                    )}
                                     <div className="row-body">
                                         {!plain ? (
                                             <input
                                                 className="input inline"
-                                                style={{ textAlign: "left", color: "var(--fg)", fontWeight: 500 }}
+                                                style={{
+                                                    textAlign: "left",
+                                                    color: "var(--fg)",
+                                                    fontWeight: 500,
+                                                }}
                                                 value={it.title}
                                                 onChange={(e) =>
-                                                    setItems((cur) => cur.map((x) => (x.id === it.id ? { ...x, title: e.target.value } : x)))
+                                                    setItems((cur) =>
+                                                        cur.map((x) =>
+                                                            x.id === it.id
+                                                                ? { ...x, title: e.target.value }
+                                                                : x,
+                                                        ),
+                                                    )
                                                 }
                                             />
                                         ) : (
@@ -359,24 +463,42 @@ export function UploadPage() {
                                     </div>
                                     {!plain && (
                                         <>
-                                            <button className="icon-btn muted" onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label="up">
+                                            <button
+                                                className="icon-btn muted"
+                                                onClick={() => moveItem(i, -1)}
+                                                disabled={i === 0}
+                                                aria-label={t("common.moveUp")}
+                                            >
                                                 <ArrowUp size={18} />
                                             </button>
-                                            <button className="icon-btn muted" onClick={() => moveItem(i, 1)} disabled={i === items.length - 1} aria-label="down">
+                                            <button
+                                                className="icon-btn muted"
+                                                onClick={() => moveItem(i, 1)}
+                                                disabled={i === items.length - 1}
+                                                aria-label={t("common.moveDown")}
+                                            >
                                                 <ArrowDown size={18} />
                                             </button>
                                         </>
                                     )}
-                                    <button className="icon-btn muted" onClick={() => setItems((cur) => cur.filter((x) => x.id !== it.id))} aria-label={t("remove")}>
+                                    <button
+                                        className="icon-btn muted"
+                                        onClick={() =>
+                                            setItems((cur) => cur.filter((x) => x.id !== it.id))
+                                        }
+                                        aria-label={t("common.remove")}
+                                    >
                                         <Trash2 size={18} />
                                     </button>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    {!plain && encoder === "server" && items.reduce((n, i) => n + i.file.size, 0) > 400 * 1024 * 1024 && (
-                        <Notice>{t("bigUploadHint")}</Notice>
-                    )}
+                    {!plain &&
+                        encoder === "server" &&
+                        items.reduce((n, i) => n + i.file.size, 0) > 400 * 1024 * 1024 && (
+                            <Notice>{t("upload.bigUploadHint")}</Notice>
+                        )}
                     {busy ? (
                         <div className="card" style={{ padding: 16 }}>
                             <div className="row-gap" style={{ marginBottom: 10 }}>
@@ -388,22 +510,40 @@ export function UploadPage() {
                             </div>
                         </div>
                     ) : (
-                        <button className="btn primary block" onClick={start} disabled={!plain && !name.trim()}>
+                        <button
+                            className="btn primary block"
+                            onClick={start}
+                            disabled={!plain && !name.trim()}
+                        >
                             <UploadCloud size={19} />
-                            {!plain ? t("createTaf") : t("uploadFiles")}
+                            {!plain ? t("upload.createTaf") : t("upload.uploadFiles")}
                         </button>
                     )}
                 </>
             )}
 
-            <LibraryPicker open={pickFolder} onClose={() => setPickFolder(false)} folderMode startPath={folder} onPick={setFolder} />
+            <LibraryPicker
+                open={pickFolder}
+                onClose={() => setPickFolder(false)}
+                folderMode
+                startPath={folder}
+                onPick={setFolder}
+            />
             <TagPicker
                 open={assign}
                 onClose={() => setAssign(false)}
-                title={t("assignToTonie")}
+                title={t("common.assignToTonie")}
                 onPick={async (tag) => {
                     if (!done) return;
-                    await ui.run(() => tc.assignSource(tag, "lib://" + done.replace(/^\//, ""), tag.overlay || undefined), t("contentAssigned"));
+                    await ui.run(
+                        () =>
+                            tc.assignSource(
+                                tag,
+                                "lib://" + done.replace(/^\//, ""),
+                                tag.overlay || undefined,
+                            ),
+                        t("common.contentAssigned"),
+                    );
                     invalidateTags();
                 }}
             />

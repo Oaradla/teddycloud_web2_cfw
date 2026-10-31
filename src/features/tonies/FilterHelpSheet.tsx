@@ -2,38 +2,38 @@ import { t } from "../../lib/i18n";
 import { Sheet } from "../../ui/Sheet";
 
 const FIELDS = [
-    ["series", "fhSeries"],
-    ["episode", "fhEpisode"],
-    ["model", "fhModel"],
-    ["language", "fhLanguage"],
-    ["picture", "fhPicture"],
-    ["ruid, uid", "fhRuid"],
-    ["source", "fhSource"],
-    ["valid, exists", "fhValid"],
-    ["live, nocloud, claimed, hasCloudAuth", "fhFlags"],
-    ["tracks, track", "fhTracks"],
-    ["trackcount, tracksecondscount", "fhTrackcount"],
+    ["series", "tonies.fhSeries"],
+    ["episode", "tonies.fhEpisode"],
+    ["model", "tonies.fhModel"],
+    ["language", "tonies.fhLanguage"],
+    ["picture", "tonies.fhPicture"],
+    ["ruid, uid", "tonies.fhRuid"],
+    ["source", "tonies.fhSource"],
+    ["valid, exists", "tonies.fhValid"],
+    ["live, nocloud, claimed, hasCloudAuth", "tonies.fhFlags"],
+    ["tracks, track", "tonies.fhTracks"],
+    ["trackcount, tracksecondscount", "tonies.fhTrackcount"],
 ] as const;
 
 const EXAMPLES = [
-    ['series = "Pixi" and valid', "fxSeries"],
-    ["language in (de-de, fr-fr)", "fxIn"],
-    ["series ~ ^Bibi", "fxRegex"],
-    ["episode is empty", "fxEmpty"],
-    ["model startswith 1000", "fxStarts"],
-    ["unique(series)", "fxUnique"],
-    ['tracks ~ "lied"', "fxTracks"],
-    ["trackcount > 10", "fxCount"],
-    ["tracksecondscount != trackcount", "fxSeconds"],
-    ["live && !nocloud || (source is not empty and not valid)", "fxCombined"],
+    ['series = "Pixi" and valid', "tonies.fxSeries"],
+    ["language in (de-de, fr-fr)", "tonies.fxIn"],
+    ["series ~ ^Bibi", "tonies.fxRegex"],
+    ["episode is empty", "tonies.fxEmpty"],
+    ["model startswith 1000", "tonies.fxStarts"],
+    ["unique(series)", "tonies.fxUnique"],
+    ['tracks ~ "lied"', "tonies.fxTracks"],
+    ["trackcount > 10", "tonies.fxCount"],
+    ["tracksecondscount != trackcount", "tonies.fxSeconds"],
+    ["live && !nocloud || (source is not empty and not valid)", "tonies.fxCombined"],
 ] as const;
 
 /** the syntax of the expert filter */
 export function FilterHelpSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     return (
-        <Sheet open={open} onClose={onClose} title={t("expertFilter")}>
-            <p className="muted">{t("fhIntro")}</p>
-            <div className="choice-label mt">{t("fhFields")}</div>
+        <Sheet open={open} onClose={onClose} title={t("tonies.expertFilter")}>
+            <p className="muted">{t("tonies.fhIntro")}</p>
+            <div className="choice-label mt">{t("tonies.fhFields")}</div>
             <dl className="help-list">
                 {FIELDS.map(([code, key]) => (
                     <div key={code}>
@@ -42,7 +42,7 @@ export function FilterHelpSheet({ open, onClose }: { open: boolean; onClose: () 
                     </div>
                 ))}
             </dl>
-            <div className="choice-label mt">{t("fhExamples")}</div>
+            <div className="choice-label mt">{t("tonies.fhExamples")}</div>
             <dl className="help-list">
                 {EXAMPLES.map(([code, key]) => (
                     <div key={code}>
@@ -51,7 +51,7 @@ export function FilterHelpSheet({ open, onClose }: { open: boolean; onClose: () 
                     </div>
                 ))}
             </dl>
-            <p className="small muted mt">{t("fhTips")}</p>
+            <p className="small muted mt">{t("tonies.fhTips")}</p>
         </Sheet>
     );
 }

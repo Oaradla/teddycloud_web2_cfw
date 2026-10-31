@@ -8,8 +8,17 @@ import pcbClamp from "./img/esp32-pcb-clamp.webp";
 import esptoolScreen from "./img/esp32-write-patched-image-with-esptools.webp";
 import { ESP32_FLASH_STEPS } from "./esp32/esp32Constants";
 import { useESP32Flasher } from "./esp32/useESP32Flasher";
-import { Code, DnsGuide, ExtLink, Pics, StatusLine, UartHint, Warnings, useBusyGuard } from "./parts";
-import { st } from "./texts";
+import {
+    Code,
+    DnsGuide,
+    ExtLink,
+    Pics,
+    StatusLine,
+    UartHint,
+    Warnings,
+    useBusyGuard,
+} from "./parts";
+import { t } from "../../lib/i18n";
 
 /**
  * The ESP32 box in the browser: read the flash over Web Serial, patch it on the server (CA,
@@ -28,18 +37,38 @@ export function Esp32Page() {
     useEffect(() => {
         if (!f.isOverwriteForceConfirmationModalOpen) return;
         f.setIsOverwriteForceConfirmationModalOpen(false);
-        ui.confirm({ title: st("overwriteCerts"), text: f.extractCertificateErrorMessage, confirm: st("overwrite"), danger: true }).then((ok) => {
+        ui.confirm({
+            title: t("setup.overwriteCerts"),
+            text: f.extractCertificateErrorMessage,
+            confirm: t("setup.overwrite"),
+            danger: true,
+        }).then((ok) => {
             if (ok) void f.extractAndStoreCertsFromFlash(true);
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [f.isOverwriteForceConfirmationModalOpen]);
 
     const flash = async () => {
-        if (state.resetBox) return f.resetFlash();
-        if (await ui.confirm({ title: st("confirmFlash"), text: st("confirmFlashText"), confirm: st("flashEsp32"), danger: true })) await f.writeFlash();
+        if (
+            await ui.confirm({
+                title: t("setup.confirmFlash"),
+                text: state.resetBox ? t("setup.confirmResetText") : t("setup.confirmFlashText"),
+                confirm: t("setup.flashEsp32"),
+                danger: true,
+            })
+        )
+            await (state.resetBox ? f.resetFlash() : f.writeFlash());
     };
 
-    const titles = state.resetBox ? [st("esp32S1"), st("esp32S2"), st("esp32S4"), st("esp32S5")] : [st("esp32S1"), st("esp32S2"), st("esp32S3"), st("esp32S4"), st("esp32S5")];
+    const titles = state.resetBox
+        ? [t("setup.esp32S1"), t("setup.esp32S2"), t("setup.esp32S4"), t("setup.esp32S5")]
+        : [
+              t("setup.esp32S1"),
+              t("setup.esp32S2"),
+              t("setup.esp32S3"),
+              t("setup.esp32S4"),
+              t("setup.esp32S5"),
+          ];
     const shown = state.resetBox && step > ESP32_FLASH_STEPS.PATCH ? step - 1 : step;
     const busy = f.disableButtons;
     useBusyGuard(busy);
@@ -48,12 +77,17 @@ export function Esp32Page() {
     const wasBusy = useRef(false);
     useEffect(() => {
         if (busy) setResult(null);
-        else if (wasBusy.current) setResult({ ok: !state.error, text: state.state || (state.error ? st("statusFailed") : st("statusDone")) });
+        else if (wasBusy.current)
+            setResult({
+                ok: !state.error,
+                text:
+                    state.state || (state.error ? t("setup.statusFailed") : t("setup.statusDone")),
+            });
         wasBusy.current = busy;
     }, [busy]);
 
     const manual = (
-        <Fold title={st("manualTitle")} sub={st("manualText")}>
+        <Fold title={t("setup.manualTitle")} sub={t("setup.manualText")}>
             <p>
                 <ExtLink href="https://github.com/espressif/esptool">esptool</ExtLink>
             </p>
@@ -89,15 +123,19 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
 
     if (!f.isSupported || !f.httpsActive)
         return (
-            <Page title={st("esp32Title")} back="/setup" narrow>
+            <Page title={t("setup.esp32Title")} back="/setup" narrow>
                 {!f.isSupported ? (
-                    <Notice>{st("esp32NoSerial")}</Notice>
+                    <Notice>{t("setup.esp32NoSerial")}</Notice>
                 ) : (
                     <Notice>
-                        {st("esp32Https")}
+                        {t("setup.esp32Https")}
                         <div className="mt">
-                            <button className="btn primary small" onClick={f.openHttpsUrl} disabled={!f.httpsUrl}>
-                                {st("esp32OpenHttps")}
+                            <button
+                                className="btn primary small"
+                                onClick={f.openHttpsUrl}
+                                disabled={!f.httpsUrl}
+                            >
+                                {t("setup.esp32OpenHttps")}
                             </button>
                         </div>
                     </Notice>
@@ -110,7 +148,7 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
         <table className="setup-table">
             <tbody>
                 <tr>
-                    <td>{st("chip")}</td>
+                    <td>{t("setup.chip")}</td>
                     <td>{state.chipType}</td>
                 </tr>
                 {state.chipMac && (
@@ -136,7 +174,7 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
             <>
                 <Warnings factoryReset="other" />
                 <UartHint />
-                <p>{st("esp32Connect")}</p>
+                <p>{t("setup.esp32Connect")}</p>
                 <Pics
                     items={[
                         { src: j100, alt: "J100" },
@@ -147,37 +185,67 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
                 />
                 {(
                     [
-                        ["risk", "esp32AckRisk"],
-                        ["fw", "esp32AckFw"],
-                        ["backup", "esp32AckBackup"],
-                        ["uart", "uartAck"],
+                        ["risk", "setup.esp32AckRisk"],
+                        ["fw", "setup.esp32AckFw"],
+                        ["backup", "setup.esp32AckBackup"],
+                        ["uart", "setup.uartAck"],
                     ] as const
                 ).map(([key, text]) => (
                     <label key={key} className="check-row">
-                        <input type="checkbox" checked={acks[key]} onChange={(e) => setAcks({ ...acks, [key]: e.target.checked })} />
-                        {st(text)}
+                        <input
+                            type="checkbox"
+                            checked={acks[key]}
+                            onChange={(e) => setAcks({ ...acks, [key]: e.target.checked })}
+                        />
+                        {t(text)}
                     </label>
                 ))}
             </>
         );
         actions = (
-            <button className="btn primary" disabled={busy || !Object.values(acks).every(Boolean)} onClick={f.next}>
-                {st("next")}
+            <button
+                className="btn primary"
+                disabled={busy || !Object.values(acks).every(Boolean)}
+                onClick={f.next}
+            >
+                {t("setup.next")}
             </button>
         );
     } else if (step === ESP32_FLASH_STEPS.READ) {
         body = (
             <>
-                <p>{st("esp32ReadText")}</p>
+                <p>{t("setup.esp32ReadText")}</p>
                 <div className="row-gap" style={{ flexWrap: "wrap" }}>
-                    <button className="btn primary" disabled={busy} onClick={() => (setState((p) => ({ ...p, resetBox: false })), f.readFlash())}>
-                        {st("readFlash")}
+                    <button
+                        className="btn primary"
+                        disabled={busy}
+                        onClick={() => (
+                            setState((p) => ({ ...p, resetBox: false })),
+                            f.readFlash()
+                        )}
+                    >
+                        {t("setup.readFlash")}
                     </button>
-                    <button className="btn" disabled={busy} onClick={async () => (setState((p) => ({ ...p, actionInProgress: true, resetBox: false })), await f.startLoadFlash())}>
-                        {st("loadFile")}
+                    <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={async () => (
+                            setState((p) => ({ ...p, actionInProgress: true, resetBox: false })),
+                            await f.startLoadFlash()
+                        )}
+                    >
+                        {t("setup.loadFile")}
                     </button>
-                    <button className="btn" title={st("resetToOriginalHint")} disabled={busy} onClick={async () => (setState((p) => ({ ...p, actionInProgress: true, resetBox: true })), await f.startLoadFlash())}>
-                        {st("resetToOriginal")}
+                    <button
+                        className="btn"
+                        title={t("setup.resetToOriginalHint")}
+                        disabled={busy}
+                        onClick={async () => (
+                            setState((p) => ({ ...p, actionInProgress: true, resetBox: true })),
+                            await f.startLoadFlash()
+                        )}
+                    >
+                        {t("setup.resetToOriginal")}
                     </button>
                 </div>
                 <input ref={f.fileInputRef} type="file" hidden onChange={f.loadFlashFile} />
@@ -185,61 +253,104 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
             </>
         );
         actions = (
-            <button className="btn primary" disabled={busy || (!state.proceed && !state.filename)} onClick={f.next}>
-                {st("next")}
+            <button
+                className="btn primary"
+                disabled={busy || (!state.proceed && !state.filename)}
+                onClick={f.next}
+            >
+                {t("setup.next")}
             </button>
         );
     } else if (step === ESP32_FLASH_STEPS.PATCH) {
         const set = (patch: Partial<typeof state>) => setState((p) => ({ ...p, ...patch }));
         body = (
             <>
-                <p>{st("esp32PatchText")}</p>
+                <p>{t("setup.esp32PatchText")}</p>
                 <div className="field">
-                    <label>{st("hostname")}</label>
-                    <input className="input" value={state.hostname} onChange={(e) => set({ hostname: e.target.value.trim() })} />
-                    {state.warningTextHostname && <div className="hint">{state.warningTextHostname}</div>}
-                    {state.hostname.length > 12 && <div className="hint">{st("hostnameTooLong")}</div>}
+                    <label>{t("setup.hostname")}</label>
+                    <input
+                        className="input"
+                        value={state.hostname}
+                        onChange={(e) => set({ hostname: e.target.value.trim() })}
+                    />
+                    {state.warningTextHostname && (
+                        <div className="hint">{state.warningTextHostname}</div>
+                    )}
+                    {state.hostname.length > 12 && (
+                        <div className="hint">{t("setup.hostnameTooLong")}</div>
+                    )}
                 </div>
                 <label className="check-row">
-                    <input type="checkbox" checked={state.flagPreviousHostname} onChange={(e) => set({ flagPreviousHostname: e.target.checked })} />
-                    {st("previousHostnameFlag")}
+                    <input
+                        type="checkbox"
+                        checked={state.flagPreviousHostname}
+                        onChange={(e) => set({ flagPreviousHostname: e.target.checked })}
+                    />
+                    {t("setup.previousHostnameFlag")}
                 </label>
                 {state.flagPreviousHostname && (
                     <div className="field">
-                        <label>{st("previousHostname")}</label>
-                        <input className="input" value={state.previousHostname} onChange={(e) => set({ previousHostname: e.target.value.trim() })} />
+                        <label>{t("setup.previousHostname")}</label>
+                        <input
+                            className="input"
+                            value={state.previousHostname}
+                            onChange={(e) => set({ previousHostname: e.target.value.trim() })}
+                        />
                     </div>
                 )}
                 <div className="field">
-                    <label>{st("port")}</label>
-                    <input className="input" inputMode="numeric" value={state.apiPort} onChange={(e) => set({ apiPort: e.target.value.trim() })} style={{ maxWidth: 140 }} />
-                    <div className="hint">{state.warningTextApiPort || st("apiPortHint")}</div>
+                    <label>{t("setup.port")}</label>
+                    <input
+                        className="input"
+                        inputMode="numeric"
+                        value={state.apiPort}
+                        onChange={(e) => set({ apiPort: e.target.value.trim() })}
+                        style={{ maxWidth: 140 }}
+                    />
+                    <div className="hint">{state.warningTextApiPort || t("setup.apiPortHint")}</div>
                 </div>
                 <div className="field">
-                    <label>{st("wifiSsid")}</label>
-                    <input className="input" value={state.wifi_ssid} onChange={(e) => set({ wifi_ssid: e.target.value })} />
+                    <label>{t("setup.wifiSsid")}</label>
+                    <input
+                        className="input"
+                        value={state.wifi_ssid}
+                        onChange={(e) => set({ wifi_ssid: e.target.value })}
+                    />
                 </div>
                 <div className="field">
-                    <label>{st("wifiPass")}</label>
-                    <input className="input" type="password" value={state.wifi_pass} onChange={(e) => set({ wifi_pass: e.target.value })} />
+                    <label>{t("setup.wifiPass")}</label>
+                    <input
+                        className="input"
+                        type="password"
+                        value={state.wifi_pass}
+                        onChange={(e) => set({ wifi_pass: e.target.value })}
+                    />
                     {state.warningTextWifi && <div className="hint">{state.warningTextWifi}</div>}
                 </div>
-                <button className="btn primary" disabled={busy || !state.hostname || (state.flagPreviousHostname && !state.previousHostname)} onClick={f.patchFlash}>
-                    {st("patch")}
+                <button
+                    className="btn primary"
+                    disabled={
+                        busy ||
+                        !state.hostname ||
+                        (state.flagPreviousHostname && !state.previousHostname)
+                    }
+                    onClick={f.patchFlash}
+                >
+                    {t("setup.patch")}
                 </button>
             </>
         );
         actions = (
             <button className="btn primary" disabled={busy || !state.showFlash} onClick={f.next}>
-                {st("next")}
+                {t("setup.next")}
             </button>
         );
     } else if (step === ESP32_FLASH_STEPS.WRITE) {
         body = (
             <>
-                <p>{st("esp32FlashText")}</p>
+                <p>{t("setup.esp32FlashText")}</p>
                 <button className="btn primary" disabled={busy} onClick={flash}>
-                    {st("flashEsp32")}
+                    {t("setup.flashEsp32")}
                 </button>
             </>
         );
@@ -247,12 +358,20 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
     } else {
         body = (
             <>
-                <Notice info>{state.resetBox ? st("esp32ResetDoneText") : st("esp32DoneText")}</Notice>
+                <Notice info>
+                    {state.resetBox ? t("setup.esp32ResetDoneText") : t("setup.esp32DoneText")}
+                </Notice>
                 {!state.resetBox && (
                     <>
-                        <p className="small muted">{st("extractCertsHint", { dir: f.certDir })}</p>
-                        <button className="btn primary" disabled={busy} onClick={() => f.extractAndStoreCertsFromFlash()}>
-                            {st("extractCerts")}
+                        <p className="small muted">
+                            {t("setup.extractCertsHint", { dir: f.certDir })}
+                        </p>
+                        <button
+                            className="btn primary"
+                            disabled={busy}
+                            onClick={() => f.extractAndStoreCertsFromFlash()}
+                        >
+                            {t("setup.extractCerts")}
                         </button>
                     </>
                 )}
@@ -260,18 +379,24 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
         );
         actions = !state.resetBox && (
             <a className="btn primary" href="#/">
-                {st("showBoxes")}
+                {t("setup.showBoxes")}
             </a>
         );
     }
 
     return (
         <Page
-            title={st("esp32Title")}
+            title={t("setup.esp32Title")}
             back="/setup"
             narrow
             right={
-                <select className="select small" value={f.baudRate} onChange={(e) => f.handleBaudrateChange(Number(e.target.value))} title={st("baudRate")} aria-label={st("baudRate")}>
+                <select
+                    className="select small"
+                    value={f.baudRate}
+                    onChange={(e) => f.handleBaudrateChange(Number(e.target.value))}
+                    title={t("setup.baudRate")}
+                    aria-label={t("setup.baudRate")}
+                >
                     {f.baudRates.map((r) => (
                         <option key={r} value={r}>
                             {r}
@@ -283,7 +408,11 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
             <div ref={anchor} />
             <div className="setup-steps">
                 {titles.map((title, i) => (
-                    <button key={title} className={i === shown ? "active" : i < shown ? "done" : ""} disabled>
+                    <button
+                        key={title}
+                        className={i === shown ? "active" : i < shown ? "done" : ""}
+                        disabled
+                    >
                         <span>{i + 1}</span>
                         {title}
                     </button>
@@ -291,37 +420,46 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
             </div>
             <div className="setup-step">
                 {body}
-                <StatusLine busy={busy} text={state.state} progress={state.showProgress ? state.progress / 100 : 0} result={result} />
+                <StatusLine
+                    busy={busy}
+                    text={state.state}
+                    progress={state.showProgress ? state.progress / 100 : 0}
+                    result={result}
+                />
                 {(state.downloadLink || state.downloadLinkPatched) && (
                     <div className="row-gap mt" style={{ flexWrap: "wrap" }}>
                         {state.downloadLink && (
                             <a className="btn small" href={state.downloadLink} download>
-                                {st("downloadOriginal")}
+                                {t("setup.downloadOriginal")}
                             </a>
                         )}
                         {state.downloadLinkPatched && (
                             <a className="btn small" href={state.downloadLinkPatched} download>
-                                {st("downloadPatched")}
+                                {t("setup.downloadPatched")}
                             </a>
                         )}
                     </div>
                 )}
             </div>
             <div className="btn-row mt">
-                <button className="btn" disabled={busy || step === ESP32_FLASH_STEPS.PREP} onClick={f.prev}>
-                    {st("back")}
+                <button
+                    className="btn"
+                    disabled={busy || step === ESP32_FLASH_STEPS.PREP}
+                    onClick={f.prev}
+                >
+                    {t("setup.back")}
                 </button>
                 {actions}
             </div>
             <div className="list mt">
-                <Fold title={st("log")}>
+                <Fold title={t("setup.log")}>
                     <div className="log-view mono">
                         {log.map((l, i) => (
                             <div key={i}>{l}</div>
                         ))}
                     </div>
                     <button className="btn small mt" onClick={f.clearLog}>
-                        {st("clearLog")}
+                        {t("setup.clearLog")}
                     </button>
                 </Fold>
                 {manual}

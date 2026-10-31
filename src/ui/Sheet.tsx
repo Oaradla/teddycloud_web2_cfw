@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { t } from "../lib/i18n";
 
 interface SheetProps {
     open: boolean;
@@ -29,6 +30,20 @@ window.addEventListener("popstate", () => {
     const top = stack.pop();
     if (top) top.close();
 });
+
+const focusable =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Tab and Shift+Tab cycle through the controls of el */
+function keepFocusIn(el: HTMLElement, e: KeyboardEvent) {
+    const all = [...el.querySelectorAll<HTMLElement>(focusable)];
+    if (!all.length) return;
+    const at = all.indexOf(document.activeElement as HTMLElement);
+    if (e.shiftKey && at <= 0) all[all.length - 1].focus();
+    else if (!e.shiftKey && (at === -1 || at === all.length - 1)) all[0].focus();
+    else return;
+    e.preventDefault();
+}
 
 /**
  * Bottom sheet on phones, centered dialog on large screens. Closes by swiping it down, by the
@@ -78,12 +93,17 @@ export function Sheet({
         stack.push(entry);
         document.documentElement.style.overflow = "hidden";
         window.history.pushState({ ...(window.history.state ?? {}), tcSheet: stack.length }, "");
+        // keyboard focus moves into the sheet, stays there and goes back when it closes
+        const before = document.activeElement as HTMLElement | null;
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && stack[stack.length - 1] === entry) onCloseRef.current();
+            if (stack[stack.length - 1] !== entry) return;
+            if (e.key === "Escape") onCloseRef.current();
+            if (e.key === "Tab" && sheetRef.current) keepFocusIn(sheetRef.current, e);
         };
         window.addEventListener("keydown", onKey);
         return () => {
             window.removeEventListener("keydown", onKey);
+            before?.focus();
             const at = stack.indexOf(entry);
             if (at >= 0) stack.splice(at, 1);
             if (!stack.length) document.documentElement.style.overflow = "";
@@ -95,6 +115,11 @@ export function Sheet({
             }
         };
     }, [open]);
+
+    useEffect(() => {
+        if (open && mounted && !sheetRef.current?.contains(document.activeElement))
+            sheetRef.current?.focus();
+    }, [open, mounted]);
 
     // swipe down to close (on the grip and the header, or the body when scrolled to the top)
     const drag = useRef<{ y: number; dy: number; active: boolean } | null>(null);
@@ -147,6 +172,7 @@ export function Sheet({
                 className={`sheet ${full ? "full" : ""} ${wide ? "wide" : ""} ${closing ? "closing" : ""} ${className}`}
                 role="dialog"
                 aria-modal="true"
+                tabIndex={-1}
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
@@ -156,7 +182,11 @@ export function Sheet({
                     <div className="sheet-head">
                         <h2>{title}</h2>
                         {headerRight}
-                        <button className="icon-btn filled small-x" onClick={onClose} aria-label="close">
+                        <button
+                            className="icon-btn filled small-x"
+                            onClick={onClose}
+                            aria-label={t("common.close")}
+                        >
                             <X size={18} />
                         </button>
                     </div>

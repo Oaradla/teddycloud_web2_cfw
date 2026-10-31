@@ -37,9 +37,18 @@ export function ModelPicker({
     });
     const f = debounced.toLowerCase();
     const customHits: TonieInfo[] = (custom.data ?? [])
-        .filter((m) => !f || `${m.model} ${m.series} ${m.episodes} ${m.title}`.toLowerCase().includes(f))
+        .filter(
+            (m) =>
+                !f || `${m.model} ${m.series} ${m.episodes} ${m.title}`.toLowerCase().includes(f),
+        )
         .slice(0, 50)
-        .map((m) => ({ model: m.model, series: m.series, episode: m.episodes, picture: m.pic, tracks: m.tracks }));
+        .map((m) => ({
+            model: m.model,
+            series: m.series,
+            episode: m.episodes,
+            picture: m.pic,
+            tracks: m.tracks,
+        }));
 
     const pick = (model: string) => {
         onPick(model);
@@ -54,25 +63,46 @@ export function ModelPicker({
             sub={[m.episode, m.model].filter(Boolean).join(" · ")}
             onClick={() => pick(m.model)}
             chevron={false}
-            right={m.model === current ? <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span> : undefined}
+            right={
+                m.model === current ? (
+                    <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span>
+                ) : undefined
+            }
         />
     );
 
     return (
-        <Sheet open={open} onClose={onClose} title={t("chooseFigure")} full>
+        <Sheet open={open} onClose={onClose} title={t("tonies.chooseFigure")} full>
             <div style={{ marginBottom: 12 }}>
-                <SearchField value={query} onChange={setQuery} placeholder={t("searchFigure")} autoFocus />
+                <SearchField
+                    value={query}
+                    onChange={setQuery}
+                    placeholder={t("tonies.searchFigure")}
+                    autoFocus
+                />
             </div>
             <div className="section">
                 <div className="list">
-                    <Row icon={<UserRoundPlus size={17} />} title={t("newFigure")} sub={t("newFigureHint")} onClick={() => setCreate({ mode: "figure" })} chevron />
-                    <Row icon={<Ban size={17} />} title={t("noFigure")} sub={t("noFigureHint")} onClick={() => pick("")} chevron={false} />
+                    <Row
+                        icon={<UserRoundPlus size={17} />}
+                        title={t("common.newFigure")}
+                        sub={t("tonies.newFigureHint")}
+                        onClick={() => setCreate({ mode: "figure" })}
+                        chevron
+                    />
+                    <Row
+                        icon={<Ban size={17} />}
+                        title={t("tonies.noFigure")}
+                        sub={t("tonies.noFigureHint")}
+                        onClick={() => pick("")}
+                        chevron={false}
+                    />
                 </div>
             </div>
             {customHits.length > 0 && (
                 <div className="section">
                     <div className="section-head">
-                        <h2 className="section-title">{t("customModels")}</h2>
+                        <h2 className="section-title">{t("common.customModels")}</h2>
                     </div>
                     <div className="list">{customHits.map((m) => item(m, "c"))}</div>
                 </div>
@@ -87,12 +117,16 @@ export function ModelPicker({
                     ) : (
                         <div className="list">
                             {(search.data ?? []).map((m) => item(m, "o"))}
-                            {search.data?.length === 0 && <Row title={t("nothingFound")} />}
+                            {search.data?.length === 0 && <Row title={t("common.nothingFound")} />}
                         </div>
                     )}
                 </div>
             )}
-            {debounced.length < 2 && <p className="small muted" style={{ textAlign: "center" }}>{t("searchFigureHint")}</p>}
+            {debounced.length < 2 && (
+                <p className="small muted" style={{ textAlign: "center" }}>
+                    {t("tonies.searchFigureHint")}
+                </p>
+            )}
             <ModelEditor
                 start={create}
                 onClose={() => setCreate(null)}

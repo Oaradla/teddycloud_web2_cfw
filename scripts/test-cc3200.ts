@@ -19,7 +19,10 @@ function makeFlash(names: string[]): Uint8Array {
         flash.set([i, 1, 10 + i, 0x80], (i + 1) * 4); // index, size in blocks, start block, flags: not mirrored
         view.setUint16(meta2 + i * 4, nameAt, true);
         view.setUint16(meta2 + i * 4 + 2, name.length, true);
-        flash.set([...name].map((c) => c.charCodeAt(0)), meta2 + 0x200 + nameAt);
+        flash.set(
+            [...name].map((c) => c.charCodeAt(0)),
+            meta2 + 0x200 + nameAt,
+        );
         nameAt += name.length;
     });
     return flash;
@@ -34,7 +37,10 @@ class SimulatedBootloader implements Link {
     private open: { name: string; write: boolean; data: number[] } | null = null;
     readonly packets: number[] = [];
 
-    constructor(public files: Map<string, Uint8Array>, public flash: Uint8Array) {}
+    constructor(
+        public files: Map<string, Uint8Array>,
+        public flash: Uint8Array,
+    ) {}
 
     private send(bytes: number[]) {
         this.output.push(...bytes);
@@ -51,7 +57,8 @@ class SimulatedBootloader implements Link {
             if (this.expectAck) {
                 if (this.input.length < 2) return;
                 const ack = this.input.splice(0, 2);
-                if (ack[0] !== 0 || ack[1] !== 0xcc) throw new Error(`host sent ${ack} instead of an ACK`);
+                if (ack[0] !== 0 || ack[1] !== 0xcc)
+                    throw new Error(`host sent ${ack} instead of an ACK`);
                 this.expectAck = false;
                 continue;
             }
@@ -60,7 +67,8 @@ class SimulatedBootloader implements Link {
             if (this.input.length < length + 1) return;
             const frame = this.input.splice(0, length + 1);
             const body = frame.slice(3);
-            if ((body.reduce((s, b) => s + b, 0) & 0xff) !== frame[2]) throw new Error("bad checksum from host");
+            if ((body.reduce((s, b) => s + b, 0) & 0xff) !== frame[2])
+                throw new Error("bad checksum from host");
             this.send([0x00, 0xcc]);
             this.handle(body);
         }
@@ -83,7 +91,18 @@ class SimulatedBootloader implements Link {
         this.packets.push(op);
         switch (op) {
             case 0x2f: // version: bootloader 0.4.1.2, a CC3200
-                this.packet([0, 4, 1, 2, ...new Array(12).fill(0), 0x10, 0, 0, 0, ...new Array(8).fill(0)]);
+                this.packet([
+                    0,
+                    4,
+                    1,
+                    2,
+                    ...new Array(12).fill(0),
+                    0x10,
+                    0,
+                    0,
+                    0,
+                    ...new Array(8).fill(0),
+                ]);
                 break;
             case 0x33: // switch to the APPS processor
                 break;
@@ -92,7 +111,11 @@ class SimulatedBootloader implements Link {
                 break;
             case 0x31: {
                 const storage = this.u32(b, 1);
-                this.packet(storage === 2 ? [BLOCK >> 8, BLOCK & 0xff, 0, BLOCKS] : [0x01, 0x00, 0x01, 0x00]);
+                this.packet(
+                    storage === 2
+                        ? [BLOCK >> 8, BLOCK & 0xff, 0, BLOCKS]
+                        : [0x01, 0x00, 0x01, 0x00],
+                );
                 break;
             }
             case 0x2d: {
@@ -132,7 +155,8 @@ class SimulatedBootloader implements Link {
                 break;
             }
             case 0x22:
-                if (this.open?.write) this.files.set(this.open.name, Uint8Array.from(this.open.data));
+                if (this.open?.write)
+                    this.files.set(this.open.name, Uint8Array.from(this.open.data));
                 this.open = null;
                 this.status = 0x40;
                 break;
@@ -150,7 +174,8 @@ class SimulatedBootloader implements Link {
 
     async read(n: number, timeoutMs: number) {
         const deadline = Date.now() + timeoutMs;
-        while (this.output.length < n && Date.now() < deadline) await new Promise((r) => setTimeout(r, 1));
+        while (this.output.length < n && Date.now() < deadline)
+            await new Promise((r) => setTimeout(r, 1));
         return Uint8Array.from(this.output.splice(0, Math.min(n, this.output.length)));
     }
     flushInput() {
@@ -167,7 +192,8 @@ const assert = (ok: unknown, what: string) => {
     if (!ok) throw new Error(`FAILED: ${what}`);
     console.log(`ok   ${what}`);
 };
-const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
+const equal = (a: Uint8Array, b: Uint8Array) =>
+    a.length === b.length && a.every((x, i) => x === b[i]);
 
 const files = new Map<string, Uint8Array>([
     ["/cert/ca.der", Uint8Array.from({ length: 900 }, (_, i) => i & 0xff)],
@@ -177,15 +203,30 @@ const files = new Map<string, Uint8Array>([
 ]);
 const sim = new SimulatedBootloader(files, makeFlash([...files.keys()]));
 const nwp = Uint8Array.from({ length: 5000 }, (_, i) => i & 0xff);
-const cc = await Cc3200.start(sim, { gateway: false, reset: "dtr", log: () => undefined, askReset: async () => undefined, loadNwpBootloader: async () => nwp });
+const cc = await Cc3200.start(sim, {
+    gateway: false,
+    reset: "dtr",
+    log: () => undefined,
+    askReset: async () => undefined,
+    loadNwpBootloader: async () => nwp,
+});
 assert(sim.packets.includes(0x33) && sim.packets.includes(0x32), "switched to the NWP bootloader");
 
 const list = await cc.listFiles();
-assert(list.map((f) => f.name).join(",") === [...files.keys()].join(","), "file list from the file table");
+assert(
+    list.map((f) => f.name).join(",") === [...files.keys()].join(","),
+    "file list from the file table",
+);
 
 const all = await cc.readAllFiles();
-assert(all.failed.length === 0 && all.files.size === 3 && !all.files.has("/sys/servicepack.ucf"), "all files read, the service pack skipped");
-assert([...all.files].every(([name, data]) => equal(data, files.get(name)!)), "file contents equal");
+assert(
+    all.failed.length === 0 && all.files.size === 3 && !all.files.has("/sys/servicepack.ucf"),
+    "all files read, the service pack skipped",
+);
+assert(
+    [...all.files].every(([name, data]) => equal(data, files.get(name)!)),
+    "file contents equal",
+);
 
 const dump = await cc.readFlash();
 assert(equal(dump, sim.flash), "flash dump equals the flash");

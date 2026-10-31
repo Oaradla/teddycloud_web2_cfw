@@ -53,7 +53,8 @@ export const picUrl = (pic?: string) => backendUrl(pic || "");
 /** the info shown for a tag: what is assigned (source) wins over the figure itself */
 export const tagInfo = (tag: Tag): TonieInfo => {
     const s = tag.sourceInfo;
-    if (s && (s.series || s.episode)) return { ...tag.tonieInfo, ...s, picture: s.picture || tag.tonieInfo?.picture };
+    if (s && (s.series || s.episode))
+        return { ...tag.tonieInfo, ...s, picture: s.picture || tag.tonieInfo?.picture };
     return tag.tonieInfo ?? { tracks: [], model: "", series: "", episode: "", picture: "" };
 };
 
@@ -79,15 +80,14 @@ export const sourceLabel = (source?: string) => {
     return source;
 };
 
-export const ruidPretty = (ruid: string) => ruid.toUpperCase().match(/.{1,2}/g)?.join(":") ?? ruid;
+export const ruidPretty = (ruid: string) =>
+    ruid
+        .toUpperCase()
+        .match(/.{1,2}/g)
+        ?.join(":") ?? ruid;
 
 export const joinPath = (...parts: string[]) =>
-    "/" +
-    parts
-        .join("/")
-        .split("/")
-        .filter(Boolean)
-        .join("/");
+    "/" + parts.join("/").split("/").filter(Boolean).join("/");
 
 export const parentPath = (path: string) => {
     const p = path.split("/").filter(Boolean);
@@ -99,7 +99,8 @@ export const baseName = (path: string) => path.split("/").filter(Boolean).pop() 
 export const stripExt = (name: string) => name.replace(/\.[^/.]+$/, "");
 export const isTaf = (name: string) => /\.taf$/i.test(name);
 export const isTap = (name: string) => /\.tap$/i.test(name);
-export const isAudio = (name: string) => /\.(mp3|m4a|m4b|aac|ogg|opus|oga|flac|wav|wma|webm)$/i.test(name);
+export const isAudio = (name: string) =>
+    /\.(mp3|m4a|m4b|aac|ogg|opus|oga|flac|wav|wma|webm)$/i.test(name);
 export const isImage = (name: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
 
 const infoTitle = (i?: TonieInfo) => (i ? [i.series, i.episode].filter(Boolean).join(" - ") : "");

@@ -8,17 +8,36 @@ const stamp = () => new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").r
 
 const row = (x: Tag) => {
     const i = tagInfo(x);
-    return { ruid: x.ruid, series: i.series, episode: i.episode, model: i.model, language: i.language ?? "", source: x.source, tracks: i.tracks ?? [] };
+    return {
+        ruid: x.ruid,
+        series: i.series,
+        episode: i.episode,
+        model: i.model,
+        language: i.language ?? "",
+        source: x.source,
+        tracks: i.tracks ?? [],
+    };
 };
 
 export const exportCsv = (tags: Tag[]) => {
     const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const lines = tags.map(row).map((r) => [r.ruid, r.series, r.episode, r.model, r.language, r.source, r.tracks.length].map(cell).join(","));
-    saveFile(`${stamp()}_tonies.csv`, ["ruid,series,episode,model,language,source,tracks", ...lines].join("\n"), "text/csv;charset=utf-8");
+    const lines = tags
+        .map(row)
+        .map((r) =>
+            [r.ruid, r.series, r.episode, r.model, r.language, r.source, r.tracks.length]
+                .map(cell)
+                .join(","),
+        );
+    saveFile(
+        `${stamp()}_tonies.csv`,
+        ["ruid,series,episode,model,language,source,tracks", ...lines].join("\n"),
+        "text/csv;charset=utf-8",
+    );
 };
 
 /** all fields the server knows of each tag */
-export const exportJson = (tags: Tag[]) => saveFile(`${stamp()}_tonies.json`, JSON.stringify(tags, null, 2), "application/json");
+export const exportJson = (tags: Tag[]) =>
+    saveFile(`${stamp()}_tonies.json`, JSON.stringify(tags, null, 2), "application/json");
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -44,8 +63,8 @@ export const exportHtml = async (tags: Tag[]) => {
             return `<li>${pic ? `<img src="${esc(pic)}" alt="">` : ""}<div>${esc(r.series || r.ruid)}${r.episode ? ` – ${esc(r.episode)}` : ""}<small>${esc(r.model)}</small></div></li>`;
         }),
     );
-    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(t("tonies"))}</title>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(t("common.tonies"))}</title>
 <style>body{font-family:system-ui,sans-serif;margin:24px}ul{list-style:none;padding:0}li{display:flex;align-items:center;gap:12px;margin-bottom:10px}img{width:120px;height:120px;object-fit:contain}small{display:block;color:#666;font-family:monospace}</style>
-</head><body><h1>${esc(t("tonies"))} (${tags.length})</h1><ul>${items.join("")}</ul><p><small>${esc(new Date().toLocaleString())}</small></p></body></html>`;
+</head><body><h1>${esc(t("common.tonies"))} (${tags.length})</h1><ul>${items.join("")}</ul><p><small>${esc(new Date().toLocaleString())}</small></p></body></html>`;
     saveFile(`${stamp()}_tonies.html`, html, "text/html");
 };

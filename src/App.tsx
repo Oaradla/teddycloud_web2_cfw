@@ -1,4 +1,23 @@
-import { Activity, Bell, Binary, Puzzle, Cpu, Printer, Wrench, Disc3, FolderOpen, LayoutGrid, Monitor, Moon, Radio, Shapes, SlidersHorizontal, Sun, Upload, Users } from "lucide-react";
+import {
+    Activity,
+    Bell,
+    Binary,
+    Puzzle,
+    Cpu,
+    Printer,
+    Wrench,
+    Disc3,
+    FolderOpen,
+    LayoutGrid,
+    Monitor,
+    Moon,
+    Radio,
+    Shapes,
+    SlidersHorizontal,
+    Sun,
+    Upload,
+    Users,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ReactNode, useEffect, useState } from "react";
 import { tc } from "./api/tc";
@@ -25,7 +44,12 @@ import { PluginPage, PluginsPage } from "./features/tools/PluginsPage";
 import { RtnlPage } from "./features/tools/RtnlPage";
 import { StudioPage } from "./features/studio/StudioPage";
 import { CommunityPage } from "./features/community/CommunityPage";
-import { ChangesPage, CreditsPage, FeaturesPage, MeetingPage } from "./features/community/InfoPages";
+import {
+    ChangesPage,
+    CreditsPage,
+    FeaturesPage,
+    MeetingPage,
+} from "./features/community/InfoPages";
 import { TranslationsPage } from "./features/community/TranslationsPage";
 import { SetupPage } from "./features/setup/SetupPage";
 import { Cc3200Page } from "./features/setup/Cc3200Page";
@@ -41,12 +65,48 @@ import { useSwipeTabs } from "./ui/useSwipeTabs";
 import { Empty } from "./ui/kit";
 import { MatrixRain } from "./ui/MatrixRain";
 
-const tabs: { to: string; label: () => string; icon: ReactNode; match: (p: string) => boolean }[] = [
-    { to: "/", label: () => t("boxes"), icon: <Radio size={24} />, match: (p) => p === "/" || p.startsWith("/box") },
-    { to: "/tonies", label: () => t("tonies"), icon: <Disc3 size={24} />, match: (p) => p.startsWith("/tonie") },
-    { to: "/library", label: () => t("library"), icon: <FolderOpen size={24} />, match: (p) => p.startsWith("/library") },
-    { to: "/more", label: () => t("more"), icon: <LayoutGrid size={24} />, match: (p) => ["/more", "/upload", "/models", "/systemsounds", "/studio", "/settings", "/system", "/plugins", "/community", "/setup", "/boxupdate", "/account", "/users"].some((x) => p.startsWith(x)) },
-];
+const tabs: { to: string; label: () => string; icon: ReactNode; match: (p: string) => boolean }[] =
+    [
+        {
+            to: "/",
+            label: () => t("common.boxes"),
+            icon: <Radio size={24} />,
+            match: (p) => p === "/" || p.startsWith("/box"),
+        },
+        {
+            to: "/tonies",
+            label: () => t("common.tonies"),
+            icon: <Disc3 size={24} />,
+            match: (p) => p.startsWith("/tonie"),
+        },
+        {
+            to: "/library",
+            label: () => t("common.library"),
+            icon: <FolderOpen size={24} />,
+            match: (p) => p.startsWith("/library"),
+        },
+        {
+            to: "/more",
+            label: () => t("common.more"),
+            icon: <LayoutGrid size={24} />,
+            match: (p) =>
+                [
+                    "/more",
+                    "/upload",
+                    "/models",
+                    "/systemsounds",
+                    "/studio",
+                    "/settings",
+                    "/system",
+                    "/plugins",
+                    "/community",
+                    "/setup",
+                    "/boxupdate",
+                    "/account",
+                    "/users",
+                ].some((x) => p.startsWith(x)),
+        },
+    ];
 const tabRoots = tabs.map((x) => x.to);
 
 /** plugins that ask for a place in the menu, next to the area they name */
@@ -58,7 +118,11 @@ function PluginLinks({ sections }: { sections: string[] }) {
             {(plugins.data ?? [])
                 .filter((p) => !p.hideInNav && sections.includes(p.teddyCloudSection ?? ""))
                 .map((p) => (
-                    <NavLink key={p.pluginId} to={`/plugins/${p.pluginId}`} className={() => (pathname === `/plugins/${p.pluginId}` ? "active" : "")}>
+                    <NavLink
+                        key={p.pluginId}
+                        to={`/plugins/${p.pluginId}`}
+                        className={() => (pathname === `/plugins/${p.pluginId}` ? "active" : "")}
+                    >
                         <Puzzle size={22} />
                         {p.pluginName}
                     </NavLink>
@@ -89,70 +153,118 @@ function Shell() {
                     TeddyCloud
                 </div>
                 {tabs.slice(0, 3).map((x) => (
-                    <NavLink key={x.to} to={x.to} className={() => (x.match(pathname) ? "active" : "")}>
+                    <NavLink
+                        key={x.to}
+                        to={x.to}
+                        className={() => (x.match(pathname) ? "active" : "")}
+                    >
                         {x.icon}
                         {x.label()}
                     </NavLink>
                 ))}
                 <PluginLinks sections={["home", "tonieboxes", "tonies"]} />
-                <div className="section-label">{t("content")}</div>
-                <NavLink to="/upload" className={() => (pathname.startsWith("/upload") ? "active" : "")}>
+                <div className="section-label">{t("common.content")}</div>
+                <NavLink
+                    to="/upload"
+                    className={() => (pathname.startsWith("/upload") ? "active" : "")}
+                >
                     <Upload size={22} />
-                    {t("upload")}
+                    {t("common.upload")}
                 </NavLink>
-                <NavLink to="/models" className={() => (pathname.startsWith("/models") ? "active" : "")}>
+                <NavLink
+                    to="/models"
+                    className={() => (pathname.startsWith("/models") ? "active" : "")}
+                >
                     <Shapes size={22} />
-                    {t("customModels")}
+                    {t("common.customModels")}
                 </NavLink>
-                <NavLink to="/systemsounds" className={() => (pathname.startsWith("/systemsounds") ? "active" : "")}>
+                <NavLink
+                    to="/systemsounds"
+                    className={() => (pathname.startsWith("/systemsounds") ? "active" : "")}
+                >
                     <Bell size={22} />
-                    {t("systemSounds")}
+                    {t("common.systemSounds")}
                 </NavLink>
-                <NavLink to="/studio" className={() => (pathname.startsWith("/studio") ? "active" : "")}>
+                <NavLink
+                    to="/studio"
+                    className={() => (pathname.startsWith("/studio") ? "active" : "")}
+                >
                     <Printer size={22} />
-                    {t("teddyStudio")}
+                    {t("common.teddyStudio")}
                 </NavLink>
-                {(access.canServerSettings || access.canManageUsers || access.canUpdateBoxes) && <div className="section-label">{t("settings")}</div>}
+                {(access.canServerSettings || access.canManageUsers || access.canUpdateBoxes) && (
+                    <div className="section-label">{t("common.settings")}</div>
+                )}
                 {access.canServerSettings && (
-                    <NavLink to="/settings" className={() => (pathname.startsWith("/settings") ? "active" : "")}>
+                    <NavLink
+                        to="/settings"
+                        className={() => (pathname.startsWith("/settings") ? "active" : "")}
+                    >
                         <SlidersHorizontal size={22} />
-                        {t("serverSettings")}
+                        {t("common.serverSettings")}
                     </NavLink>
                 )}
                 {access.admin && (
-                    <NavLink to="/setup" className={() => (pathname.startsWith("/setup") ? "active" : "")}>
+                    <NavLink
+                        to="/setup"
+                        className={() => (pathname.startsWith("/setup") ? "active" : "")}
+                    >
                         <Wrench size={22} />
-                        {t("boxSetup")}
+                        {t("common.boxSetup")}
                     </NavLink>
                 )}
                 {access.canUpdateBoxes && (
-                    <NavLink to="/boxupdate" className={() => (pathname.startsWith("/boxupdate") ? "active" : "")}>
+                    <NavLink
+                        to="/boxupdate"
+                        className={() => (pathname.startsWith("/boxupdate") ? "active" : "")}
+                    >
                         <Cpu size={22} />
-                        {t("boxUpdate")}
+                        {t("common.boxUpdate")}
                     </NavLink>
                 )}
                 <PluginLinks sections={["settings", "community"]} />
                 {access.canManageUsers && (
-                    <NavLink to="/users" className={() => (pathname.startsWith("/users") ? "active" : "")}>
+                    <NavLink
+                        to="/users"
+                        className={() => (pathname.startsWith("/users") ? "active" : "")}
+                    >
                         <Users size={22} />
-                        {t("usersAndRights")}
+                        {t("common.usersAndRights")}
                     </NavLink>
                 )}
                 <div className="spacer" />
                 {/* what the "More" tab holds on the phone */}
                 {access.admin && (
-                    <NavLink to="/system" className={() => (["/system", "/plugins", "/community"].some((x) => pathname.startsWith(x)) ? "active" : "")}>
+                    <NavLink
+                        to="/system"
+                        className={() =>
+                            ["/system", "/plugins", "/community"].some((x) =>
+                                pathname.startsWith(x),
+                            )
+                                ? "active"
+                                : ""
+                        }
+                    >
                         <Activity size={22} />
-                        {t("system")}
+                        {t("common.system")}
                     </NavLink>
                 )}
                 <SidebarPrefs />
                 {access.loginActive && (
-                    <NavLink to="/account" className={() => `account-chip ${pathname.startsWith("/account") ? "active" : ""}`}>
-                        <span className="avatar">{(access.status?.username || "?").slice(0, 1).toUpperCase()}</span>
+                    <NavLink
+                        to="/account"
+                        className={() =>
+                            `account-chip ${pathname.startsWith("/account") ? "active" : ""}`
+                        }
+                    >
+                        <span className="avatar">
+                            {(access.status?.username || "?").slice(0, 1).toUpperCase()}
+                        </span>
                         <span style={{ minWidth: 0 }}>
-                            <span style={{ display: "block", fontWeight: 650, color: "var(--fg)" }}>{access.status?.username}</span>
-                            <span className="small muted">{t("myAccount")}</span>
+                            <span style={{ display: "block", fontWeight: 650, color: "var(--fg)" }}>
+                                {access.status?.username}
+                            </span>
+                            <span className="small muted">{t("common.myAccount")}</span>
                         </span>
                     </NavLink>
                 )}
@@ -192,13 +304,20 @@ function Shell() {
                     <Route path="/account" element={<AccountPage />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/more" element={<MorePage />} />
-                    <Route path="*" element={<Empty icon={<Radio size={28} />} title={t("notFound")} />} />
+                    <Route
+                        path="*"
+                        element={<Empty icon={<Radio size={28} />} title={t("common.notFound")} />}
+                    />
                 </Routes>
             </main>
 
             <nav className="tabbar" aria-label="tabs">
                 {tabs.map((x) => (
-                    <NavLink key={x.to} to={x.to} className={() => (x.match(pathname) ? "active" : "")}>
+                    <NavLink
+                        key={x.to}
+                        to={x.to}
+                        className={() => (x.match(pathname) ? "active" : "")}
+                    >
                         {x.icon}
                         {x.label()}
                     </NavLink>
@@ -208,9 +327,24 @@ function Shell() {
     );
 }
 
-const THEME_ICON: Record<Theme, ReactNode> = { auto: <Monitor size={18} />, light: <Sun size={18} />, dark: <Moon size={18} />, matrix: <Binary size={18} /> };
-const NEXT_THEME: Record<Theme, Theme> = { auto: "light", light: "dark", dark: "matrix", matrix: "auto" };
-const THEME_LABEL = { auto: "themeAuto", light: "themeLight", dark: "themeDark", matrix: "themeMatrix" } as const;
+const THEME_ICON: Record<Theme, ReactNode> = {
+    auto: <Monitor size={18} />,
+    light: <Sun size={18} />,
+    dark: <Moon size={18} />,
+    matrix: <Binary size={18} />,
+};
+const NEXT_THEME: Record<Theme, Theme> = {
+    auto: "light",
+    light: "dark",
+    dark: "matrix",
+    matrix: "auto",
+};
+const THEME_LABEL = {
+    auto: "common.themeAuto",
+    light: "common.themeLight",
+    dark: "common.themeDark",
+    matrix: "common.themeMatrix",
+} as const;
 
 /** theme and language at the bottom of the sidebar */
 function SidebarPrefs() {
@@ -220,8 +354,8 @@ function SidebarPrefs() {
         <div className="sidebar-prefs">
             <button
                 className="btn ghost small"
-                title={`${t("theme")}: ${t(THEME_LABEL[theme])}`}
-                aria-label={`${t("theme")}: ${t(THEME_LABEL[theme])}`}
+                title={`${t("common.theme")}: ${t(THEME_LABEL[theme])}`}
+                aria-label={`${t("common.theme")}: ${t(THEME_LABEL[theme])}`}
                 onClick={() => {
                     const next = NEXT_THEME[theme];
                     setTheme(next);
@@ -232,7 +366,13 @@ function SidebarPrefs() {
                 {THEME_ICON[theme]}
                 {t(THEME_LABEL[theme])}
             </button>
-            <select className="lang-select" value={lang} title={t("language")} aria-label={t("language")} onChange={(e) => setLang(e.target.value as Lang)}>
+            <select
+                className="lang-select"
+                value={lang}
+                title={t("common.language")}
+                aria-label={t("common.language")}
+                onChange={(e) => setLang(e.target.value as Lang)}
+            >
                 {Object.entries(LANGS).map(([code, name]) => (
                     <option key={code} value={code} title={name}>
                         {code.toUpperCase()}

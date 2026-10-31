@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import { backendUrl } from "../../api/client";
 import { duration } from "../../lib/format";
 import { t } from "../../lib/i18n";
+import { getPref, setPref } from "../../lib/prefs";
+import { ChoiceGroup } from "../../ui/Popover";
 import { Sheet } from "../../ui/Sheet";
 import { Row, Section, useUi } from "../../ui/kit";
 
 const safe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, "_").trim() || "download";
 const pad = (n: number) => String(n).padStart(2, "0");
+const mp3Url = (url: string) => `${url}&format=mp3`;
+
+type Format = "ogg" | "mp3";
+type Several = "zip" | "single";
 
 const save = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -28,8 +34,9 @@ const fetchBlob = async (url: string) => {
 };
 
 /**
- * OGG download of a TAF: the whole file, or chosen chapters. Several chapters are fetched one by
- * one and packed into a zip in the browser (the server's zip export needs the zip tool there).
+ * Audio download of a TAF as OGG or MP3 (encoded by the server): the whole file, or chosen
+ * chapters. Several chapters are fetched one by one and either packed into a zip in the browser
+ * or saved as single files, which suits phones better.
  */
 export function DownloadSheet({
     open,
@@ -53,11 +60,15 @@ export function DownloadSheet({
     const ui = useUi();
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [busy, setBusy] = useState<string | null>(null);
+    const [format, setFormat] = useState(() => getPref("download.format", "ogg") as Format);
+    const [several, setSeveral] = useState(() => getPref("download.several", "zip") as Several);
     useEffect(() => {
         if (open) setSelected(new Set());
     }, [open]);
     const name = safe(title);
-    const trackName = (n: number) => `${pad(n)} ${safe(chapterTitles[n - 1] || t("chapterN", { n }))}.ogg`;
+    const url = (u: string) => (format === "mp3" ? mp3Url(u) : u);
+    const trackName = (n: number) =>
+        `${pad(n)} ${safe(chapterTitles[n - 1] || t("common.chapterN", { n }))}.${format}`;
     const canSplit = Boolean(trackUrl) && chapters.length > 1;
     const all = canSplit && selected.size === chapters.length;
 
@@ -66,34 +77,48 @@ export function DownloadSheet({
         try {
             await fn();
         } catch (e) {
-            ui.toast("error", t("downloadFailed"), String((e as Error).message));
+            ui.toast("error", t("library.downloadFailed"), String((e as Error).message));
         } finally {
             setBusy(null);
         }
     };
 
-    const whole = () => run(async () => save(await fetchBlob(wholeUrl), `${name}.ogg`), t("downloading"));
+    const whole = () =>
+        run(
+            async () => save(await fetchBlob(url(wholeUrl)), `${name}.${format}`),
+            t("library.downloading"),
+        );
 
     const tracks = () =>
         run(async () => {
             const list = [...selected].sort((a, b) => a - b);
-            if (list.length === 1) return save(await fetchBlob(trackUrl!(list[0])), trackName(list[0]));
+            const fetchTrack = (n: number) => fetchBlob(url(trackUrl!(n)));
+            if (list.length === 1) return save(await fetchTrack(list[0]), trackName(list[0]));
+            if (several === "single") {
+                for (let i = 0; i < list.length; i++) {
+                    setBusy(t("library.downloadingN", { n: i + 1, total: list.length }));
+                    save(await fetchTrack(list[i]), trackName(list[i]));
+                }
+                return;
+            }
             const files: Record<string, Uint8Array> = {};
             for (let i = 0; i < list.length; i++) {
-                setBusy(t("downloadingN", { n: i + 1, total: list.length }));
-                files[trackName(list[i])] = new Uint8Array(await (await fetchBlob(trackUrl!(list[i]))).arrayBuffer());
+                setBusy(t("library.downloadingN", { n: i + 1, total: list.length }));
+                files[trackName(list[i])] = new Uint8Array(
+                    await (await fetchTrack(list[i])).arrayBuffer(),
+                );
             }
-            setBusy(t("packing"));
-            // Ogg is compressed already: store only
+            setBusy(t("library.packing"));
+            // Ogg and MP3 are compressed already: store only
             const zip = zipSync(files, { level: 0 });
             save(new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }), `${name}.zip`);
-        }, t("downloading"));
+        }, t("library.downloading"));
 
     return (
         <Sheet
             open={open}
             onClose={onClose}
-            title={t("downloadOgg")}
+            title={t("common.downloadOgg")}
             full={canSplit}
             footer={
                 busy ? (
@@ -105,30 +130,73 @@ export function DownloadSheet({
                     <>
                         <button className="btn" onClick={whole}>
                             <Download size={17} />
-                            {t("wholeFile")}
+                            {t("library.wholeFile")}
                         </button>
                         <button className="btn primary" disabled={!selected.size} onClick={tracks}>
-                            {selected.size > 1 ? <FileArchive size={17} /> : <Download size={17} />}
-                            {selected.size ? t("nTracks", { n: selected.size }) : t("chooseTracks")}
+                            {selected.size > 1 && several === "zip" ? (
+                                <FileArchive size={17} />
+                            ) : (
+                                <Download size={17} />
+                            )}
+                            {selected.size
+                                ? t("library.nTracks", { n: selected.size })
+                                : t("library.chooseTracks")}
                         </button>
                     </>
                 ) : (
                     <button className="btn primary" onClick={whole}>
                         <Download size={17} />
-                        {t("wholeFile")}
+                        {t("library.wholeFile")}
                     </button>
                 )
             }
         >
             <p className="small muted" style={{ margin: "0 2px 14px" }}>
-                {canSplit ? t("downloadOggChoose") : trackUrl ? t("downloadOggHint") : t("downloadOggWholeOnly")}
+                {canSplit
+                    ? t("library.downloadOggChoose")
+                    : trackUrl
+                      ? t("common.downloadOggHint")
+                      : t("library.downloadOggWholeOnly")}
             </p>
+            <ChoiceGroup
+                label={t("library.format")}
+                value={format}
+                onChange={(v) => {
+                    setFormat(v);
+                    setPref("download.format", v);
+                }}
+                options={[
+                    { value: "ogg", label: "OGG" },
+                    { value: "mp3", label: "MP3" },
+                ]}
+            />
+            {canSplit && (
+                <ChoiceGroup
+                    label={t("library.severalChapters")}
+                    value={several}
+                    onChange={(v) => {
+                        setSeveral(v);
+                        setPref("download.several", v);
+                    }}
+                    options={[
+                        { value: "zip", label: t("library.asZip") },
+                        { value: "single", label: t("library.asSingleFiles") },
+                    ]}
+                />
+            )}
             {canSplit && (
                 <Section
-                    title={t("chapters")}
+                    title={t("common.chapters")}
                     right={
-                        <button className="btn ghost small" onClick={() => setSelected(all ? new Set() : new Set(chapters.map((_, i) => i + 1)))}>
-                            {all ? t("selectNone") : t("selectAll")}
+                        <button
+                            className="btn ghost small"
+                            onClick={() =>
+                                setSelected(
+                                    all ? new Set() : new Set(chapters.map((_, i) => i + 1)),
+                                )
+                            }
+                        >
+                            {all ? t("common.selectNone") : t("common.selectAll")}
                         </button>
                     }
                 >
@@ -139,11 +207,14 @@ export function DownloadSheet({
                             <Row
                                 key={n}
                                 leading={
-                                    <span className={`select-box ${on ? "checked" : ""}`} style={{ position: "static", opacity: 1 }}>
+                                    <span
+                                        className={`select-box ${on ? "checked" : ""}`}
+                                        style={{ position: "static", opacity: 1 }}
+                                    >
                                         {on && <Check size={15} strokeWidth={3} />}
                                     </span>
                                 }
-                                title={chapterTitles[i] || t("chapterN", { n })}
+                                title={chapterTitles[i] || t("common.chapterN", { n })}
                                 nowrap
                                 right={<span className="track-time">{duration(start)}</span>}
                                 onClick={() =>

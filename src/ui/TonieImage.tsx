@@ -14,9 +14,9 @@ export function TonieImage({
     className?: string;
     alt?: string;
 }) {
-    const [failed, setFailed] = useState(false);
+    const [failedSrc, setFailedSrc] = useState<string>();
     const style = size ? { width: size, height: size } : undefined;
-    if (!src || failed)
+    if (!src || src === failedSrc)
         return (
             <div className={`tonie-pic-fallback ${className}`} style={style}>
                 <Disc3 size={size ? Math.round(size * 0.5) : 40} />
@@ -28,9 +28,11 @@ export function TonieImage({
             alt={alt}
             className={className}
             style={size ? { ...style, objectFit: "contain" } : undefined}
-            loading={className.includes("hero-pic") || className.includes("cover") ? "eager" : "lazy"}
+            loading={
+                className.includes("hero-pic") || className.includes("cover") ? "eager" : "lazy"
+            }
             decoding="async"
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src)}
             draggable={false}
         />
     );

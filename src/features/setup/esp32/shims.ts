@@ -1,9 +1,8 @@
 // What the ESP32 flasher code (taken over from teddycloud_web, now maintained here) expects of
 // its surroundings: an API client, notifications and a t() for its texts, on web2's own pieces.
 import { backendUrl, request } from "../../../api/client";
-import { pick } from "../../../lib/i18n";
+import { t, type Key } from "../../../lib/i18n";
 import { useUi } from "../../../ui/kit";
-import { ESP32_TEXTS } from "./texts";
 
 export enum NotificationTypeEnum {
     Success = "success",
@@ -15,8 +14,11 @@ export enum NotificationTypeEnum {
 /** the few calls of the classic generated API client the copied files use */
 export class TeddyCloudApi {
     constructor(_config?: unknown) {}
-    apiGetTeddyCloudSettingRaw(name: string) {
-        return request(`/api/settings/get/${name}`);
+    // throws on an error answer, as the classic client does: no error text as a setting value
+    async apiGetTeddyCloudSettingRaw(name: string) {
+        const response = await request(`/api/settings/get/${name}`);
+        if (!response.ok) throw new Error(`Error: ${response.status} ${response.statusText}`);
+        return response;
     }
     apiGetTeddyCloudApiRaw(path: string) {
         return request(path);
@@ -31,13 +33,10 @@ export class TeddyCloudApi {
 export const defaultAPIConfig = () => undefined;
 export { backendUrl };
 
-/** t() over the texts of the flasher (texts.ts), {{name}} filled from vars */
-export const useTranslation = () => {
-    return {
-        t: (key: string, vars: Record<string, string | number> = {}) =>
-            (ESP32_TEXTS[key] ? pick(ESP32_TEXTS[key], `esp32.${key}`) : key).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, name) => String(vars[name] ?? "")),
-    };
-};
+/** the flasher's keys are the classic UI's ones, under tonieboxes.esp32BoxFlashing in translations */
+export const useTranslation = () => ({
+    t: (key: string, vars?: Record<string, string | number>) => t(key as Key, vars),
+});
 export type TFunction = (key: string, vars?: Record<string, string | number>) => string;
 
 /** the notifications of the classic TeddyCloudProvider as web2 toasts */
@@ -45,8 +44,17 @@ export const useTeddyCloud = () => {
     const ui = useUi();
     return {
         addNotification: (type: NotificationTypeEnum, title: string, detail?: string) =>
-            ui.toast(type === NotificationTypeEnum.Error ? "error" : type === NotificationTypeEnum.Success ? "ok" : "info", title, detail),
-        addLoadingNotification: (_key: string, title: string, detail?: string) => ui.toast("info", title, detail),
+            ui.toast(
+                type === NotificationTypeEnum.Error
+                    ? "error"
+                    : type === NotificationTypeEnum.Success
+                      ? "ok"
+                      : "info",
+                title,
+                detail,
+            ),
+        addLoadingNotification: (_key: string, title: string, detail?: string) =>
+            ui.toast("info", title, detail),
         closeLoadingNotification: (_key: string) => undefined,
         setFetchCloudStatus: (_v: unknown) => undefined,
     };

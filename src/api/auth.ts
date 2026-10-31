@@ -1,6 +1,6 @@
 // Web login, users and permissions of teddyCloud (/api/auth/*, /api/acl/*). Servers without
 // them answer 404; the UI then treats everyone as admin, like the classic UI.
-import { getJson, postJson, q, request } from "./client";
+import { ApiError, getJson, postJson, q, request } from "./client";
 
 export type Level = "admin" | "user" | "guest";
 
@@ -70,6 +70,8 @@ export interface AclMine {
     models?: Record<string, AclMineEntry>;
     images?: Record<string, AclMineEntry>;
     unassigned: { tonie?: string; box?: string };
+    /** the rights the user has on a tonie nobody owns */
+    unassignedRights?: { tonie?: string[] };
 }
 
 export interface AclRight {
@@ -119,26 +121,47 @@ export const ADMIN_MINE: AclMine = {
     unassigned: {},
 };
 
+/** while the rights of a logged-in user load, or when they could not be loaded */
+export const NO_RIGHTS: AclMine = {
+    ...ADMIN_MINE,
+    loginActive: true,
+    level: "guest",
+    admin: false,
+};
+
 /** true if a comma separated list of patterns covers the right (same rules as the server) */
 export function listAllows(list: string | undefined, right: string): boolean {
     if (!list) return false;
     return list
         .split(/[,\s]+/)
         .filter(Boolean)
-        .some((p) => p === "*" || (p === "box.settings" && right.startsWith("box.setting:")) || (p.endsWith("*") ? right.startsWith(p.slice(0, -1)) : p === right));
+        .some(
+            (p) =>
+                p === "*" ||
+                (p === "box.settings" && right.startsWith("box.setting:")) ||
+                (p.endsWith("*") ? right.startsWith(p.slice(0, -1)) : p === right),
+        );
 }
 
 /** a 6 digit value is a TOTP code, anything else a recovery code */
-const codeBody = (password: string, code: string) => {
+const secondFactor = (code: string) => {
     const c = code.replace(/\s/g, "");
-    return /^\d{6}$/.test(c) ? { password, code: c } : { password, recoveryCode: code.trim() };
+    return /^\d{6}$/.test(c) ? { code: c } : { recoveryCode: code.trim() };
 };
+const codeBody = (password: string, code: string) => ({ password, ...secondFactor(code) });
 
 export const auth = {
     users: async (): Promise<AuthUsers> => {
-        const d = await getJson<{ users?: string[]; userDetails?: AuthUser[] } & Partial<AuthUsers>>("/api/auth/users/get");
+        const d = await getJson<
+            { users?: string[]; userDetails?: AuthUser[] } & Partial<AuthUsers>
+        >("/api/auth/users/get");
         return {
-            users: d.userDetails ?? (d.users as unknown as string[] | undefined)?.map((username) => ({ username }) as AuthUser) ?? [],
+            users:
+                d.userDetails ??
+                (d.users as unknown as string[] | undefined)?.map(
+                    (username) => ({ username }) as AuthUser,
+                ) ??
+                [],
             enabled: Boolean(d.enabled),
             envOverride: Boolean(d.envOverride),
             require2faAll: Boolean(d.require2faAll),
@@ -146,34 +169,78 @@ export const auth = {
             passwordMinLength: Number(d.passwordMinLength || 10),
         };
     },
-    createUser: (body: { username: string; password: string; level?: string; group?: string; lanOnly?: boolean; require2fa?: boolean; mustChangePassword?: boolean }) =>
-        postJson("/api/auth/users/create", body),
+    createUser: (body: {
+        username: string;
+        password: string;
+        level?: string;
+        group?: string;
+        lanOnly?: boolean;
+        require2fa?: boolean;
+        mustChangePassword?: boolean;
+    }) => postJson("/api/auth/users/create", body),
     updateUser: (
         username: string,
-        changes: { lanOnly?: boolean; require2fa?: boolean; mustChangePassword?: boolean; reset2fa?: boolean; revokeSessions?: boolean; level?: string; group?: string },
-    ) => postJson<{ user: AuthUser; sessionsRevoked?: number }>("/api/auth/users/update", { username, ...changes }),
-    deleteUser: (username: string) => postJson<{ authDisabled?: boolean }>("/api/auth/users/delete", { username }),
-    /** currentPassword for the own password; mustChangePassword makes another user choose a new one at the next login */
-    setPassword: (username: string, password: string, currentPassword?: string, mustChangePassword?: boolean) =>
+        changes: {
+            lanOnly?: boolean;
+            require2fa?: boolean;
+            mustChangePassword?: boolean;
+            reset2fa?: boolean;
+            revokeSessions?: boolean;
+            level?: string;
+            group?: string;
+        },
+    ) =>
+        postJson<{ user: AuthUser; sessionsRevoked?: number }>("/api/auth/users/update", {
+            username,
+            ...changes,
+        }),
+    deleteUser: (username: string) =>
+        postJson<{ authDisabled?: boolean }>("/api/auth/users/delete", { username }),
+    /** currentPassword (and code, with 2FA) for the own password; mustChangePassword makes another user choose a new one at the next login */
+    setPassword: (
+        username: string,
+        password: string,
+        currentPassword?: string,
+        mustChangePassword?: boolean,
+        code?: string,
+    ) =>
         postJson<{ sessionsRevoked?: number }>("/api/auth/users/updatePassword", {
             username,
             password,
             ...(currentPassword === undefined ? {} : { currentPassword }),
             ...(mustChangePassword ? { mustChangePassword } : {}),
+            ...(code ? secondFactor(code) : {}),
         }),
     setEnabled: (enabled: boolean) => postJson("/api/auth/enabled", { enabled }),
 
-    setup2fa: (password: string) => postJson<{ secret: string; otpauthUri: string; expiresIn: number }>("/api/auth/2fa/setup", { password }),
-    enable2fa: (code: string) => postJson<{ recoveryCodes?: string[] }>("/api/auth/2fa/enable", { code }).then((d) => d.recoveryCodes ?? []),
-    disable2fa: (password: string, code: string) => postJson("/api/auth/2fa/disable", codeBody(password, code)),
+    setup2fa: (password: string) =>
+        postJson<{ secret: string; otpauthUri: string; expiresIn: number }>("/api/auth/2fa/setup", {
+            password,
+        }),
+    enable2fa: (code: string) =>
+        postJson<{ recoveryCodes?: string[] }>("/api/auth/2fa/enable", { code }).then(
+            (d) => d.recoveryCodes ?? [],
+        ),
+    disable2fa: (password: string, code: string) =>
+        postJson("/api/auth/2fa/disable", codeBody(password, code)),
     renewRecoveryCodes: (password: string, code: string) =>
-        postJson<{ recoveryCodes?: string[] }>("/api/auth/2fa/recoveryCodes", codeBody(password, code)).then((d) => d.recoveryCodes ?? []),
+        postJson<{ recoveryCodes?: string[] }>(
+            "/api/auth/2fa/recoveryCodes",
+            codeBody(password, code),
+        ).then((d) => d.recoveryCodes ?? []),
 
-    sessions: (all = false) => getJson<{ sessions?: AuthSession[] }>(`/api/auth/sessions/get${all ? "?all=1" : ""}`).then((d) => d.sessions ?? []),
-    revokeSession: (id: string) => postJson<{ revoked?: number }>("/api/auth/sessions/revoke", { id }),
-    revokeOtherSessions: () => postJson<{ revoked?: number }>("/api/auth/sessions/revoke", { others: true }),
+    sessions: (all = false) =>
+        getJson<{ sessions?: AuthSession[] }>(`/api/auth/sessions/get${all ? "?all=1" : ""}`).then(
+            (d) => d.sessions ?? [],
+        ),
+    revokeSession: (id: string) =>
+        postJson<{ revoked?: number }>("/api/auth/sessions/revoke", { id }),
+    revokeOtherSessions: () =>
+        postJson<{ revoked?: number }>("/api/auth/sessions/revoke", { others: true }),
     events: () =>
-        getJson<{ events?: AuthEvent[]; lockedAddresses?: { ip: string; lockedUntil: number }[] }>("/api/auth/events/get").then((d) => ({
+        getJson<{ events?: AuthEvent[]; lockedAddresses?: { ip: string; lockedUntil: number }[] }>(
+            "/api/auth/events/get",
+        ).then((d) => ({
             events: d.events ?? [],
             locked: d.lockedAddresses ?? [],
         })),
@@ -182,17 +249,36 @@ export const auth = {
     /* permissions */
     mine: async (): Promise<AclMine> => {
         const r = await request("/api/acl/mine");
-        if (!r.ok) return ADMIN_MINE; // no permissions on this server: everyone is admin
+        if (r.status === 404) return ADMIN_MINE; // no permissions on this server: everyone is admin
+        if (!r.ok) throw new ApiError(await r.text(), r.status);
         return { ...ADMIN_MINE, ...(await r.json()) };
     },
     catalog: () => getJson<AclCatalog>("/api/acl/catalog"),
     /** what a user owns or has shared (admins only) */
-    owned: (user: string) => getJson<Record<"boxes" | "tonies" | "folders" | "models" | "images", { id: string; owner: boolean; granted?: string }[]>>(`/api/acl/owned${q({ user })}`),
-    aclUsers: () => getJson<{ users?: { username: string; level: string; group?: string }[] }>("/api/acl/users").then((d) => d.users ?? []),
+    owned: (user: string) =>
+        getJson<
+            Record<
+                "boxes" | "tonies" | "folders" | "models" | "images",
+                { id: string; owner: boolean; granted?: string }[]
+            >
+        >(`/api/acl/owned${q({ user })}`),
+    aclUsers: () =>
+        getJson<{ users?: { username: string; level: string; group?: string }[] }>(
+            "/api/acl/users",
+        ).then((d) => d.users ?? []),
     entry: (type: AclScope, id: string) => getJson<AclEntry>(`/api/acl/get${q({ type, id })}`),
-    saveEntry: (type: AclScope, id: string, changes: { owners?: string[]; shares?: Record<string, string> }) =>
-        postJson<AclEntry>("/api/acl/set", { type, id, ...changes }),
-    saveLevels: (limits: { user?: string; guest?: string; unassignedTonie?: string; unassignedBox?: string }) => postJson("/api/acl/levels/set", limits),
-    saveGroup: (g: Omit<AclGroup, "id"> & { id?: string }) => postJson<{ id?: string }>("/api/acl/groups/set", g).then((d) => String(d.id ?? "")),
+    saveEntry: (
+        type: AclScope,
+        id: string,
+        changes: { owners?: string[]; shares?: Record<string, string> },
+    ) => postJson<AclEntry>("/api/acl/set", { type, id, ...changes }),
+    saveLevels: (limits: {
+        user?: string;
+        guest?: string;
+        unassignedTonie?: string;
+        unassignedBox?: string;
+    }) => postJson("/api/acl/levels/set", limits),
+    saveGroup: (g: Omit<AclGroup, "id"> & { id?: string }) =>
+        postJson<{ id?: string }>("/api/acl/groups/set", g).then((d) => String(d.id ?? "")),
     deleteGroup: (id: string) => postJson("/api/acl/groups/delete", { id }),
 };

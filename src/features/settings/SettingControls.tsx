@@ -11,10 +11,16 @@ import { Row, Segmented, Slider, Switch, useUi } from "../../ui/kit";
 
 /** a volume step of the CFW, with the limit of the original firmware where it has the same step */
 const ORIGINAL_STEP: Record<number, number> = { 6: 25, 9: 50, 12: 75, 15: 100 };
-const volumeStep = (v: number) => (ORIGINAL_STEP[v] ? t("volumeStepOriginal", { n: v, pct: ORIGINAL_STEP[v] }) : t("volumeStep", { n: v }));
+const volumeStep = (v: number) =>
+    ORIGINAL_STEP[v]
+        ? t("settings.volumeStepOriginal", { n: v, pct: ORIGINAL_STEP[v] })
+        : t("settings.volumeStep", { n: v });
 
 /** settings that slide with their values shown this way, wherever they appear */
-const FORMATS: Partial<Record<string, (v: number) => string>> = { "cfw.box.speaker_limit": volumeStep, "cfw.box.headphone_limit": volumeStep };
+const FORMATS: Partial<Record<string, (v: number) => string>> = {
+    "cfw.box.speaker_limit": volumeStep,
+    "cfw.box.headphone_limit": volumeStep,
+};
 
 /** "0=25%, 1=50%, 2=75%" -> options, undefined when the description is no such list */
 export const enumOptions = (opt: SettingOption): { value: number; label: string }[] | undefined => {
@@ -37,7 +43,9 @@ export function useSettingActions(overlay: string) {
     };
     const patch = (id: string, value: SettingOption["value"], overlayed = true) => {
         qc.setQueryData<SettingOption[]>(keys.settings(overlay), (list) =>
-            list?.map((o) => (o.ID === id ? { ...o, value, overlayed: overlay ? overlayed : o.overlayed } : o)),
+            list?.map((o) =>
+                o.ID === id ? { ...o, value, overlayed: overlay ? overlayed : o.overlayed } : o,
+            ),
         );
     };
     return {
@@ -48,12 +56,15 @@ export function useSettingActions(overlay: string) {
                 await tc.setSetting(opt.ID, value, overlay || undefined);
             } catch (e) {
                 patch(opt.ID, old, opt.overlayed);
-                ui.toast("error", t("saveFailed"), String((e as Error).message));
+                ui.toast("error", t("common.saveFailed"), String((e as Error).message));
             }
             refresh();
         },
         reset: async (opt: SettingOption) => {
-            await ui.run(() => tc.resetSetting(opt.ID, overlay || undefined), t("resetDone"));
+            await ui.run(
+                () => tc.resetSetting(opt.ID, overlay || undefined),
+                t("settings.resetDone"),
+            );
             refresh();
         },
     };
@@ -76,7 +87,17 @@ interface SettingRowProps {
 }
 
 /** one setting with the fitting control; on a box (overlay) it shows whether the box has its own value */
-export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: givenFormat, noReset, labels }: SettingRowProps) {
+export function SettingRow({
+    opt,
+    overlay,
+    label,
+    sub,
+    icon,
+    iconColor,
+    format: givenFormat,
+    noReset,
+    labels,
+}: SettingRowProps) {
     const format = givenFormat ?? FORMATS[opt.ID];
     const { set, reset } = useSettingActions(overlay);
     const [editing, setEditing] = useState(false);
@@ -90,8 +111,8 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
         own && !noReset ? (
             <button
                 className="icon-btn muted"
-                title={t("useDefault")}
-                aria-label={t("useDefault")}
+                title={t("settings.useDefault")}
+                aria-label={t("settings.useDefault")}
                 onClick={(e) => {
                     e.stopPropagation();
                     reset(opt);
@@ -105,7 +126,7 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
             {sub ?? (label || description === title ? undefined : description)}
             {overlay ? (
                 <span style={{ display: "block", color: own ? "var(--accent)" : "var(--fg-3)" }}>
-                    {own ? t("ownValue") : t("inherited")}
+                    {own ? t("settings.ownValue") : t("settings.inherited")}
                 </span>
             ) : null}
         </>
@@ -136,7 +157,13 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
     if (choices && choices.length <= 4 && choices.reduce((n, c) => n + c.label.length, 0) <= 32) {
         return (
             <div className="row-wrap">
-                <Row icon={icon} iconColor={iconColor} title={title} sub={subLine} right={resetBtn} />
+                <Row
+                    icon={icon}
+                    iconColor={iconColor}
+                    title={title}
+                    sub={subLine}
+                    right={resetBtn}
+                />
                 <div style={{ padding: "0 16px 12px" }}>
                     <Segmented
                         value={String(opt.value)}
@@ -150,12 +177,27 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
 
     const numeric = opt.type === "uint" || opt.type === "int" || opt.type === "float";
     // many enumerated steps with a format (e.g. 16 volume steps) slide too; their names are too long for a row
-    const range = choices && format ? { min: choices[0].value, max: choices[choices.length - 1].value } : choices ? undefined : opt;
-    if (numeric && range?.min !== undefined && range.max !== undefined && range.max - range.min <= 100) {
+    const range =
+        choices && format
+            ? { min: choices[0].value, max: choices[choices.length - 1].value }
+            : choices
+              ? undefined
+              : opt;
+    if (
+        numeric &&
+        range?.min !== undefined &&
+        range.max !== undefined &&
+        range.max - range.min <= 100
+    ) {
         const v = slide ?? Number(opt.value ?? 0);
         // as wide as the widest value, so that the slider does not move while sliding
         const { min, max } = range;
-        const widest = Math.max(...Array.from({ length: Math.floor(max - min) + 1 }, (_, i) => (format ? format(min + i) : String(min + i)).length));
+        const widest = Math.max(
+            ...Array.from(
+                { length: Math.floor(max - min) + 1 },
+                (_, i) => (format ? format(min + i) : String(min + i)).length,
+            ),
+        );
         return (
             <div className="row-wrap">
                 <Row
@@ -165,8 +207,23 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                     sub={subLine}
                     right={resetBtn}
                 />
-                <div style={{ padding: "0 16px 10px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ minWidth: `${widest + 1}ch`, color: "var(--fg-2)", whiteSpace: "nowrap" }}>{format ? format(v) : String(v)}</span>
+                <div
+                    style={{
+                        padding: "0 16px 10px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                    }}
+                >
+                    <span
+                        style={{
+                            minWidth: `${widest + 1}ch`,
+                            color: "var(--fg-2)",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {format ? format(v) : String(v)}
+                    </span>
                     <Slider
                         value={v}
                         min={range.min}
@@ -183,7 +240,17 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
         );
     }
 
-    const shown = choices?.find((c) => c.value === Number(opt.value))?.label ?? String(opt.value ?? "");
+    const secret = !numeric && opt.ID.toLowerCase().includes("password");
+    const shown =
+        choices?.find((c) => c.value === Number(opt.value))?.label ??
+        (secret && opt.value ? "••••••" : String(opt.value ?? ""));
+    const n = Number(draft);
+    const valid =
+        !numeric ||
+        (draft.trim() !== "" &&
+            Number.isFinite(n) &&
+            (opt.min === undefined || n >= opt.min) &&
+            (opt.max === undefined || n <= opt.max));
     return (
         <>
             <Row
@@ -191,7 +258,7 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                 iconColor={iconColor}
                 title={title}
                 sub={subLine}
-                value={shown || <span style={{ color: "var(--fg-3)" }}>{t("empty")}</span>}
+                value={shown || <span style={{ color: "var(--fg-3)" }}>{t("common.empty")}</span>}
                 right={resetBtn}
                 onClick={
                     disabled
@@ -210,16 +277,17 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                 footer={
                     <>
                         <button className="btn" onClick={() => setEditing(false)}>
-                            {t("cancel")}
+                            {t("common.cancel")}
                         </button>
                         <button
                             className="btn primary"
+                            disabled={!valid}
                             onClick={() => {
                                 setEditing(false);
                                 set(opt, numeric ? Number(draft) : draft);
                             }}
                         >
-                            {t("save")}
+                            {t("common.save")}
                         </button>
                     </>
                 }
@@ -227,6 +295,7 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
+                        if (!valid) return;
                         setEditing(false);
                         set(opt, numeric ? Number(draft) : draft);
                     }}
@@ -239,7 +308,11 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                                     title={c.label}
                                     onClick={() => setDraft(String(c.value))}
                                     chevron={false}
-                                    right={String(c.value) === draft ? <span style={{ color: "var(--accent)" }}>✓</span> : null}
+                                    right={
+                                        String(c.value) === draft ? (
+                                            <span style={{ color: "var(--accent)" }}>✓</span>
+                                        ) : null
+                                    }
                                 />
                             ))}
                         </div>
@@ -249,7 +322,7 @@ export function SettingRow({ opt, overlay, label, sub, icon, iconColor, format: 
                                 className="input"
                                 autoFocus
                                 inputMode={numeric ? "numeric" : undefined}
-                                type={opt.ID.toLowerCase().includes("password") ? "password" : "text"}
+                                type={secret ? "password" : "text"}
                                 value={draft}
                                 onChange={(e) => setDraft(e.target.value)}
                             />

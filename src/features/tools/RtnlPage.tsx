@@ -8,10 +8,12 @@ const MAX_LINES = 2000;
 
 /** printable ASCII of a hex string, "." for the rest */
 const hexAscii = (hex: string) =>
-    (hex.match(/../g) ?? []).map((p) => {
-        const c = parseInt(p, 16);
-        return c >= 32 && c <= 126 ? String.fromCharCode(c) : ".";
-    }).join("");
+    (hex.match(/../g) ?? [])
+        .map((p) => {
+            const c = parseInt(p, 16);
+            return c >= 32 && c <= 126 ? String.fromCharCode(c) : ".";
+        })
+        .join("");
 
 /** the boxes' log records (RTNL) as they arrive at the server */
 export function RtnlPage() {
@@ -39,7 +41,9 @@ export function RtnlPage() {
             const d = parse(e as MessageEvent);
             if (!d) return;
             const payload = String(d.field6 ?? "");
-            add(`#${d.sequence} up ${d.uptime}  ${String(d.function_group).padStart(2, " ")}-${d.function}  ${payload}  '${hexAscii(payload)}'`);
+            add(
+                `#${d.sequence} up ${d.uptime}  ${String(d.function_group).padStart(2, " ")}-${d.function}  ${payload}  '${hexAscii(payload)}'`,
+            );
         });
         source.addEventListener("rtnl-raw-log3", (e) => {
             const d = parse(e as MessageEvent);
@@ -47,7 +51,7 @@ export function RtnlPage() {
         });
         source.addEventListener("pressed", (e) => {
             const d = parse(e as MessageEvent);
-            if (d !== null) add(`${t("rtnlPressed")}: ${d}`);
+            if (d !== null) add(`${t("tools.rtnlPressed")}: ${d}`);
         });
         return () => source.close();
     }, []);
@@ -58,22 +62,36 @@ export function RtnlPage() {
 
     return (
         <Page
-            title={t("rtnlLog")}
-            subtitle={t("rtnlLogHint")}
+            title={t("common.rtnlLog")}
+            subtitle={t("common.rtnlLogHint")}
             back="/system"
             right={
                 <>
-                    <button className="icon-btn" onClick={() => setPaused(!paused)} aria-label={paused ? t("resumeLog") : t("pause")} title={paused ? t("resumeLog") : t("pause")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => setPaused(!paused)}
+                        aria-label={paused ? t("tools.resumeLog") : t("common.pause")}
+                        title={paused ? t("tools.resumeLog") : t("common.pause")}
+                    >
                         {paused ? <Play size={20} /> : <Pause size={20} />}
                     </button>
-                    <button className="icon-btn" onClick={() => setLines([])} aria-label={t("clear")} title={t("clear")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => setLines([])}
+                        aria-label={t("common.clear")}
+                        title={t("common.clear")}
+                    >
                         <Trash2 size={20} />
                     </button>
                 </>
             }
         >
             {lines.length === 0 ? (
-                <Empty icon={<Radio size={28} />} title={t("rtnlWaiting")} text={t("rtnlWaitingText")} />
+                <Empty
+                    icon={<Radio size={28} />}
+                    title={t("tools.rtnlWaiting")}
+                    text={t("tools.rtnlWaitingText")}
+                />
             ) : (
                 <div className="log-view mono">
                     {lines.map((l, i) => (

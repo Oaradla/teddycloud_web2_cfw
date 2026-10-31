@@ -40,8 +40,10 @@ export async function shrinkImage(input: Blob, name: string): Promise<File> {
     }
     if (!blob) throw new Error("could not encode the picture");
     const base = name.replace(/\.[^.]+$/, "");
-    if (scale === 1 && blob.size >= input.size) return new File([input], name, { type: input.type });
-    const ext = { "image/webp": "webp", "image/png": "png", "image/jpeg": "jpg" }[blob.type] ?? "img";
+    if (scale === 1 && blob.size >= input.size)
+        return new File([input], name, { type: input.type });
+    const ext =
+        { "image/webp": "webp", "image/png": "png", "image/jpeg": "jpg" }[blob.type] ?? "img";
     return new File([blob], `${base}.${ext}`, { type: blob.type });
 }
 
@@ -49,7 +51,10 @@ export async function shrinkImage(input: Blob, name: string): Promise<File> {
 export async function remoteSize(path: string): Promise<number> {
     const ctrl = new AbortController();
     try {
-        const r = await fetch(backendUrl(path), { signal: ctrl.signal, credentials: "same-origin" });
+        const r = await fetch(backendUrl(path), {
+            signal: ctrl.signal,
+            credentials: "same-origin",
+        });
         if (!r.ok) return -1;
         const n = Number(r.headers.get("Content-Length") || 0);
         if (n > 0) {

@@ -22,24 +22,33 @@ export function CertificatesPage() {
         if (!list.length) return;
         const wrong = list.filter((f) => !f.name.toLowerCase().endsWith(".der"));
         if (wrong.length) {
-            ui.toast("error", t("certsDerOnly"), wrong.map((f) => f.name).join(", "));
+            ui.toast("error", t("tools.certsDerOnly"), wrong.map((f) => f.name).join(", "));
             return;
         }
         const ok = await ui.run(async () => {
             await tc.uploadCerts(list, overlay || undefined);
             return true;
-        }, t("certsUploaded"));
+        }, t("tools.certsUploaded"));
         if (ok) setDone(list.map((f) => f.name));
         if (input.current) input.current.value = "";
     };
 
     return (
-        <Page title={t("certificates")} subtitle={t("certificatesHint")} back={box ? `/box/${box}` : "/system"} narrow>
-            <Notice info>{t("certificatesInfo")}</Notice>
-            <Section title={t("certsFor")}>
+        <Page
+            title={t("common.certificates")}
+            subtitle={t("common.certificatesHint")}
+            back={box ? `/box/${box}` : "/system"}
+            narrow
+        >
+            <Notice info>{t("tools.certificatesInfo")}</Notice>
+            <Section title={t("tools.certsFor")}>
                 <div style={{ padding: "12px 16px" }}>
-                    <select className="select" value={overlay} onChange={(e) => setOverlay(e.target.value)}>
-                        <option value="">{t("certsForServer")}</option>
+                    <select
+                        className="select"
+                        value={overlay}
+                        onChange={(e) => setOverlay(e.target.value)}
+                    >
+                        <option value="">{t("tools.certsForServer")}</option>
                         {(boxes.data ?? []).map((b) => (
                             <option key={b.ID} value={b.ID}>
                                 {b.boxName || b.commonName}
@@ -48,14 +57,32 @@ export function CertificatesPage() {
                     </select>
                 </div>
             </Section>
-            <Section footer={t("certsUploadHint")}>
-                <Row icon={<UploadCloud size={17} />} title={t("certsUpload")} accent onClick={() => input.current?.click()} chevron={false} />
+            <Section footer={t("tools.certsUploadHint")}>
+                <Row
+                    icon={<UploadCloud size={17} />}
+                    title={t("tools.certsUpload")}
+                    accent
+                    onClick={() => input.current?.click()}
+                    chevron={false}
+                />
                 {done.map((name) => (
-                    <Row key={name} icon={<FileKey size={17} />} title={name} sub={t("certsUploaded")} />
+                    <Row
+                        key={name}
+                        icon={<FileKey size={17} />}
+                        title={name}
+                        sub={t("tools.certsUploaded")}
+                    />
                 ))}
             </Section>
             {overlay && <CertificateCheck overlay={overlay} />}
-            <input ref={input} type="file" accept=".der" multiple hidden onChange={(e) => upload(e.target.files)} />
+            <input
+                ref={input}
+                type="file"
+                accept=".der"
+                multiple
+                hidden
+                onChange={(e) => upload(e.target.files)}
+            />
         </Page>
     );
 }
@@ -74,12 +101,19 @@ function CertificateCheck({ overlay }: { overlay: string }) {
     const c = check.data;
     if (!c) return null;
     return (
-        <Section title={t("certCheck")} footer={t("certCheckHint")}>
-            <Row title={t("certStatus")} value={certStatusText(c.status)} />
-            <Row title={t("certPresented")} sub={<span className="mono selectable">{c.presented || "–"}</span>} />
-            <Row title={t("certPin")} sub={<span className="mono selectable">{c.pin || "–"}</span>} />
+        <Section title={t("tools.certCheck")} footer={t("tools.certCheckHint")}>
+            <Row title={t("tools.certStatus")} value={certStatusText(c.status)} />
+            <Row
+                title={t("tools.certPresented")}
+                sub={<span className="mono selectable">{c.presented || "–"}</span>}
+            />
+            <Row
+                title={t("tools.certPin")}
+                sub={<span className="mono selectable">{c.pin || "–"}</span>}
+            />
         </Section>
     );
 }
 
-export const certStatusText = (status: string) => t(`certStatus_${status || "none"}` as never);
+export const certStatusText = (status: string) =>
+    t(`tools.certStatus_${status || "none"}` as never);

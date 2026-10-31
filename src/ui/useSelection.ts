@@ -7,7 +7,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useSelection(onOpen: (id: string) => void, order: string[] = []) {
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [selecting, setSelecting] = useState(false);
-    const press = useRef<{ id: string; x: number; y: number; timer: number; fired: boolean } | null>(null);
+    const press = useRef<{
+        id: string;
+        x: number;
+        y: number;
+        timer: number;
+        fired: boolean;
+    } | null>(null);
 
     const anchor = useRef<string | null>(null);
     const orderRef = useRef(order);

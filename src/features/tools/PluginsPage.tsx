@@ -18,26 +18,37 @@ export function PluginsPage() {
 
     const upload = async (file: File | undefined) => {
         if (!file) return;
-        await ui.run(() => tc.uploadPlugin(file), t("pluginAdded"));
+        await ui.run(() => tc.uploadPlugin(file), t("tools.pluginAdded"));
         if (input.current) input.current.value = "";
         qc.invalidateQueries({ queryKey: ["plugins"] });
     };
 
     return (
         <Page
-            title={t("plugins")}
-            subtitle={t("pluginsHint")}
+            title={t("common.plugins")}
+            subtitle={t("common.pluginsHint")}
             back="/system"
             narrow
             right={
-                <button className="icon-btn" onClick={() => input.current?.click()} aria-label={t("pluginAdd")} title={t("pluginAdd")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => input.current?.click()}
+                    aria-label={t("tools.pluginAdd")}
+                    title={t("tools.pluginAdd")}
+                >
                     <UploadCloud size={20} />
                 </button>
             }
         >
             {plugins.isLoading && <Loading />}
             {plugins.error && <ErrorBox error={plugins.error} retry={() => plugins.refetch()} />}
-            {plugins.data && plugins.data.length === 0 && <Empty icon={<Puzzle size={28} />} title={t("noPlugins")} text={t("noPluginsText")} />}
+            {plugins.data && plugins.data.length === 0 && (
+                <Empty
+                    icon={<Puzzle size={28} />}
+                    title={t("tools.noPlugins")}
+                    text={t("tools.noPluginsText")}
+                />
+            )}
             {plugins.data && plugins.data.length > 0 && (
                 <Section>
                     {plugins.data.map((p) => (
@@ -46,18 +57,38 @@ export function PluginsPage() {
                             icon={<Puzzle size={17} />}
                             title={p.pluginName}
                             sub={[p.version, p.author, p.description].filter(Boolean).join(" · ")}
-                            to={p.standalone ? undefined : `/plugins/${encodeURIComponent(p.pluginId)}`}
-                            onClick={p.standalone ? () => window.open(pluginUrl(p.pluginId), "_blank", "noopener") : undefined}
+                            to={
+                                p.standalone
+                                    ? undefined
+                                    : `/plugins/${encodeURIComponent(p.pluginId)}`
+                            }
+                            onClick={
+                                p.standalone
+                                    ? () => window.open(pluginUrl(p.pluginId), "_blank", "noopener")
+                                    : undefined
+                            }
                             right={
                                 <button
                                     className="icon-btn"
-                                    aria-label={t("delete")}
-                                    title={t("delete")}
+                                    aria-label={t("common.delete")}
+                                    title={t("common.delete")}
                                     onClick={async (e) => {
                                         e.stopPropagation();
                                         e.preventDefault();
-                                        if (!(await ui.confirm({ title: t("pluginDeleteTitle", { name: p.pluginName }), confirm: t("delete"), danger: true }))) return;
-                                        await ui.run(() => tc.deletePlugin(p.pluginId), t("deleted"));
+                                        if (
+                                            !(await ui.confirm({
+                                                title: t("tools.pluginDeleteTitle", {
+                                                    name: p.pluginName,
+                                                }),
+                                                confirm: t("common.delete"),
+                                                danger: true,
+                                            }))
+                                        )
+                                            return;
+                                        await ui.run(
+                                            () => tc.deletePlugin(p.pluginId),
+                                            t("common.deleted"),
+                                        );
                                         qc.invalidateQueries({ queryKey: ["plugins"] });
                                     }}
                                 >
@@ -68,7 +99,13 @@ export function PluginsPage() {
                     ))}
                 </Section>
             )}
-            <input ref={input} type="file" accept=".zip" hidden onChange={(e) => upload(e.target.files?.[0])} />
+            <input
+                ref={input}
+                type="file"
+                accept=".zip"
+                hidden
+                onChange={(e) => upload(e.target.files?.[0])}
+            />
         </Page>
     );
 }
@@ -83,7 +120,14 @@ export function PluginPage() {
             title={meta?.pluginName ?? id}
             back="/plugins"
             right={
-                <a className="icon-btn" href={pluginUrl(id)} target="_blank" rel="noopener" aria-label={t("openInNewTab")} title={t("openInNewTab")}>
+                <a
+                    className="icon-btn"
+                    href={pluginUrl(id)}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={t("tools.openInNewTab")}
+                    title={t("tools.openInNewTab")}
+                >
                     <ExternalLink size={20} />
                 </a>
             }

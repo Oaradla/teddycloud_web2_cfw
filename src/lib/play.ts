@@ -8,7 +8,10 @@ export const canPlayTag = (tag: Tag) => tag.valid || tag.live || Boolean(tag.sou
 export const tagPlayItem = (tag: Tag): PlayItem => {
     const info = tagInfo(tag);
     const chapters = tag.trackSeconds?.length ? tag.trackSeconds : undefined;
-    const titles = info.tracks?.length && chapters && info.tracks.length >= chapters.length ? info.tracks : undefined;
+    const titles =
+        info.tracks?.length && chapters && info.tracks.length >= chapters.length
+            ? info.tracks
+            : undefined;
     return {
         id: tag.ruid,
         title: tagTitle(tag),
@@ -36,7 +39,9 @@ export const filePlayItem = (path: string, file: FileEntry): PlayItem => ({
     url: libraryFileUrl(path),
     chapters: file.tafHeader?.trackSeconds,
     chapterTitles:
-        file.tonieInfo?.tracks?.length && file.tafHeader?.trackSeconds && file.tonieInfo.tracks.length >= file.tafHeader.trackSeconds.length
+        file.tonieInfo?.tracks?.length &&
+        file.tafHeader?.trackSeconds &&
+        file.tonieInfo.tracks.length >= file.tafHeader.trackSeconds.length
             ? file.tonieInfo.tracks
             : undefined,
     length: file.tafHeader?.lengthSeconds,

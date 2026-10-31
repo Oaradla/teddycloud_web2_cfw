@@ -1,8 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
-import { CloudDownload, Headphones, ListMusic, Lock, Pause, Play, RefreshCw, SkipBack, SkipForward, Square, Volume1, Volume2 } from "lucide-react";
+import {
+    CloudDownload,
+    Headphones,
+    ListMusic,
+    Lock,
+    Pause,
+    Play,
+    RefreshCw,
+    SkipBack,
+    SkipForward,
+    Square,
+    Volume1,
+    Volume2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
-import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent, tagInfo, tagTitle } from "../../lib/format";
+import {
+    ago,
+    contentTitle,
+    figureSubtitle,
+    figureTitle,
+    linkedContent,
+    tagInfo,
+    tagTitle,
+} from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { keys, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
@@ -34,9 +55,9 @@ export function RemoteControl({ boxId }: { boxId: string }) {
         if ("vibrate" in navigator) navigator.vibrate?.(10);
         try {
             const r = await tc.cfwRemote(boxId, command, extra);
-            if (r && r.ok === false) ui.toast("error", t("commandFailed"), r.message);
+            if (r && r.ok === false) ui.toast("error", t("boxes.commandFailed"), r.message);
         } catch (e) {
-            ui.toast("error", t("commandFailed"), String((e as Error).message));
+            ui.toast("error", t("boxes.commandFailed"), String((e as Error).message));
         }
         window.clearTimeout(refreshTimer.current);
         refreshTimer.current = window.setTimeout(() => status.refetch(), 1200);
@@ -45,16 +66,22 @@ export function RemoteControl({ boxId }: { boxId: string }) {
     const st = status.data?.status;
     const connected = status.data?.remote === true;
     const playing = st?.state === "playing";
-    const tag = st?.ruid ? tags.data?.find((x) => x.ruid.toLowerCase() === st.ruid.toLowerCase()) : undefined;
+    const tag = st?.ruid
+        ? tags.data?.find((x) => x.ruid.toLowerCase() === st.ruid.toLowerCase())
+        : undefined;
     const limit = st?.limit || 15;
     const volume = vol ?? st?.volume ?? 0;
     const last = status.data?.lastResult;
     // unknown numbers stay numbers (t returns the key)
     const lastText = (key: string, n: number) => {
-        const text = t(`${key}_${n}` as never);
-        return text === `${key}_${n}` ? String(n) : text;
+        const text = t(`boxes.${key}_${n}` as never);
+        return text === `boxes.${key}_${n}` ? String(n) : text;
     };
-    const stateText = st ? t(`state_${st.state}` as never) : connected ? "…" : t("remoteWaiting");
+    const stateText = st
+        ? t(`boxes.state_${st.state}` as never)
+        : connected
+          ? "…"
+          : t("boxes.remoteWaiting");
 
     const choices = (tags.data ?? [])
         .filter((x) => x.type !== "system" && (x.valid || x.source))
@@ -70,38 +97,66 @@ export function RemoteControl({ boxId }: { boxId: string }) {
             <div className="row-gap" style={{ marginBottom: 8 }}>
                 <TonieImage src={tag ? tagInfo(tag).picture : undefined} size={48} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontWeight: 650 }}>{tag ? tagTitle(tag) : st?.ruid ? st.ruid.toUpperCase() : t("noTonie")}</div>
+                    <div style={{ fontWeight: 650 }}>
+                        {tag
+                            ? tagTitle(tag)
+                            : st?.ruid
+                              ? st.ruid.toUpperCase()
+                              : t("boxes.noTonie")}
+                    </div>
                     <div className="small muted">
                         {stateText}
-                        {st && st.chapter > 0 ? ` · ${t("chapterN", { n: st.chapter })}` : ""}
+                        {st && st.chapter > 0
+                            ? ` · ${t("common.chapterN", { n: st.chapter })}`
+                            : ""}
                         {st?.headphones ? " · " : ""}
                         {st?.headphones && <Headphones size={13} style={{ verticalAlign: -2 }} />}
                     </div>
                 </div>
                 {st && (st.locks.slap || st.locks.tilt || st.locks.volume) && (
-                    <span className="badge" title={t("locks")}>
+                    <span className="badge" title={t("boxes.locks")}>
                         <Lock size={12} />
                     </span>
                 )}
             </div>
             <div className="remote-controls">
-                <button className="icon-btn" onClick={() => send("prev")} aria-label={t("previous")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => send("prev")}
+                    aria-label={t("boxes.previous")}
+                >
                     <SkipBack size={22} fill="currentColor" />
                 </button>
-                <button className="icon-btn" onClick={() => send("stop")} aria-label={t("stop")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => send("stop")}
+                    aria-label={t("boxes.stop")}
+                >
                     <Square size={18} fill="currentColor" />
                 </button>
                 <button
                     className="icon-btn main"
                     onClick={() => send(playing ? "pause" : "continue")}
-                    aria-label={playing ? t("pause") : t("play")}
+                    aria-label={playing ? t("common.pause") : t("common.play")}
                 >
-                    {playing ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" style={{ marginLeft: 3 }} />}
+                    {playing ? (
+                        <Pause size={28} fill="currentColor" />
+                    ) : (
+                        <Play size={28} fill="currentColor" style={{ marginLeft: 3 }} />
+                    )}
                 </button>
-                <button className="icon-btn" onClick={() => setPick(true)} aria-label={t("playTonie")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => setPick(true)}
+                    aria-label={t("boxes.playTonie")}
+                >
                     <ListMusic size={20} />
                 </button>
-                <button className="icon-btn" onClick={() => send("next")} aria-label={t("next")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => send("next")}
+                    aria-label={t("common.next")}
+                >
                     <SkipForward size={22} fill="currentColor" />
                 </button>
             </div>
@@ -121,33 +176,53 @@ export function RemoteControl({ boxId }: { boxId: string }) {
             </div>
             {st && (
                 <div className="small muted" style={{ marginTop: 4, textAlign: "center" }}>
-                    {t("remoteVolume", { step: volume, limit, output: t(st.headphones ? "headphones" : "speaker") })}
+                    {t("boxes.remoteVolume", {
+                        step: volume,
+                        limit,
+                        output: t(st.headphones ? "boxes.headphones" : "boxes.speaker"),
+                    })}
                 </div>
             )}
-            {!connected && <div className="small muted" style={{ marginTop: 8 }}>{t("remoteHint")}</div>}
+            {!connected && (
+                <div className="small muted" style={{ marginTop: 8 }}>
+                    {t("boxes.remoteHint")}
+                </div>
+            )}
             <div className="remote-extra">
-                <button className="btn soft small" disabled={!connected} onClick={() => send("status")}>
+                <button
+                    className="btn soft small"
+                    disabled={!connected}
+                    onClick={() => send("status")}
+                >
                     <RefreshCw size={15} />
-                    {t("remoteRefresh")}
+                    {t("boxes.remoteRefresh")}
                 </button>
-                <button className="btn soft small" disabled={!connected} onClick={() => send("updateCheck")}>
+                <button
+                    className="btn soft small"
+                    disabled={!connected}
+                    onClick={() => send("updateCheck")}
+                >
                     <CloudDownload size={15} />
-                    {t("remoteUpdateCheck")}
+                    {t("boxes.remoteUpdateCheck")}
                 </button>
             </div>
             <div className="small muted" style={{ marginTop: 8 }}>
                 {[
-                    st?.time ? t("remoteAsOf", { when: ago(st.time * 1000) }) : "",
-                    status.data?.queued ? t("remoteQueued", { n: status.data.queued }) : "",
+                    st?.time ? t("boxes.remoteAsOf", { when: ago(st.time * 1000) }) : "",
+                    status.data?.queued ? t("boxes.remoteQueued", { n: status.data.queued }) : "",
                     last
-                        ? t("remoteLast", { command: lastText("command", last.command), result: lastText("result", last.result), when: ago(last.time * 1000) })
+                        ? t("boxes.remoteLast", {
+                              command: lastText("command", last.command),
+                              result: lastText("result", last.result),
+                              when: ago(last.time * 1000),
+                          })
                         : "",
                 ]
                     .filter(Boolean)
                     .join(" · ")}
             </div>
 
-            <Sheet open={pick} onClose={() => setPick(false)} title={t("playTonie")} full>
+            <Sheet open={pick} onClose={() => setPick(false)} title={t("boxes.playTonie")} full>
                 <div style={{ marginBottom: 12 }}>
                     <SearchField value={filter} onChange={setFilter} />
                 </div>
@@ -161,7 +236,11 @@ export function RemoteControl({ boxId }: { boxId: string }) {
                                 </div>
                             }
                             title={figureTitle(x)}
-                            sub={linkedContent(x) ? `→ ${contentTitle(linkedContent(x)!)}` : figureSubtitle(x)}
+                            sub={
+                                linkedContent(x)
+                                    ? `→ ${contentTitle(linkedContent(x)!)}`
+                                    : figureSubtitle(x)
+                            }
                             onClick={() => {
                                 setPick(false);
                                 send("play", { ruid: x.ruid });

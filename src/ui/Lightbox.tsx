@@ -14,11 +14,26 @@ const TAP_ZOOM = 2.5;
  * an image large on the whole screen: a tap or double click zooms in and out, two fingers or the
  * wheel zoom, a finger pans while zoomed; swipe sideways for the next image, down to close
  */
-export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; index: number; onClose: () => void }) {
+export function Lightbox({
+    items,
+    index,
+    onClose,
+}: {
+    items: LightboxItem[];
+    index: number;
+    onClose: () => void;
+}) {
     const [at, setAt] = useState(index);
     const [view, setView] = useState({ s: 1, x: 0, y: 0 });
     const pointers = useRef(new Map<number, { x: number; y: number }>());
-    const gesture = useRef<{ x: number; y: number; t: number; view: typeof view; dist: number; moved: boolean } | null>(null);
+    const gesture = useRef<{
+        x: number;
+        y: number;
+        t: number;
+        view: typeof view;
+        dist: number;
+        moved: boolean;
+    } | null>(null);
     const item = items[at];
     const many = items.length > 1;
 
@@ -59,7 +74,14 @@ export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; ind
     const down = (e: React.PointerEvent) => {
         (e.currentTarget as Element).setPointerCapture(e.pointerId);
         pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        gesture.current = { x: e.clientX, y: e.clientY, t: Date.now(), view, dist: distance(), moved: pointers.current.size > 1 };
+        gesture.current = {
+            x: e.clientX,
+            y: e.clientY,
+            t: Date.now(),
+            view,
+            dist: distance(),
+            moved: pointers.current.size > 1,
+        };
     };
 
     const move = (e: React.PointerEvent) => {
@@ -71,7 +93,9 @@ export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; ind
         if (Math.hypot(dx, dy) > 8) g.moved = true;
         if (pointers.current.size === 2 && g.dist > 0) {
             const [a, b] = [...pointers.current.values()];
-            setView(zoomAt((g.view.s * distance()) / g.dist, (a.x + b.x) / 2, (a.y + b.y) / 2, g.view));
+            setView(
+                zoomAt((g.view.s * distance()) / g.dist, (a.x + b.x) / 2, (a.y + b.y) / 2, g.view),
+            );
         } else if (pointers.current.size === 1 && g.view.s > 1) {
             setView({ ...g.view, x: g.view.x + dx, y: g.view.y + dy });
         } else if (pointers.current.size === 1) {
@@ -94,13 +118,15 @@ export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; ind
             return;
         }
         if (g.view.s === 1 && pointers.current.size === 0) {
-            if (many && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) return go(dx < 0 ? 1 : -1);
+            if (many && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy))
+                return go(dx < 0 ? 1 : -1);
             if (dy > 100 && dy > Math.abs(dx)) return onClose();
             setView({ s: 1, x: 0, y: 0 });
         }
     };
 
-    const wheel = (e: React.WheelEvent) => setView(zoomAt(view.s * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY));
+    const wheel = (e: React.WheelEvent) =>
+        setView(zoomAt(view.s * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY));
 
     const settling = gesture.current === null;
     return createPortal(
@@ -130,7 +156,11 @@ export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; ind
             </button>
             {many && (
                 <>
-                    <button className="lightbox-btn prev" onClick={() => go(-1)} aria-label="Previous">
+                    <button
+                        className="lightbox-btn prev"
+                        onClick={() => go(-1)}
+                        aria-label="Previous"
+                    >
                         <ChevronLeft size={26} />
                     </button>
                     <button className="lightbox-btn next" onClick={() => go(1)} aria-label="Next">
@@ -141,7 +171,12 @@ export function Lightbox({ items, index, onClose }: { items: LightboxItem[]; ind
             {(item.alt || many) && (
                 <div className="lightbox-caption">
                     {item.alt}
-                    {many && <span className="muted"> {at + 1} / {items.length}</span>}
+                    {many && (
+                        <span className="muted">
+                            {" "}
+                            {at + 1} / {items.length}
+                        </span>
+                    )}
                 </div>
             )}
         </div>,

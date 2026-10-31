@@ -23,13 +23,14 @@ export const EMPTY_PROFILE: CfwProfile = {
 export const PROFILE_KEYS = Object.keys(EMPTY_PROFILE) as (keyof CfwProfile)[];
 
 type Tri = "unset" | "on" | "off";
-const toTri = (v: boolean | null | Mixed): Tri | Mixed => (v === MIXED ? MIXED : v === null ? "unset" : v ? "on" : "off");
+const toTri = (v: boolean | null | Mixed): Tri | Mixed =>
+    v === MIXED ? MIXED : v === null ? "unset" : v ? "on" : "off";
 const fromTri = (v: Tri) => (v === "unset" ? null : v === "on");
 
 /** marks a value that differs between the selected tonies, or that the user changed */
 export function FieldState({ mixed, changed }: { mixed?: boolean; changed?: boolean }) {
-    if (changed) return <span className="badge accent">{t("changed")}</span>;
-    if (mixed) return <span className="badge warn">{t("mixed")}</span>;
+    if (changed) return <span className="badge accent">{t("tonies.changed")}</span>;
+    if (mixed) return <span className="badge warn">{t("tonies.mixed")}</span>;
     return null;
 }
 
@@ -46,15 +47,27 @@ export function CfwProfileFields({
     onChange: <K extends keyof CfwProfile>(k: K, v: CfwProfile[K]) => void;
     changed?: Set<keyof CfwProfile>;
 }) {
-    const state = (k: keyof CfwProfile) => <FieldState mixed={values[k] === MIXED} changed={changed?.has(k)} />;
-    const block = (k: keyof CfwProfile, title: string, sub: string, control: ReactNode, value?: ReactNode) => (
+    const state = (k: keyof CfwProfile) => (
+        <FieldState mixed={values[k] === MIXED} changed={changed?.has(k)} />
+    );
+    const block = (
+        k: keyof CfwProfile,
+        title: string,
+        sub: string,
+        control: ReactNode,
+        value?: ReactNode,
+    ) => (
         <div className="row-wrap" key={k}>
             <Row title={title} sub={sub} value={value} right={state(k)} />
             <div style={{ padding: "0 16px 12px" }}>{control}</div>
         </div>
     );
 
-    const tri = (k: "resume" | "shuffle" | "slapLock" | "tiltLock" | "volumeLock", title: string, sub: string) =>
+    const tri = (
+        k: "resume" | "shuffle" | "slapLock" | "tiltLock" | "volumeLock",
+        title: string,
+        sub: string,
+    ) =>
         block(
             k,
             title,
@@ -63,9 +76,9 @@ export function CfwProfileFields({
                 value={toTri(values[k])}
                 onChange={(v) => onChange(k, fromTri(v as Tri))}
                 options={[
-                    { value: "unset", label: t("notSet") },
-                    { value: "on", label: t("on") },
-                    { value: "off", label: t("off") },
+                    { value: "unset", label: t("tonies.notSet") },
+                    { value: "on", label: t("tonies.on") },
+                    { value: "off", label: t("tonies.off") },
                 ]}
             />,
         );
@@ -76,13 +89,24 @@ export function CfwProfileFields({
             <div className="row-wrap" key={k}>
                 <Row
                     title={title}
-                    sub={t("cfwLimitHint")}
-                    value={v === MIXED ? undefined : v === null ? t("notSet") : `${Math.round((v / 15) * 100)} %`}
+                    sub={t("tonies.cfwLimitHint")}
+                    value={
+                        v === MIXED
+                            ? undefined
+                            : v === null
+                              ? t("tonies.notSet")
+                              : `${Math.round((v / 15) * 100)} %`
+                    }
                     right={
                         <>
                             {state(k)}
-                            <button className="btn small" onClick={() => onChange(k, v === null ? 15 : v === MIXED ? 15 : null)}>
-                                {v === null || v === MIXED ? t("set") : t("unset")}
+                            <button
+                                className="btn small"
+                                onClick={() =>
+                                    onChange(k, v === null ? 15 : v === MIXED ? 15 : null)
+                                }
+                            >
+                                {v === null || v === MIXED ? t("tonies.set") : t("tonies.unset")}
                             </button>
                         </>
                     }
@@ -99,12 +123,12 @@ export function CfwProfileFields({
     const sleep = values.sleepMinutes;
     return (
         <>
-            {tri("resume", t("cfwResume"), t("cfwResumeHint"))}
-            {tri("shuffle", t("cfwShuffle"), t("cfwShuffleHint"))}
+            {tri("resume", t("tonies.cfwResume"), t("tonies.cfwResumeHint"))}
+            {tri("shuffle", t("tonies.cfwShuffle"), t("tonies.cfwShuffleHint"))}
             {block(
                 "sleepMinutes",
-                t("cfwSleep"),
-                t("cfwSleepHint"),
+                t("tonies.cfwSleep"),
+                t("tonies.cfwSleepHint"),
                 <div className="chips" style={{ margin: 0, padding: 0, flexWrap: "wrap" }}>
                     {[null, 10, 15, 20, 30, 45, 60, 90].map((m) => (
                         <button
@@ -112,32 +136,38 @@ export function CfwProfileFields({
                             className={`chip ${sleep !== MIXED && (sleep || null) === m ? "active" : ""}`}
                             onClick={() => onChange("sleepMinutes", m)}
                         >
-                            {m === null ? t("inactive") : `${m} min`}
+                            {m === null ? t("tonies.inactive") : `${m} min`}
                         </button>
                     ))}
                 </div>,
-                sleep === MIXED ? undefined : !sleep ? t("inactive") : `${sleep} min`,
+                sleep === MIXED ? undefined : !sleep ? t("tonies.inactive") : `${sleep} min`,
             )}
             {block(
                 "ledLevel",
-                t("led"),
-                t("cfwLedHint"),
+                t("common.led"),
+                t("tonies.cfwLedHint"),
                 <Segmented
-                    value={values.ledLevel === MIXED ? MIXED : values.ledLevel === null ? "unset" : String(values.ledLevel)}
+                    value={
+                        values.ledLevel === MIXED
+                            ? MIXED
+                            : values.ledLevel === null
+                              ? "unset"
+                              : String(values.ledLevel)
+                    }
                     onChange={(v) => onChange("ledLevel", v === "unset" ? null : Number(v))}
                     options={[
-                        { value: "unset", label: t("notSet") },
-                        { value: "0", label: t("ledOn") },
-                        { value: "2", label: t("ledDimmed") },
-                        { value: "1", label: t("ledOff") },
+                        { value: "unset", label: t("tonies.notSet") },
+                        { value: "0", label: t("common.ledOn") },
+                        { value: "2", label: t("common.ledDimmed") },
+                        { value: "1", label: t("common.ledOff") },
                     ]}
                 />,
             )}
-            {limit("speakerLimit", t("speakerLimit"))}
-            {limit("headphoneLimit", t("headphoneLimit"))}
-            {tri("slapLock", t("slapLock"), t("cfwLockHint"))}
-            {tri("tiltLock", t("tiltLock"), t("cfwLockHint"))}
-            {tri("volumeLock", t("volumeLock"), t("cfwLockHint"))}
+            {limit("speakerLimit", t("common.speakerLimit"))}
+            {limit("headphoneLimit", t("common.headphoneLimit"))}
+            {tri("slapLock", t("common.slapLock"), t("tonies.cfwLockHint"))}
+            {tri("tiltLock", t("common.tiltLock"), t("tonies.cfwLockHint"))}
+            {tri("volumeLock", t("common.volumeLock"), t("tonies.cfwLockHint"))}
         </>
     );
 }

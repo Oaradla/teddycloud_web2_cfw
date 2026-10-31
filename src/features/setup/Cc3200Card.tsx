@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { tc } from "../../api/tc";
 import { Notice } from "../../ui/kit";
 import { StatusLine, useBusyGuard } from "./parts";
-import { st } from "./texts";
+import { t } from "../../lib/i18n";
 
 export const saveZip = (data: Uint8Array, name: string) => {
     const a = document.createElement("a");
@@ -17,14 +17,20 @@ export const saveZip = (data: Uint8Array, name: string) => {
 /** the files of a release package below prefix, without it */
 export const packageFiles = (pkg: Uint8Array, prefix: string) => {
     const out: Record<string, Uint8Array> = {};
-    for (const [name, data] of Object.entries(unzipSync(pkg))) if (name.startsWith(prefix) && !name.endsWith("/")) out[name.slice(prefix.length)] = data;
+    for (const [name, data] of Object.entries(unzipSync(pkg)))
+        if (name.startsWith(prefix) && !name.endsWith("/")) out[name.slice(prefix.length)] = data;
     return out;
 };
 
 /** the CC3200 release packages teddyCloud keeps, newest first */
 export const useCc3200Releases = () => {
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, retry: false });
-    return { releases: (firmware.data?.images ?? []).filter((i) => i.package && i.platform !== "esp32").sort((a, b) => b.build - a.build), loading: firmware.isLoading };
+    return {
+        releases: (firmware.data?.images ?? [])
+            .filter((i) => i.package && i.platform !== "esp32")
+            .sort((a, b) => b.build - a.build),
+        loading: firmware.isLoading,
+    };
 };
 
 /**
@@ -32,11 +38,22 @@ export const useCc3200Releases = () => {
  * settings, from a release package. On its own for a box that runs HackieboxNG already, or as the
  * last step of the setup in the browser (build given).
  */
-export function Cc3200Card({ build, mac = "", onSaved }: { build?: number; mac?: string; onSaved?: () => Promise<void> }) {
+export function Cc3200Card({
+    build,
+    mac = "",
+    onSaved,
+}: {
+    build?: number;
+    mac?: string;
+    onSaved?: () => Promise<void>;
+}) {
     const { releases, loading } = useCc3200Releases();
     const [chosen, setChosen] = useState<number | null>(null);
     const release = releases.find((r) => r.build === (build ?? chosen)) ?? releases[0];
-    const apiPort = useQuery({ queryKey: ["setting", "core.server.https_api_port"], queryFn: () => tc.getSetting("core.server.https_api_port") });
+    const apiPort = useQuery({
+        queryKey: ["setting", "core.server.https_api_port"],
+        queryFn: () => tc.getSetting("core.server.https_api_port"),
+    });
     const [host, setHost] = useState(window.location.hostname);
     const [hostEdited, setHostEdited] = useState(false);
     // the address the other boxes use: the web address may be a reverse proxy the box cannot use
@@ -63,7 +80,7 @@ export function Cc3200Card({ build, mac = "", onSaved }: { build?: number; mac?:
             files["cfw/config.txt"] = new TextEncoder().encode(lines.join("\n") + "\n");
             saveZip(zipSync(files, { level: 0 }), `toniebox-${mac || "cc3200"}-sdcard.zip`);
             await onSaved?.();
-            setResult({ ok: true, text: st("cc3200CardSaved") });
+            setResult({ ok: true, text: t("setup.cc3200CardSaved") });
         } catch (e) {
             setResult({ ok: false, text: (e as Error).message });
         } finally {
@@ -71,14 +88,18 @@ export function Cc3200Card({ build, mac = "", onSaved }: { build?: number; mac?:
         }
     };
 
-    if (!loading && releases.length === 0) return <Notice>{st("cc3200ReleaseNone")}</Notice>;
+    if (!loading && releases.length === 0) return <Notice>{t("setup.cc3200ReleaseNone")}</Notice>;
     return (
         <>
-            <p>{st("cc3200CardText")}</p>
+            <p>{t("setup.cc3200CardText")}</p>
             {build === undefined && releases.length > 0 && (
                 <div className="field">
-                    <label>{st("cc3200Release")}</label>
-                    <select className="select" value={release?.build} onChange={(e) => setChosen(Number(e.target.value))}>
+                    <label>{t("setup.cc3200Release")}</label>
+                    <select
+                        className="select"
+                        value={release?.build}
+                        onChange={(e) => setChosen(Number(e.target.value))}
+                    >
                         {releases.map((r) => (
                             <option key={r.build} value={r.build}>
                                 {r.version || r.build} ({r.channel})
@@ -88,7 +109,7 @@ export function Cc3200Card({ build, mac = "", onSaved }: { build?: number; mac?:
                 </div>
             )}
             <div className="field">
-                <label>{st("hostname")}</label>
+                <label>{t("setup.hostname")}</label>
                 <input
                     className="input"
                     value={host}
@@ -97,16 +118,30 @@ export function Cc3200Card({ build, mac = "", onSaved }: { build?: number; mac?:
                         setHostEdited(true);
                     }}
                 />
-                <div className="hint">{seenHost ? st("cc3200HostSeen", { host: seenHost }) : st("cc3200HostHint")}</div>
+                <div className="hint">
+                    {seenHost
+                        ? t("setup.cc3200HostSeen", { host: seenHost })
+                        : t("setup.cc3200HostHint")}
+                </div>
             </div>
             <div className="field">
-                <label>{st("port")}</label>
-                <input className="input" inputMode="numeric" value={port || apiPort.data || "443"} onChange={(e) => setPort(e.target.value)} style={{ maxWidth: 140 }} />
+                <label>{t("setup.port")}</label>
+                <input
+                    className="input"
+                    inputMode="numeric"
+                    value={port || apiPort.data || "443"}
+                    onChange={(e) => setPort(e.target.value)}
+                    style={{ maxWidth: 140 }}
+                />
             </div>
-            <button className="btn primary" disabled={busy || !host.trim() || !release} onClick={download}>
-                {st("cc3200CardDownload")}
+            <button
+                className="btn primary"
+                disabled={busy || !host.trim() || !release}
+                onClick={download}
+            >
+                {t("setup.cc3200CardDownload")}
             </button>
-            <StatusLine busy={busy} text={st("cc3200CardBuilding")} result={result} />
+            <StatusLine busy={busy} text={t("setup.cc3200CardBuilding")} result={result} />
         </>
     );
 }

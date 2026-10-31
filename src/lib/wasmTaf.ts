@@ -30,7 +30,11 @@ const load = () => {
             script.onerror = () => reject(new Error("could not load the browser encoder"));
             document.head.appendChild(script);
         })
-            .then(() => (window as unknown as { createTafEncoder: () => Promise<TafEncoderModule> }).createTafEncoder())
+            .then(() =>
+                (
+                    window as unknown as { createTafEncoder: () => Promise<TafEncoderModule> }
+                ).createTafEncoder(),
+            )
             .catch((e) => {
                 loading = null;
                 throw e;
@@ -52,7 +56,8 @@ export async function encodeTafInBrowser(
     try {
         for (let i = 0; i < files.length; i++) {
             onProgress?.(i, files.length);
-            if (i > 0 && m._taf_encoder_new_chapter(ctx) !== 0) throw new Error("encoder: new chapter failed");
+            if (i > 0 && m._taf_encoder_new_chapter(ctx) !== 0)
+                throw new Error("encoder: new chapter failed");
             const pcm = await toPcmSamples(files[i]);
             const chunk = 48000 * 2; // one second of stereo samples at a time
             for (let off = 0; off < pcm.length; off += chunk) {
@@ -60,7 +65,8 @@ export async function encodeTafInBrowser(
                 const ptr = m._malloc(part.length * 2);
                 try {
                     m.HEAP16.set(part, ptr / 2);
-                    if (m._taf_encoder_encode(ctx, ptr, part.length / 2) !== 0) throw new Error("encoder: encoding failed");
+                    if (m._taf_encoder_encode(ctx, ptr, part.length / 2) !== 0)
+                        throw new Error("encoder: encoding failed");
                 } finally {
                     m._free(ptr);
                 }

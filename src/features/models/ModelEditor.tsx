@@ -76,13 +76,19 @@ interface Linked {
 /** audio id and hash of a TAF, or of the TAF a TAP builds */
 async function linkFile(fetchFiles: FetchFiles, path: string): Promise<Linked> {
     if (isTap(path)) {
-        const tap = await getJson<{ filepath?: string; audio_id?: number; files?: { name?: string }[] }>(
+        const tap = await getJson<{
+            filepath?: string;
+            audio_id?: number;
+            files?: { name?: string }[];
+        }>(
             `/content/${path.replace(/^\//, "").split("/").map(encodeURIComponent).join("/")}${q({ special: "library" })}`,
         );
         const out = tap.filepath?.startsWith("lib://") ? "/" + tap.filepath.slice(6) : "";
         const outEntry = out ? await fileEntry(fetchFiles, out).catch(() => undefined) : undefined;
         const entry = await fileEntry(fetchFiles, path).catch(() => undefined);
-        const ids = [outEntry?.tafHeader?.audioId, tap.audio_id].filter((x): x is number => Boolean(x)).map(String);
+        const ids = [outEntry?.tafHeader?.audioId, tap.audio_id]
+            .filter((x): x is number => Boolean(x))
+            .map(String);
         return {
             path,
             entry: entry ?? outEntry,
@@ -129,7 +135,8 @@ export function ModelEditor({
     const access = useAccess();
     const mayEdit = original ? access.mayChangeModel(original) : access.canCreateModels;
 
-    const set = <K extends keyof CustomModel>(k: K, v: CustomModel[K]) => setDraft((d) => ({ ...d, [k]: v }));
+    const set = <K extends keyof CustomModel>(k: K, v: CustomModel[K]) =>
+        setDraft((d) => ({ ...d, [k]: v }));
 
     const link = async (path: string) => {
         setLinking(true);
@@ -138,7 +145,9 @@ export function ModelEditor({
             setLinked(l);
             const info = l.entry?.tonieInfo;
             // the file has a custom model already: edit that one instead of making a second
-            const existing = models.data?.find((m) => l.audioIds.some((id) => m.audio_id.map(String).includes(id)));
+            const existing = models.data?.find((m) =>
+                l.audioIds.some((id) => m.audio_id.map(String).includes(id)),
+            );
             if (existing && !original) {
                 setOriginal(existing.model);
                 setDraft(structuredClone(existing));
@@ -153,9 +162,9 @@ export function ModelEditor({
                 pic: d.pic || info?.picture || "",
                 tracks: d.tracks.length ? d.tracks : l.chapterNames,
             }));
-            if (!l.audioIds.length) ui.toast("error", t("noAudioId"));
+            if (!l.audioIds.length) ui.toast("error", t("common.noAudioId"));
         } catch (e) {
-            ui.toast("error", t("loadFailed"), String((e as Error).message));
+            ui.toast("error", t("common.loadFailed"), String((e as Error).message));
         } finally {
             setLinking(false);
         }
@@ -172,7 +181,15 @@ export function ModelEditor({
             setKind(start.model.audio_id.length ? "cover" : "figure");
         } else if (start.mode === "override") {
             const i = start.info;
-            setDraft({ ...blank(), model: i.model, series: i.series, episodes: i.episode, pic: i.picture, tracks: i.tracks ?? [], language: i.language || "de-de" });
+            setDraft({
+                ...blank(),
+                model: i.model,
+                series: i.series,
+                episodes: i.episode,
+                pic: i.picture,
+                tracks: i.tracks ?? [],
+                language: i.language || "de-de",
+            });
             setOriginal(null);
             setKind("figure");
             setExpert(true);
@@ -188,30 +205,41 @@ export function ModelEditor({
     /** an official figure with this number: the custom model replaces its data */
     const official = useQuery({
         queryKey: ["officialModel", modelId],
-        queryFn: () => tc.searchTonies(modelId).then((list) => list.find((x) => x.model === modelId) ?? null),
+        queryFn: () =>
+            tc.searchTonies(modelId).then((list) => list.find((x) => x.model === modelId) ?? null),
         enabled: Boolean(start) && modelId.length >= 2,
     });
 
     /** what another custom model has already: its number, or the same audio id with the same hash */
     const duplicate = () => {
         const others = (models.data ?? []).filter((m) => m.model !== original);
-        if (modelId && others.some((m) => m.model.toLowerCase() === modelId.toLowerCase())) return t("modelIdTaken", { model: modelId });
+        if (modelId && others.some((m) => m.model.toLowerCase() === modelId.toLowerCase()))
+            return t("models.modelIdTaken", { model: modelId });
         const pairs = draft.audio_id.map((id, i) => `${id}/${(draft.hash[i] ?? "").toLowerCase()}`);
-        const twin = others.find((m) => m.audio_id.some((id, i) => pairs.includes(`${id}/${(m.hash[i] ?? "").toLowerCase()}`)));
-        return twin ? t("audioTaken", { model: twin.series || twin.model }) : "";
+        const twin = others.find((m) =>
+            m.audio_id.some((id, i) => pairs.includes(`${id}/${(m.hash[i] ?? "").toLowerCase()}`)),
+        );
+        return twin ? t("models.audioTaken", { model: twin.series || twin.model }) : "";
     };
 
     /** the same data as a new custom model with a number of its own */
     const copy = () => {
         setOriginal(null);
-        setDraft((d) => ({ ...d, model: "", audio_id: [], hash: [], series: `${d.series} (${t("copyNoun")})` }));
+        setDraft((d) => ({
+            ...d,
+            model: "",
+            audio_id: [],
+            hash: [],
+            series: `${d.series} (${t("models.copyNoun")})`,
+        }));
         setLinked(null);
-        ui.toast("info", t("copyCreated"));
+        ui.toast("info", t("models.copyCreated"));
     };
 
     const save = async () => {
-        if (!draft.series.trim()) return ui.toast("error", t("nameRequired"));
-        if (kind === "cover" && !draft.audio_id.length) return ui.toast("error", t("chooseFileFirst"));
+        if (!draft.series.trim()) return ui.toast("error", t("common.nameRequired"));
+        if (kind === "cover" && !draft.audio_id.length)
+            return ui.toast("error", t("models.chooseFileFirst"));
         const dup = duplicate();
         if (dup) return ui.toast("error", dup);
         setSaving(true);
@@ -221,14 +249,16 @@ export function ModelEditor({
             series: draft.series.trim(),
             episodes: draft.episodes.trim(),
             tracks: draft.tracks.map((x) => x.trim()).filter(Boolean),
-            model: draft.model.trim() || newModelId([draft.series, draft.episodes].filter(Boolean).join(" "), taken),
+            model:
+                draft.model.trim() ||
+                newModelId([draft.series, draft.episodes].filter(Boolean).join(" "), taken),
         };
         model.title = [model.series, model.episodes].filter(Boolean).join(" - ");
         const ok = await ui.run(async () => {
             if (original && original !== model.model) await tc.renameModel(original, model.model);
             await tc.upsertModel(model);
             return true;
-        }, t("saved"));
+        }, t("common.saved"));
         setSaving(false);
         if (!ok) return;
         qc.invalidateQueries({ queryKey: keys.customModels });
@@ -244,16 +274,18 @@ export function ModelEditor({
         if (!original) return;
         // the picture can go along when no other custom tonie shows it
         const pic = models.data?.find((m) => m.model === original)?.pic ?? "";
-        const lastOfPic = pic.startsWith("/custom_img/") && !models.data?.some((m) => m.model !== original && m.pic === pic);
+        const lastOfPic =
+            pic.startsWith("/custom_img/") &&
+            !models.data?.some((m) => m.model !== original && m.pic === pic);
         const { ok: yes, checked } = await ui.confirmCheck({
-            title: t("deleteModel"),
-            text: t("deleteModelText", { name: draft.series || draft.model }),
-            confirm: t("delete"),
+            title: t("models.deleteModel"),
+            text: t("models.deleteModelText", { name: draft.series || draft.model }),
+            confirm: t("common.delete"),
             danger: true,
-            check: lastOfPic ? { label: t("deletePictureToo"), value: true } : undefined,
+            check: lastOfPic ? { label: t("models.deletePictureToo"), value: true } : undefined,
         });
         if (!yes) return;
-        const ok = await ui.run(() => tc.deleteModel(original, checked), t("deleted"));
+        const ok = await ui.run(() => tc.deleteModel(original, checked), t("common.deleted"));
         if (ok !== undefined) {
             qc.invalidateQueries({ queryKey: keys.customModels });
             invalidateTags();
@@ -266,17 +298,17 @@ export function ModelEditor({
         const small = await shrinkImage(file, file.name).catch(() => file);
         const name = `${Date.now().toString(36)}-${small.name.replace(/[^\w.-]+/g, "_")}`;
         const renamed = new File([small], name, { type: small.type });
-        const ok = await ui.run(() => tc.uploadCustomImage(renamed), t("imageUploaded"));
+        const ok = await ui.run(() => tc.uploadCustomImage(renamed), t("models.imageUploaded"));
         if (ok !== undefined) set("pic", `/custom_img/${name}`);
     };
 
     const title = saved
-        ? t("figureCreated")
+        ? t("models.figureCreated")
         : original
           ? draft.series || draft.model
           : kind === "figure"
-            ? t("newFigure")
-            : t("newCover");
+            ? t("common.newFigure")
+            : t("models.newCover");
 
     return (
         <>
@@ -289,31 +321,46 @@ export function ModelEditor({
                     saved ? (
                         <>
                             <button className="btn" onClick={onClose}>
-                                {t("done")}
+                                {t("common.done")}
                             </button>
                             <button className="btn primary" onClick={() => setAssign(true)}>
                                 <Disc3 size={18} />
-                                {t("assignToTonie")}
+                                {t("common.assignToTonie")}
                             </button>
                         </>
                     ) : (
                         <>
                             {original && mayEdit && (
-                                <button className="btn danger" style={{ flex: "0 0 auto" }} onClick={remove} aria-label={t("delete")}>
+                                <button
+                                    className="btn danger"
+                                    style={{ flex: "0 0 auto" }}
+                                    onClick={remove}
+                                    aria-label={t("common.delete")}
+                                >
                                     <Trash2 size={18} />
                                 </button>
                             )}
                             {original && access.canCreateModels && (
-                                <button className="btn" style={{ flex: "0 0 auto" }} onClick={copy} aria-label={t("copyModel")} title={t("copyModel")}>
+                                <button
+                                    className="btn"
+                                    style={{ flex: "0 0 auto" }}
+                                    onClick={copy}
+                                    aria-label={t("models.copyModel")}
+                                    title={t("models.copyModel")}
+                                >
                                     <Copy size={18} />
                                 </button>
                             )}
                             <button className="btn" onClick={onClose}>
-                                {t("cancel")}
+                                {t("common.cancel")}
                             </button>
                             {mayEdit && (
-                                <button className="btn primary" onClick={save} disabled={saving || linking}>
-                                    {t("save")}
+                                <button
+                                    className="btn primary"
+                                    onClick={save}
+                                    disabled={saving || linking}
+                                >
+                                    {t("common.save")}
                                 </button>
                             )}
                         </>
@@ -323,54 +370,124 @@ export function ModelEditor({
                 {saved ? (
                     <div style={{ textAlign: "center", padding: "20px 0" }}>
                         <TonieImage src={saved.pic} size={140} />
-                        <CheckCircle2 size={34} color="var(--ok)" style={{ margin: "14px auto 6px" }} />
+                        <CheckCircle2
+                            size={34}
+                            color="var(--ok)"
+                            style={{ margin: "14px auto 6px" }}
+                        />
                         <div style={{ fontWeight: 700, fontSize: 19 }}>{saved.series}</div>
                         {saved.episodes && <div className="muted">{saved.episodes}</div>}
                         <p className="muted small" style={{ maxWidth: 340, margin: "14px auto 0" }}>
-                            {t("figureCreatedText")}
+                            {t("models.figureCreatedText")}
                         </p>
                     </div>
                 ) : (
-                    <fieldset disabled={!mayEdit} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-                        {!mayEdit && <Notice info>{t("modelNotYours")}</Notice>}
-                        {official.data && <Notice info>{t("overridesOriginal", { model: official.data.model, name: [official.data.series, official.data.episode].filter(Boolean).join(" – ") })}</Notice>}
+                    <fieldset
+                        disabled={!mayEdit}
+                        style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+                    >
+                        {!mayEdit && <Notice info>{t("models.modelNotYours")}</Notice>}
+                        {official.data && (
+                            <Notice info>
+                                {t("models.overridesOriginal", {
+                                    model: official.data.model,
+                                    name: [official.data.series, official.data.episode]
+                                        .filter(Boolean)
+                                        .join(" – "),
+                                })}
+                            </Notice>
+                        )}
                         <p className="muted small" style={{ margin: "0 2px 14px" }}>
-                            {kind === "figure" ? t("figureIntro") : t("coverIntro")}
+                            {kind === "figure" ? t("models.figureIntro") : t("models.coverIntro")}
                         </p>
 
                         {kind === "cover" && (
-                            <Section title={t("audioFile")}>
+                            <Section title={t("models.audioFile")}>
                                 <Row
-                                    icon={linked?.entry?.tonieInfo?.picture ? undefined : <FileAudio size={17} />}
-                                    leading={linked?.entry?.tonieInfo?.picture ? <TonieImage src={linked.entry.tonieInfo.picture} size={40} /> : undefined}
-                                    title={linking ? t("loading") : linked ? baseName(linked.path) : draft.audio_id.length ? t("linkedAudioIds", { n: draft.audio_id.length }) : t("chooseFile")}
-                                    sub={linked ? parentPath(linked.path) : draft.audio_id.length ? t("tapToRelink") : t("chooseFileHint")}
+                                    icon={
+                                        linked?.entry?.tonieInfo?.picture ? undefined : (
+                                            <FileAudio size={17} />
+                                        )
+                                    }
+                                    leading={
+                                        linked?.entry?.tonieInfo?.picture ? (
+                                            <TonieImage
+                                                src={linked.entry.tonieInfo.picture}
+                                                size={40}
+                                            />
+                                        ) : undefined
+                                    }
+                                    title={
+                                        linking
+                                            ? t("models.loading")
+                                            : linked
+                                              ? baseName(linked.path)
+                                              : draft.audio_id.length
+                                                ? t("models.linkedAudioIds", {
+                                                      n: draft.audio_id.length,
+                                                  })
+                                                : t("common.chooseFile")
+                                    }
+                                    sub={
+                                        linked
+                                            ? parentPath(linked.path)
+                                            : draft.audio_id.length
+                                              ? t("models.tapToRelink")
+                                              : t("models.chooseFileHint")
+                                    }
                                     onClick={() => setPickFile(true)}
                                     chevron
                                 />
                             </Section>
                         )}
 
-                        <div style={{ display: "flex", justifyContent: "center", margin: "6px 0 18px" }}>
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                margin: "6px 0 18px",
+                            }}
+                        >
                             <button
                                 type="button"
                                 className="no-drag"
-                                style={{ border: "none", background: "none", padding: 0, position: "relative" }}
+                                style={{
+                                    border: "none",
+                                    background: "none",
+                                    padding: 0,
+                                    position: "relative",
+                                }}
                                 onClick={() => fileInput.current?.click()}
-                                aria-label={t("picture")}
+                                aria-label={t("models.picture")}
                             >
                                 {draft.pic ? (
                                     <TonieImage src={draft.pic} size={150} />
                                 ) : (
-                                    <div className="tonie-pic-fallback" style={{ width: 150, height: 150, flexDirection: "column", gap: 6 }}>
+                                    <div
+                                        className="tonie-pic-fallback"
+                                        style={{
+                                            width: 150,
+                                            height: 150,
+                                            flexDirection: "column",
+                                            gap: 6,
+                                        }}
+                                    >
                                         <Camera size={34} />
-                                        <span className="small">{t("addPicture")}</span>
+                                        <span className="small">{t("models.addPicture")}</span>
                                     </div>
                                 )}
                                 {draft.pic && (
                                     <span
                                         className="icon-btn"
-                                        style={{ position: "absolute", right: -4, bottom: -4, width: 40, height: 40, background: "var(--accent)", color: "#fff" }}
+                                        style={{
+                                            position: "absolute",
+                                            right: -4,
+                                            bottom: -4,
+                                            width: 40,
+                                            height: 40,
+                                            background: "var(--accent)",
+                                            color: "#fff",
+                                        }}
                                     >
                                         <Camera size={18} />
                                     </span>
@@ -390,61 +507,120 @@ export function ModelEditor({
                         </div>
 
                         <div className="field">
-                            <label>{kind === "figure" ? t("figureName") : t("albumTitle")}</label>
+                            <label>
+                                {kind === "figure"
+                                    ? t("models.figureName")
+                                    : t("models.albumTitle")}
+                            </label>
                             <input
                                 className="input"
                                 value={draft.series}
                                 onChange={(e) => set("series", e.target.value)}
-                                placeholder={kind === "figure" ? t("figureNamePlaceholder") : t("albumTitlePlaceholder")}
+                                placeholder={
+                                    kind === "figure"
+                                        ? t("models.figureNamePlaceholder")
+                                        : t("models.albumTitlePlaceholder")
+                                }
                             />
                         </div>
                         <div className="field">
-                            <label>{t("subtitleOptional")}</label>
-                            <input className="input" value={draft.episodes} onChange={(e) => set("episodes", e.target.value)} placeholder={t("subtitlePlaceholder")} />
+                            <label>{t("models.subtitleOptional")}</label>
+                            <input
+                                className="input"
+                                value={draft.episodes}
+                                onChange={(e) => set("episodes", e.target.value)}
+                                placeholder={t("models.subtitlePlaceholder")}
+                            />
                         </div>
                         <div className="field">
-                            <label>{t("tracks")}</label>
+                            <label>{t("models.tracks")}</label>
                             <textarea
                                 className="textarea"
                                 rows={5}
                                 value={draft.tracks.join("\n")}
                                 onChange={(e) => set("tracks", e.target.value.split("\n"))}
-                                placeholder={t("tracksPlaceholder")}
+                                placeholder={t("models.tracksPlaceholder")}
                             />
-                            <div className="hint">{t("tracksHint")}</div>
+                            <div className="hint">{t("models.tracksHint")}</div>
                         </div>
-                        {kind === "cover" && linked && linked.path && isTap(linked.path) && <Notice info>{t("tapCoverHint")}</Notice>}
+                        {kind === "cover" && linked && linked.path && isTap(linked.path) && (
+                            <Notice info>{t("models.tapCoverHint")}</Notice>
+                        )}
 
-                        <button type="button" className="btn ghost small" style={{ padding: "0 4px" }} onClick={() => setExpert((v) => !v)}>
+                        <button
+                            type="button"
+                            className="btn ghost small"
+                            style={{ padding: "0 4px" }}
+                            onClick={() => setExpert((v) => !v)}
+                        >
                             <Link2 size={15} />
-                            {expert ? t("hideExpert") : t("showExpert")}
+                            {expert ? t("common.hideExpert") : t("common.showExpert")}
                         </button>
                         {expert && (
                             <div className="mt">
                                 <div className="field">
-                                    <label>{t("modelId")}</label>
-                                    <input className="input mono" value={draft.model} onChange={(e) => set("model", e.target.value)} placeholder={t("automatic")} />
-                                    <div className="hint">{original ? t("modelIdRenameHint") : t("modelIdAutoHint")}</div>
+                                    <label>{t("models.modelId")}</label>
+                                    <input
+                                        className="input mono"
+                                        value={draft.model}
+                                        onChange={(e) => set("model", e.target.value)}
+                                        placeholder={t("common.automatic")}
+                                    />
+                                    <div className="hint">
+                                        {original
+                                            ? t("models.modelIdRenameHint")
+                                            : t("models.modelIdAutoHint")}
+                                    </div>
                                 </div>
                                 <div className="field">
                                     <label>Audio-IDs</label>
-                                    <input className="input mono" value={draft.audio_id.join(", ")} onChange={(e) => set("audio_id", e.target.value.split(/[,\s]+/).filter(Boolean))} />
+                                    <input
+                                        className="input mono"
+                                        value={draft.audio_id.join(", ")}
+                                        onChange={(e) =>
+                                            set(
+                                                "audio_id",
+                                                e.target.value.split(/[,\s]+/).filter(Boolean),
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div className="field">
                                     <label>SHA1-Hashes</label>
-                                    <input className="input mono" value={draft.hash.join(", ")} onChange={(e) => set("hash", e.target.value.split(/[,\s]+/).filter(Boolean))} />
+                                    <input
+                                        className="input mono"
+                                        value={draft.hash.join(", ")}
+                                        onChange={(e) =>
+                                            set(
+                                                "hash",
+                                                e.target.value.split(/[,\s]+/).filter(Boolean),
+                                            )
+                                        }
+                                    />
                                 </div>
                                 <div className="field">
-                                    <label>{t("picture")} (URL)</label>
-                                    <input className="input mono" value={draft.pic} onChange={(e) => set("pic", e.target.value)} />
+                                    <label>{t("models.picture")} (URL)</label>
+                                    <input
+                                        className="input mono"
+                                        value={draft.pic}
+                                        onChange={(e) => set("pic", e.target.value)}
+                                    />
                                 </div>
                                 <div className="field">
-                                    <label>{t("language")}</label>
-                                    <input className="input" value={draft.language} onChange={(e) => set("language", e.target.value)} />
+                                    <label>{t("common.language")}</label>
+                                    <input
+                                        className="input"
+                                        value={draft.language}
+                                        onChange={(e) => set("language", e.target.value)}
+                                    />
                                 </div>
                                 <div className="field">
-                                    <label>{t("category")}</label>
-                                    <input className="input" value={draft.category ?? ""} onChange={(e) => set("category", e.target.value)} />
+                                    <label>{t("models.category")}</label>
+                                    <input
+                                        className="input"
+                                        value={draft.category ?? ""}
+                                        onChange={(e) => set("category", e.target.value)}
+                                    />
                                 </div>
                             </div>
                         )}
@@ -457,15 +633,24 @@ export function ModelEditor({
                 onClose={() => setPickFile(false)}
                 onPick={(source) => link("/" + source.replace(/^lib:\/\//, ""))}
                 startPath={linked ? parentPath(linked.path) : "/"}
-                title={t("chooseFile")}
+                title={t("common.chooseFile")}
             />
             <TagPicker
                 open={assign}
                 onClose={() => setAssign(false)}
-                title={t("assignToTonie")}
+                title={t("common.assignToTonie")}
                 onPick={async (tag) => {
                     if (!saved) return;
-                    await ui.run(() => tc.setContent(tag.ruid, "tonie_model", saved.model, tag.overlay || undefined), t("figureSet"));
+                    await ui.run(
+                        () =>
+                            tc.setContent(
+                                tag.ruid,
+                                "tonie_model",
+                                saved.model,
+                                tag.overlay || undefined,
+                            ),
+                        t("common.figureSet"),
+                    );
                     invalidateTags();
                     onClose();
                 }}
@@ -473,4 +658,3 @@ export function ModelEditor({
         </>
     );
 }
-

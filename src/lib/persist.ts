@@ -5,7 +5,15 @@ import type { Query } from "@tanstack/react-query";
 import { del, get, set } from "idb-keyval";
 import { PREFIX } from "../api/client";
 
-const PERSISTED = new Set(["boxes", "boxModels", "allTags", "tags", "files", "customModels", "cfwBoxes"]);
+const PERSISTED = new Set([
+    "boxes",
+    "boxModels",
+    "allTags",
+    "tags",
+    "files",
+    "customModels",
+    "cfwBoxes",
+]);
 
 export const persister = createAsyncStoragePersister({
     storage: {
@@ -23,6 +31,7 @@ export const persistOptions = {
     maxAge: 7 * 24 * 3600 * 1000,
     buster: "1",
     dehydrateOptions: {
-        shouldDehydrateQuery: (q: Query) => q.state.status === "success" && PERSISTED.has(String(q.queryKey[0])),
+        shouldDehydrateQuery: (q: Query) =>
+            q.state.status === "success" && PERSISTED.has(String(q.queryKey[0])),
     },
 };

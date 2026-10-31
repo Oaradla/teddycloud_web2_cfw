@@ -1,5 +1,6 @@
 // teddyCloud endpoints used by the app
-import { getJson, getText, postForm, postJson, postText, q, request } from "./client";
+import { t } from "../lib/i18n";
+import { ApiError, getJson, getText, postForm, postJson, postText, q, request } from "./client";
 import type {
     AuthStatus,
     Box,
@@ -35,11 +36,20 @@ let tapBuildProbe: Promise<boolean> | null = null;
 
 export const NO_RUID = "ffffffffffffffff";
 
+/** a refused setting is answered with 200 "ERROR" */
+const settingTaken = async (answer: Promise<Response>) => {
+    if ((await (await answer).text()).trim() === "ERROR") throw new Error(t("common.saveFailed"));
+};
+
 export const tc = {
     /* ---------- boxes ---------- */
     boxes: () => getJson<{ boxes: Box[] }>("/api/getBoxes").then((r) => r.boxes ?? []),
     // without tonieboxes.json the server answers no list
-    boxModels: () => getJson<BoxModel[]>("/api/tonieboxesJson").then((r) => (Array.isArray(r) ? r : []), () => [] as BoxModel[]),
+    boxModels: () =>
+        getJson<BoxModel[]>("/api/tonieboxesJson").then(
+            (r) => (Array.isArray(r) ? r : []),
+            () => [] as BoxModel[],
+        ),
     boxState: async (id: string): Promise<BoxState> => {
         const [online, lastRuid, lastRuidTime, lastSeen, ip, firmware] = await Promise.all([
             setting("internal.online", id),
@@ -83,9 +93,15 @@ export const tc = {
     },
     searchTonies: (text: string) =>
         Promise.all([
-            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchSeries: text })}`).catch(() => []),
-            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchEpisode: text })}`).catch(() => []),
-            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchModel: text })}`).catch(() => []),
+            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchSeries: text })}`).catch(
+                () => [],
+            ),
+            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchEpisode: text })}`).catch(
+                () => [],
+            ),
+            getJson<TonieInfo[]>(`/api/toniesJsonSearch${q({ searchModel: text })}`).catch(
+                () => [],
+            ),
         ]).then((lists) => {
             const seen = new Set<string>();
             return lists.flat().filter((t) => !seen.has(t.model) && seen.add(t.model));
@@ -95,20 +111,28 @@ export const tc = {
     customModels: () => getJson<CustomModel[]>("/api/toniesCustomJson"),
     upsertModel: (model: CustomModel) => postJson("/api/toniesCustomJsonUpsert", model),
     /** pictures: also the picture when no other custom tonie shows it */
-    deleteModel: (model: string, pictures = false) => postJson("/api/toniesCustomJsonDelete", { models: [model], pictures }),
+    deleteModel: (model: string, pictures = false) =>
+        postJson("/api/toniesCustomJsonDelete", { models: [model], pictures }),
     /** the custom tonies used only by these library paths: they may go with them */
     orphanModels: (paths: string[]) => postJson<string[]>("/api/toniesCustomJsonOrphans", paths),
     /** the custom tonies and pictures the user may change */
-    modelsChangeable: () => getJson<{ models: string[]; images: string[] }>("/api/toniesCustomJsonChangeable"),
-    deleteCustomImage: (name: string) => postText(`/api/fileDelete${q({ special: "custom_img" })}`, name),
+    modelsChangeable: () =>
+        getJson<{ models: string[]; images: string[] }>("/api/toniesCustomJsonChangeable"),
+    deleteCustomImage: (name: string) =>
+        postText(`/api/fileDelete${q({ special: "custom_img" })}`, name),
     renameModel: (fromModel: string, toModel: string) =>
         postJson("/api/toniesCustomJsonRename", { fromModel, toModel, updateContentJson: true }),
     reloadToniesJson: () => getText("/api/toniesJsonReload"),
     /** the audio ids and hashes of a figure, from the custom models and tonies.json (a few MB, fetched on demand) */
     modelAudio: async (model: string) => {
-        const lists = await Promise.all([tc.customModels(), getJson<CustomModel[]>("/api/toniesJson")]);
+        const lists = await Promise.all([
+            tc.customModels(),
+            getJson<CustomModel[]>("/api/toniesJson"),
+        ]);
         const entry = lists.flat().find((x) => x.model === model);
-        return (entry?.audio_id ?? []).map((id, i) => ({ audioId: String(id), hash: (entry!.hash?.[i] ?? "").toLowerCase() })).filter((x) => x.hash);
+        return (entry?.audio_id ?? [])
+            .map((id, i) => ({ audioId: String(id), hash: (entry!.hash?.[i] ?? "").toLowerCase() }))
+            .filter((x) => x.hash);
     },
     /** a flash dump of a box into the server's firmware folder; answers the file name it got there */
     storeFlashDump: (name: string, data: Uint8Array) => {
@@ -130,25 +154,53 @@ export const tc = {
     dirCreate: (path: string, special = "library") =>
         postText(`/api/dirCreate${q({ special })}`, path),
     /** models: also the custom tonies used only by what is deleted */
-    fileDelete: (path: string, isDir: boolean, special = "library", overlay?: string, models = false) =>
-        postText(`/api/${isDir ? "dirDelete" : "fileDelete"}${q({ special, overlay, models: models ? 1 : undefined })}`, path),
-    /** everything inside a folder, all levels */
-    walkTree: async (path: string, special = "library"): Promise<{ path: string; entry: FileEntry }[]> => {
-        // the folders of one level are read at the same time
-        const levels = await Promise.all(
-            (await tc.files(path, special))
-                .filter((f) => f.name !== "." && f.name !== "..")
-                .map(async (f) => {
-                    const p = `${path.replace(/\/$/, "")}/${f.name}`;
-                    return [{ path: p, entry: f }, ...(f.isDir ? await tc.walkTree(p, special) : [])];
-                }),
-        );
-        return levels.flat();
+    fileDelete: (
+        path: string,
+        isDir: boolean,
+        special = "library",
+        overlay?: string,
+        models = false,
+    ) =>
+        postText(
+            `/api/${isDir ? "dirDelete" : "fileDelete"}${q({ special, overlay, models: models ? 1 : undefined })}`,
+            path,
+        ),
+    /** everything inside a folder, all levels; at most four folders are read at the same time */
+    walkTree: async (
+        path: string,
+        special = "library",
+    ): Promise<{ path: string; entry: FileEntry }[]> => {
+        const all: { path: string; entry: FileEntry }[] = [];
+        const folders = [path];
+        const depth = path.split("/").length;
+        while (folders.length > 0) {
+            const batch = folders.splice(0, 4);
+            const lists = await Promise.all(batch.map((folder) => tc.files(folder, special)));
+            lists.forEach((files, i) =>
+                files
+                    .filter((f) => f.name !== "." && f.name !== "..")
+                    .forEach((f) => {
+                        const p = `${batch[i].replace(/\/$/, "")}/${f.name}`;
+                        all.push({ path: p, entry: f });
+                        // not deeper than 16 folders: a folder linked into itself must end
+                        if (f.isDir && p.split("/").length - depth < 16) folders.push(p);
+                    }),
+            );
+        }
+        // a folder's files stay together, as when read depth first
+        return all.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
     },
     /** deletes a folder with everything in it */
     deleteTree: async (path: string, special = "library", models = false): Promise<void> => {
         // newer servers take the whole folder, also files the lists do not show
-        if (await tc.fileDelete(path, false, special, undefined, models).then(() => true, () => false)) return;
+        if (
+            await tc.fileDelete(path, false, special, undefined, models).then(
+                () => true,
+                // older ones answer 500 for a folder; other errors (no right, no session) stay errors
+                (e) => (e instanceof ApiError && e.status === 500 ? false : Promise.reject(e)),
+            )
+        )
+            return;
         // older ones remove empty folders only
         for (const f of await tc.files(path, special)) {
             if (f.name === "." || f.name === "..") continue;
@@ -160,14 +212,23 @@ export const tc = {
     },
     /** moves the content TAF of a tag into the library (by/audioId/ or its root) and assigns it there */
     migrateToLibrary: async (ruid: string, root: boolean, overlay?: string) => {
-        const r = await (await postText(`/api/migrateContent2Lib${q({ overlay })}`, `ruid=${ruid}&libroot=${root}`)).text();
+        const r = await (
+            await postText(
+                `/api/migrateContent2Lib${q({ overlay })}`,
+                `ruid=${ruid}&libroot=${root}`,
+            )
+        ).text();
         if (r.trim() !== "OK") throw new Error(r || "failed");
     },
-    fileMove: (source: string, target: string, special = "library") =>
-        postText(
+    fileMove: async (source: string, target: string, special = "library") => {
+        // the server cuts a longer target short without an error
+        if (new TextEncoder().encode(target).length > 258)
+            throw new Error(t("library.pathTooLong"));
+        return postText(
             `/api/fileMove${q({ special })}`,
             `source=${encodeURIComponent(source)}&target=${encodeURIComponent(target)}`,
-        ),
+        );
+    },
     setListened: (path: string, listened: boolean) =>
         postText(`/api/fileSetListened${q({ path, special: "library" })}`, `listened=${listened}`),
     uploadFiles: (files: File[], path: string, onProgress?: (f: number) => void) => {
@@ -201,15 +262,22 @@ export const tc = {
     encodeFiles: (source: string[], target: string) =>
         postText(
             "/api/fileEncode?special=library",
-            [...source.map((s) => `source=${encodeURIComponent(s)}`), `target=${encodeURIComponent(target)}`].join("&"),
+            [
+                ...source.map((s) => `source=${encodeURIComponent(s)}`),
+                `target=${encodeURIComponent(target)}`,
+            ].join("&"),
         ),
 
     /* ---------- playlists (TAP) ---------- */
     readTap: (path: string) =>
-        getJson<Tap>(`/content/${path.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}${q({ special: "library" })}`),
+        getJson<Tap>(
+            `/content/${path.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}${q({ special: "library" })}`,
+        ),
     /** writes a TAP file into a library folder */
     saveTap: (tap: Tap, dir: string, fileName: string) => {
-        const file = new File([JSON.stringify(tap, null, 2)], fileName, { type: "application/json" });
+        const file = new File([JSON.stringify(tap, null, 2)], fileName, {
+            type: "application/json",
+        });
         return tc.uploadFiles([file], dir);
     },
     /** puts the TAF of a playlist together (remux when all files are TAFs) */
@@ -233,13 +301,24 @@ export const tc = {
     },
     /** whether the server can join TAFs of a playlist (otherwise teddyCloud builds it on playback) */
     hasTapBuild: () =>
-        (tapBuildProbe ??= request("/api/tapBuild?special=library", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "" })
+        (tapBuildProbe ??= request("/api/tapBuild?special=library", {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: "",
+        })
             .then((r) => r.status !== 404 && r.status !== 405)
             .catch(() => false)),
     /** every chapter of a TAF as a TAF of its own plus a playlist that builds the original again */
     splitTaf: async (path: string, titles: string[]) => {
-        const body = [`path=${encodeURIComponent(path.replace(/^\/+/, ""))}`, ...titles.map((t) => `title=${encodeURIComponent(t)}`)].join("&");
-        const r = await request("/api/tafSplit?special=library", { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+        const body = [
+            `path=${encodeURIComponent(path.replace(/^\/+/, ""))}`,
+            ...titles.map((t) => `title=${encodeURIComponent(t)}`),
+        ].join("&");
+        const r = await request("/api/tafSplit?special=library", {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body,
+        });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
         return data as { folder: string; tap: string; chapters: number; original?: string };
@@ -247,15 +326,15 @@ export const tc = {
 
     /* ---------- settings ---------- */
     settingsIndex: (overlay?: string) =>
-        getJson<{ options: SettingOption[] }>(`/api/settings/getIndex${q({ groups: "true", overlay })}`).then(
-            (r) => r.options ?? [],
-        ),
+        getJson<{ options: SettingOption[] }>(
+            `/api/settings/getIndex${q({ groups: "true", overlay })}`,
+        ).then((r) => r.options ?? []),
     setSetting: async (key: string, value: string | number | boolean, overlay?: string) => {
-        await postText(`/api/settings/set/${key}${q({ overlay })}`, String(value));
+        await settingTaken(postText(`/api/settings/set/${key}${q({ overlay })}`, String(value)));
         await getText("/api/triggerWriteConfig").catch(() => "");
     },
     resetSetting: async (key: string, overlay?: string) => {
-        await postText(`/api/settings/reset/${key}${q({ overlay })}`, "");
+        await settingTaken(postText(`/api/settings/reset/${key}${q({ overlay })}`, ""));
         await getText("/api/triggerWriteConfig").catch(() => "");
     },
 
@@ -269,7 +348,9 @@ export const tc = {
 
     /* ---------- plugins ---------- */
     plugins: async (): Promise<PluginMeta[]> => {
-        const folders = await getJson<string[]>("/api/plugins/getPlugins").catch(() => [] as string[]);
+        const folders = await getJson<string[]>("/api/plugins/getPlugins").catch(
+            () => [] as string[],
+        );
         const metas = await Promise.all(
             folders.map((folder) =>
                 getJson<Partial<PluginMeta>>(`/plugins/${encodeURIComponent(folder)}/plugin.json`)
@@ -277,7 +358,9 @@ export const tc = {
                     .catch(() => null),
             ),
         );
-        return metas.filter((m): m is PluginMeta => m !== null).sort((a, b) => a.pluginName.localeCompare(b.pluginName));
+        return metas
+            .filter((m): m is PluginMeta => m !== null)
+            .sort((a, b) => a.pluginName.localeCompare(b.pluginName));
     },
     uploadPlugin: (file: File) => {
         const form = new FormData();
@@ -302,7 +385,9 @@ export const tc = {
             .catch(() => false),
     /** the newest teddyCloud on GitHub: a commit of develop or a release */
     latestVersion: (develop: boolean) =>
-        getJson<{ sha?: string; tag_name?: string }>(develop ? "/reverseGeneric/teddycloud_develop" : "/reverseGeneric/teddycloud_release"),
+        getJson<{ sha?: string; tag_name?: string }>(
+            develop ? "/reverseGeneric/teddycloud_develop" : "/reverseGeneric/teddycloud_release",
+        ),
 
     /* ---------- login ---------- */
     authStatus: async (): Promise<AuthStatus> => {
@@ -330,7 +415,8 @@ export const tc = {
     /* ---------- custom firmware ---------- */
     cfwBoxes: async (): Promise<CfwBox[] | null> => {
         const response = await request("/api/cfw/boxes");
-        if (!response.ok) return null; // no CFW support on this server
+        if (response.status === 404) return null; // CFW support off, or not on this server
+        if (!response.ok) throw new ApiError(await response.text(), response.status);
         return (await response.json()).boxes ?? [];
     },
     cfwStatus: (id: string) => getJson<CfwStatus>(`/api/cfw/status${q({ overlay: id })}`),
@@ -361,7 +447,12 @@ export const tc = {
         return postForm(`/api/uploadCert${q({ mac })}`, form);
     },
     /** a firmware image or release zip; ESP32 originals may get teddyCloud's server patches */
-    cfwUpload: (file: File, channel: CfwChannel, patch: { hostname?: string; hostnameOld?: string; port?: number } = {}, onProgress?: (f: number) => void) => {
+    cfwUpload: (
+        file: File,
+        channel: CfwChannel,
+        patch: { hostname?: string; hostnameOld?: string; port?: number } = {},
+        onProgress?: (f: number) => void,
+    ) => {
         const form = new FormData();
         form.append("file", file, file.name);
         return postForm(
@@ -374,19 +465,30 @@ export const tc = {
     cfwUploadPage: (file: File, image?: CfwImage) => {
         const form = new FormData();
         form.append("file", file, file.name);
-        return postForm(`/api/cfw/firmware/upload${image ? q({ build: image.build, platform: image.platform ?? "cc3200" }) : ""}`, form).then(
-            (text) => (text ? JSON.parse(text) : { ok: true, message: "" }) as CfwResult,
-        );
+        return postForm(
+            `/api/cfw/firmware/upload${image ? q({ build: image.build, platform: image.platform ?? "cc3200" }) : ""}`,
+            form,
+        ).then((text) => (text ? JSON.parse(text) : { ok: true, message: "" }) as CfwResult);
     },
     cfwEditFirmware: (image: CfwImage, change: { channel?: CfwChannel; notes?: string }) =>
-        postJson<CfwResult>("/api/cfw/firmware/edit", { build: image.build, platform: image.platform ?? "cc3200", ...change }),
+        postJson<CfwResult>("/api/cfw/firmware/edit", {
+            build: image.build,
+            platform: image.platform ?? "cc3200",
+            ...change,
+        }),
     cfwDeleteFirmware: (image: CfwImage) =>
-        postJson<CfwResult>("/api/cfw/firmware/delete", { build: image.build, platform: image.platform ?? "cc3200" }),
+        postJson<CfwResult>("/api/cfw/firmware/delete", {
+            build: image.build,
+            platform: image.platform ?? "cc3200",
+        }),
     cfwCheckGithub: () => postJson<CfwResult>("/api/cfw/firmware/github", {}),
-    cfwDownloadGithub: (tag: string) => postJson<CfwResult>("/api/cfw/firmware/githubDownload", { tag }),
+    cfwDownloadGithub: (tag: string) =>
+        postJson<CfwResult>("/api/cfw/firmware/githubDownload", { tag }),
     /** assigns an image to a box (0: none); now: the box checks at once */
-    cfwDeliver: (id: string, build: number, now = false) => postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { build, now }),
-    cfwCheckNow: (id: string) => postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { now: true }),
+    cfwDeliver: (id: string, build: number, now = false) =>
+        postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { build, now }),
+    cfwCheckNow: (id: string) =>
+        postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { now: true }),
     cfwTag: (ruid: string) => getJson<CfwTag>(`/api/cfw/tag${q({ ruid })}`),
     cfwSetTag: (ruid: string, tag: Omit<CfwTag, "ruid">) =>
         postJson<{ ok: boolean; message: string }>(`/api/cfw/tag${q({ ruid })}`, tag),

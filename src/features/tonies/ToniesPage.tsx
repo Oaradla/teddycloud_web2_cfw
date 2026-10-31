@@ -1,12 +1,33 @@
-import { Check, CheckSquare, CircleHelp, Disc3, Download, LayoutGrid, List, Pencil, Play, Save, SearchX, SlidersHorizontal, X } from "lucide-react";
+import {
+    Check,
+    CheckSquare,
+    CircleHelp,
+    Disc3,
+    Download,
+    LayoutGrid,
+    List,
+    Pencil,
+    Play,
+    Save,
+    SearchX,
+    SlidersHorizontal,
+    X,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { contentTitle, figureInfo, figureSubtitle, figureTitle, linkedContent, tagInfo } from "../../lib/format";
+import {
+    contentTitle,
+    figureInfo,
+    figureSubtitle,
+    figureTitle,
+    linkedContent,
+    tagInfo,
+} from "../../lib/format";
 import { exportCsv, exportHtml, exportJson } from "../../lib/exportTags";
 import { lang, t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
-import { TagWithBox, useAllTags, useBoxes, useBoxesDiffer } from "../../lib/queries";
+import { TagWithBox, useAllTags, useBoxes, useTagsPlaced } from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { FigurePic } from "../../ui/FigurePic";
 import { Empty, ErrorBox, Page, SearchField, useUi } from "../../ui/kit";
@@ -54,7 +75,8 @@ const loadProfiles = (): Record<string, string> => {
     }
 };
 
-const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+const cmp = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 /** the tonies; with system the system sound tags of the boxes instead */
 export function ToniesPage({ system = false }: { system?: boolean }) {
@@ -77,7 +99,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
     const boxes = useBoxes();
     const tags = useAllTags();
     const player = usePlayer();
-    const boxesDiffer = useBoxesDiffer();
+    const tagsPlaced = useTagsPlaced();
     const navigate = useNavigate();
 
     const setParam = (k: string, v: string) => {
@@ -95,13 +117,19 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         setPref("tonies.view", v);
     };
 
-    const base = useMemo(() => (tags.data ?? []).filter((x) => (x.type === "system") === system), [tags.data, system]);
+    const base = useMemo(
+        () => (tags.data ?? []).filter((x) => (x.type === "system") === system),
+        [tags.data, system],
+    );
     const seriesList = useMemo(
         () => [...new Set(base.map((x) => figureInfo(x).series).filter(Boolean))].sort(cmp),
         [base],
     );
 
-    const languages = useMemo(() => [...new Set(base.map((x) => tagInfo(x).language).filter(Boolean) as string[])].sort(), [base]);
+    const languages = useMemo(
+        () => [...new Set(base.map((x) => tagInfo(x).language).filter(Boolean) as string[])].sort(),
+        [base],
+    );
     const expertFilter = useMemo(() => {
         try {
             return { test: compileFilter(expert, base) };
@@ -118,7 +146,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             .filter((x) => !expertFilter.test || expertFilter.test(x))
             .filter((x) => hidden || !x.hide)
             .filter((x) => matches(x, content))
-            .filter((x) => !box || x.boxIds.includes(box))
+            .filter((x) => !box || x.placedOn.includes(box))
             .filter((x) => !series || figureInfo(x).series === series)
             .filter((x) => {
                 if (!f) return true;
@@ -132,39 +160,44 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         result.sort((a, b) => {
             if (sort === "za") return cmp(title(b), title(a));
             if (sort === "length") return (b.lengthSeconds ?? 0) - (a.lengthSeconds ?? 0);
-            if (sort === "series") return cmp(figureInfo(a).series, figureInfo(b).series) || cmp(title(a), title(b));
+            if (sort === "series")
+                return cmp(figureInfo(a).series, figureInfo(b).series) || cmp(title(a), title(b));
             return cmp(title(a), title(b));
         });
         return result;
     }, [base, query, content, box, series, hidden, sort, language, expertFilter]);
 
     const contentLabels: Record<Content, string> = {
-        all: t("all"),
-        content: t("withContent"),
-        custom: t("ownContent"),
-        original: t("original"),
-        empty: t("noContent"),
-        live: t("live"),
+        all: t("common.all"),
+        content: t("tonies.withContent"),
+        custom: t("tonies.ownContent"),
+        original: t("tonies.original"),
+        empty: t("tonies.noContent"),
+        live: t("common.live"),
     };
     const boxName = (id: string) => boxes.data?.find((b) => b.ID === id)?.boxName || id;
     const active: { label: string; clear: () => void }[] = [
         ...(box ? [{ label: boxName(box), clear: () => setParam("box", "") }] : []),
-        ...(content !== "all" ? [{ label: contentLabels[content], clear: () => setParam("f", "") }] : []),
+        ...(content !== "all"
+            ? [{ label: contentLabels[content], clear: () => setParam("f", "") }]
+            : []),
         ...(series ? [{ label: series, clear: () => setParam("series", "") }] : []),
-        ...(hidden ? [{ label: t("showHidden"), clear: () => setParam("hidden", "") }] : []),
+        ...(hidden ? [{ label: t("tonies.showHidden"), clear: () => setParam("hidden", "") }] : []),
         ...(language ? [{ label: languageName(language), clear: () => setParam("lang", "") }] : []),
-        ...(expert ? [{ label: expert, clear: () => (setParam("x", ""), setExpertDraft("")) }] : []),
+        ...(expert
+            ? [{ label: expert, clear: () => (setParam("x", ""), setExpertDraft("")) }]
+            : []),
     ];
 
     const saveProfile = async () => {
-        const name = await ui.prompt({ title: t("saveFilter"), label: t("name") });
+        const name = await ui.prompt({ title: t("tonies.saveFilter"), label: t("common.name") });
         if (!name) return;
         const next = new URLSearchParams(params);
         if (query) next.set("q", query);
         const all = { ...profiles, [name]: next.toString() };
         setProfiles(all);
         setPref("tonies.filters", JSON.stringify(all));
-        ui.toast("ok", t("filterSaved"));
+        ui.toast("ok", t("tonies.filterSaved"));
     };
     const loadProfile = (name: string) => {
         const next = new URLSearchParams(profiles[name]);
@@ -179,19 +212,27 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         setPref("tonies.filters", JSON.stringify(rest));
     };
     const exportList = (tags: TagWithBox[]) =>
-        ui.actions(t("exportN", { n: tags.length }), [
+        ui.actions(t("tonies.exportN", { n: tags.length }), [
             { label: "CSV", icon: <Download size={17} />, onSelect: () => exportCsv(tags) },
             { label: "JSON", icon: <Download size={17} />, onSelect: () => exportJson(tags) },
-            { label: "HTML", icon: <Download size={17} />, onSelect: () => ui.run(() => exportHtml(tags)) },
+            {
+                label: "HTML",
+                icon: <Download size={17} />,
+                onSelect: () => ui.run(() => exportHtml(tags)),
+            },
         ]);
 
-    const open = (tag: TagWithBox) => navigate(`/tonie/${tag.ruid}${tag.overlay ? `?box=${tag.overlay}` : ""}`);
+    const open = (tag: TagWithBox) =>
+        navigate(`/tonie/${tag.ruid}${tag.overlay ? `?box=${tag.overlay}` : ""}`);
     const play = (tag: TagWithBox) => player.play(tagPlayItem(tag));
     const byRuid = useMemo(() => new Map(list.map((x) => [x.ruid, x])), [list]);
-    const sel = useSelection((ruid) => {
-        const tag = byRuid.get(ruid);
-        if (tag) open(tag);
-    }, list.map((x) => x.ruid));
+    const sel = useSelection(
+        (ruid) => {
+            const tag = byRuid.get(ruid);
+            if (tag) open(tag);
+        },
+        list.map((x) => x.ruid),
+    );
     const [bulk, setBulk] = useState(false);
     const selectedTags = list.filter((x) => sel.selected.has(x.ruid));
     const allSelected = list.length > 0 && selectedTags.length === list.length;
@@ -199,7 +240,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         <button
             type="button"
             className={`select-box ${sel.selected.has(ruid) ? "checked" : ""}`}
-            aria-label={t("select")}
+            aria-label={t("common.select")}
             aria-pressed={sel.selected.has(ruid)}
             onClick={(e) => {
                 e.stopPropagation();
@@ -213,15 +254,20 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
 
     return (
         <Page
-            title={system ? t("systemSounds") : t("tonies")}
+            title={system ? t("common.systemSounds") : t("common.tonies")}
             back={system ? "/more" : undefined}
             right={
                 sel.selecting ? (
                     <button className="btn ghost" onClick={sel.clear}>
-                        {t("done")}
+                        {t("common.done")}
                     </button>
                 ) : (
-                    <button className="icon-btn" onClick={() => sel.setSelecting(true)} aria-label={t("select")} title={t("selectHint")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => sel.setSelecting(true)}
+                        aria-label={t("common.select")}
+                        title={t("common.selectHint")}
+                    >
                         <CheckSquare size={21} />
                     </button>
                 )
@@ -229,12 +275,16 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         >
             <div className="sticky-tools">
                 <div className="toolbar">
-                    <SearchField value={query} onChange={setQuery} placeholder={t("searchTonies")} />
+                    <SearchField
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("tonies.searchTonies")}
+                    />
                     <button
                         ref={menuBtn}
                         className={`icon-btn filled filter-btn ${menu ? "active" : ""}`}
                         onClick={() => setMenu((v) => !v)}
-                        aria-label={t("filterAndView")}
+                        aria-label={t("common.filterAndView")}
                     >
                         <SlidersHorizontal size={19} />
                         {active.length > 0 && <span className="count">{active.length}</span>}
@@ -256,7 +306,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                 open={menu}
                 onClose={() => setMenu(false)}
                 anchor={menuBtn}
-                title={t("filterAndView")}
+                title={t("common.filterAndView")}
                 footer={
                     <>
                         <button
@@ -266,53 +316,77 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                 setParams({}, { replace: true });
                             }}
                         >
-                            {t("resetFilters")}
+                            {t("tonies.resetFilters")}
                         </button>
                         <button className="btn primary" onClick={() => setMenu(false)}>
-                            {t("showN", { n: list.length })}
+                            {t("common.showN", { n: list.length })}
                         </button>
                     </>
                 }
             >
                 <ChoiceGroup
-                    label={t("view")}
+                    label={t("common.view")}
                     value={view}
                     onChange={setView}
                     options={[
-                        { value: "grid", label: <><LayoutGrid size={15} /> {t("viewGrid")}</> },
-                        { value: "list", label: <><List size={15} /> {t("viewList")}</> },
+                        {
+                            value: "grid",
+                            label: (
+                                <>
+                                    <LayoutGrid size={15} /> {t("common.viewGrid")}
+                                </>
+                            ),
+                        },
+                        {
+                            value: "list",
+                            label: (
+                                <>
+                                    <List size={15} /> {t("common.viewList")}
+                                </>
+                            ),
+                        },
                     ]}
                 />
                 <ChoiceGroup
-                    label={t("sortBy")}
+                    label={t("common.sortBy")}
                     value={sort}
                     onChange={setSort}
                     options={[
                         { value: "az", label: "A–Z" },
                         { value: "za", label: "Z–A" },
-                        { value: "series", label: t("series") },
-                        { value: "length", label: t("length") },
+                        { value: "series", label: t("tonies.series") },
+                        { value: "length", label: t("common.length") },
                     ]}
                 />
-                {boxesDiffer && (
+                {tagsPlaced && (
                     <ChoiceGroup
-                        label={t("box")}
+                        label={t("common.box")}
                         value={box}
                         onChange={(v) => setParam("box", v)}
-                        options={[{ value: "", label: t("allBoxes") }, ...boxes.data!.map((b) => ({ value: b.ID, label: b.boxName || b.ID }))]}
+                        options={[
+                            { value: "", label: t("tonies.allBoxes") },
+                            ...boxes.data!.map((b) => ({ value: b.ID, label: b.boxName || b.ID })),
+                        ]}
                     />
                 )}
                 <ChoiceGroup
-                    label={t("content")}
+                    label={t("common.content")}
                     value={content}
                     onChange={(v) => setParam("f", v === "all" ? "" : v)}
-                    options={(Object.keys(contentLabels) as Content[]).map((k) => ({ value: k, label: contentLabels[k] }))}
+                    options={(Object.keys(contentLabels) as Content[]).map((k) => ({
+                        value: k,
+                        label: contentLabels[k],
+                    }))}
                 />
                 {seriesList.length > 1 && (
                     <div className="choice-group">
-                        <div className="choice-label">{t("series")}</div>
-                        <select className="select" value={series} onChange={(e) => setParam("series", e.target.value)}>
-                            <option value="">{t("allSeries")}</option>
+                        <div className="choice-label">{t("tonies.series")}</div>
+                        <select
+                            className="select"
+                            value={series}
+                            onChange={(e) => setParam("series", e.target.value)}
+                        >
+                            <option value="">{t("tonies.allSeries")}</option>
                             {seriesList.map((s) => (
                                 <option key={s} value={s}>
                                     {s}
@@ -322,19 +396,23 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                     </div>
                 )}
                 <ChoiceGroup
-                    label={t("hidden")}
+                    label={t("tonies.hidden")}
                     value={hidden ? "1" : ""}
                     onChange={(v) => setParam("hidden", v)}
                     options={[
-                        { value: "", label: t("hideHidden") },
-                        { value: "1", label: t("showHidden") },
+                        { value: "", label: t("tonies.hideHidden") },
+                        { value: "1", label: t("tonies.showHidden") },
                     ]}
                 />
                 {languages.length > 1 && (
                     <div className="choice-group">
-                        <div className="choice-label">{t("language")}</div>
-                        <select className="select" value={language} onChange={(e) => setParam("lang", e.target.value)}>
-                            <option value="">{t("allLanguages")}</option>
+                        <div className="choice-label">{t("common.language")}</div>
+                        <select
+                            className="select"
+                            value={language}
+                            onChange={(e) => setParam("lang", e.target.value)}
+                        >
+                            <option value="">{t("tonies.allLanguages")}</option>
                             {languages.map((l) => (
                                 <option key={l} value={l}>
                                     {languageName(l)}
@@ -345,8 +423,13 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                 )}
                 <div className="choice-group">
                     <div className="choice-label">
-                        {t("expertFilter")}
-                        <button className="btn ghost small" onClick={() => setHelp(true)} aria-label={t("help")} style={{ padding: "0 4px" }}>
+                        {t("tonies.expertFilter")}
+                        <button
+                            className="btn ghost small"
+                            onClick={() => setHelp(true)}
+                            aria-label={t("tonies.help")}
+                            style={{ padding: "0 4px" }}
+                        >
                             <CircleHelp size={15} />
                         </button>
                     </div>
@@ -367,30 +450,47 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                             spellCheck={false}
                         />
                     </form>
-                    {expertFilter.error && <div className="small" style={{ color: "var(--danger)", marginTop: 4 }}>{t("filterInvalid", { at: expertFilter.error })}</div>}
+                    {expertFilter.error && (
+                        <div className="small" style={{ color: "var(--danger)", marginTop: 4 }}>
+                            {t("tonies.filterInvalid", { at: expertFilter.error })}
+                        </div>
+                    )}
                 </div>
                 <div className="choice-group">
-                    <div className="choice-label">{t("savedFilters")}</div>
+                    <div className="choice-label">{t("tonies.savedFilters")}</div>
                     <div className="choice-options">
                         {Object.keys(profiles).map((name) => (
                             <span key={name} className="chip">
-                                <button type="button" className="chip-text" onClick={() => loadProfile(name)}>
+                                <button
+                                    type="button"
+                                    className="chip-text"
+                                    onClick={() => loadProfile(name)}
+                                >
                                     {name}
                                 </button>
-                                <button type="button" className="chip-x" onClick={() => deleteProfile(name)} aria-label={t("delete")}>
+                                <button
+                                    type="button"
+                                    className="chip-x"
+                                    onClick={() => deleteProfile(name)}
+                                    aria-label={t("common.delete")}
+                                >
                                     <X size={13} />
                                 </button>
                             </span>
                         ))}
                         <button type="button" className="chip" onClick={saveProfile}>
-                            <Save size={14} /> {t("saveFilter")}
+                            <Save size={14} /> {t("tonies.saveFilter")}
                         </button>
                     </div>
                 </div>
                 <div className="choice-group">
-                    <button className="btn soft small" disabled={!list.length} onClick={() => exportList(list)}>
+                    <button
+                        className="btn soft small"
+                        disabled={!list.length}
+                        onClick={() => exportList(list)}
+                    >
                         <Download size={15} />
-                        {t("exportN", { n: list.length })}
+                        {t("tonies.exportN", { n: list.length })}
                     </button>
                 </div>
             </Popover>
@@ -407,11 +507,19 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             {tags.data &&
                 list.length === 0 &&
                 (query || active.length ? (
-                    <Empty icon={<SearchX size={28} />} title={t("nothingFound")} />
+                    <Empty icon={<SearchX size={28} />} title={t("common.nothingFound")} />
                 ) : (
-                    <Empty icon={<Disc3 size={30} />} title={t("noTonies")} text={t("noToniesText")} />
+                    <Empty
+                        icon={<Disc3 size={30} />}
+                        title={t("tonies.noTonies")}
+                        text={t("tonies.noToniesText")}
+                    />
                 ))}
-            {list.length > 0 && <p className="small muted" style={{ margin: "0 4px 10px" }}>{t("nTonies", { n: list.length })}</p>}
+            {list.length > 0 && (
+                <p className="small muted" style={{ margin: "0 4px 10px" }}>
+                    {t("tonies.nTonies", { n: list.length })}
+                </p>
+            )}
 
             {view === "grid" ? (
                 <div className={`grid-tonies ${sel.selecting ? "selecting" : ""}`}>
@@ -431,30 +539,42 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                     {canPlayTag(tag) && !sel.selecting && (
                                         <button
                                             className="play"
-                                            aria-label={t("play")}
+                                            aria-label={t("common.play")}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 play(tag);
                                             }}
                                         >
-                                            <Play size={17} fill="currentColor" style={{ marginLeft: 2 }} />
+                                            <Play
+                                                size={17}
+                                                fill="currentColor"
+                                                style={{ marginLeft: 2 }}
+                                            />
                                         </button>
                                     )}
                                 </div>
                                 <div className="flags">
-                                    <span>{tag.live && <span className="badge accent">{t("live")}</span>}</span>
+                                    <span>
+                                        {tag.live && (
+                                            <span className="badge accent">{t("common.live")}</span>
+                                        )}
+                                    </span>
                                     <span>
                                         {tag.source ? (
-                                            <span className="badge ok">{t("own")}</span>
+                                            <span className="badge ok">{t("tonies.own")}</span>
                                         ) : !tag.valid && !tag.live ? (
-                                            <span className="badge warn">{t("empty")}</span>
+                                            <span className="badge warn">{t("common.empty")}</span>
                                         ) : null}
                                     </span>
                                 </div>
                                 <div className="meta">
                                     <div className="series">{figureTitle(tag)}</div>
-                                    <div className="episode">{figureSubtitle(tag) || figureInfo(tag).model}</div>
-                                    {linked && <div className="linked-title">→ {contentTitle(linked)}</div>}
+                                    <div className="episode">
+                                        {figureSubtitle(tag) || figureInfo(tag).model}
+                                    </div>
+                                    {linked && (
+                                        <div className="linked-title">→ {contentTitle(linked)}</div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -465,7 +585,13 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                     {list.map((tag) => {
                         const linked = linkedContent(tag);
                         return (
-                            <div key={tag.ruid} className="row" role="button" tabIndex={0} {...sel.itemProps(tag.ruid)}>
+                            <div
+                                key={tag.ruid}
+                                className="row"
+                                role="button"
+                                tabIndex={0}
+                                {...sel.itemProps(tag.ruid)}
+                            >
                                 {sel.selecting && checkbox(tag.ruid)}
                                 <div style={{ width: 52, height: 52, flexShrink: 0 }}>
                                     <FigurePic tag={tag} />
@@ -474,16 +600,26 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                     <div className="row-title">{figureTitle(tag)}</div>
                                     <div className="row-sub">
                                         {figureSubtitle(tag)}
-                                        {linked && <span style={{ display: "block", color: "var(--accent)" }}>→ {contentTitle(linked)}</span>}
+                                        {linked && (
+                                            <span
+                                                style={{ display: "block", color: "var(--accent)" }}
+                                            >
+                                                → {contentTitle(linked)}
+                                            </span>
+                                        )}
                                         {!linked && !tag.valid && !tag.live && !tag.source && (
-                                            <span style={{ display: "block", color: "var(--warn)" }}>{t("noContent")}</span>
+                                            <span
+                                                style={{ display: "block", color: "var(--warn)" }}
+                                            >
+                                                {t("tonies.noContent")}
+                                            </span>
                                         )}
                                     </div>
                                 </span>
                                 {canPlayTag(tag) && !sel.selecting && (
                                     <button
                                         className="icon-btn"
-                                        aria-label={t("play")}
+                                        aria-label={t("common.play")}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             play(tag);
@@ -501,22 +637,43 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
 
             {sel.selecting && (
                 <div className="select-bar" role="toolbar">
-                    <button className="icon-btn" onClick={sel.clear} aria-label={t("cancel")}>
+                    <button
+                        className="icon-btn"
+                        onClick={sel.clear}
+                        aria-label={t("common.cancel")}
+                    >
                         <X size={20} />
                     </button>
-                    <span className="count">{selectedTags.length ? t("nSelected", { n: selectedTags.length }) : t("selectTonies")}</span>
+                    <span className="count">
+                        {selectedTags.length
+                            ? t("common.nSelected", { n: selectedTags.length })
+                            : t("tonies.selectTonies")}
+                    </span>
                     <button
                         className="btn ghost small"
-                        onClick={() => sel.setSelected(allSelected ? new Set() : new Set(list.map((x) => x.ruid)))}
+                        onClick={() =>
+                            sel.setSelected(
+                                allSelected ? new Set() : new Set(list.map((x) => x.ruid)),
+                            )
+                        }
                     >
-                        {allSelected ? t("selectNone") : t("selectAll")}
+                        {allSelected ? t("common.selectNone") : t("common.selectAll")}
                     </button>
-                    <button className="icon-btn" disabled={!selectedTags.length} onClick={() => exportList(selectedTags)} aria-label={t("export")}>
+                    <button
+                        className="icon-btn"
+                        disabled={!selectedTags.length}
+                        onClick={() => exportList(selectedTags)}
+                        aria-label={t("tonies.export")}
+                    >
                         <Download size={19} />
                     </button>
-                    <button className="btn primary small" disabled={!selectedTags.length} onClick={() => setBulk(true)}>
+                    <button
+                        className="btn primary small"
+                        disabled={!selectedTags.length}
+                        onClick={() => setBulk(true)}
+                    >
                         <Pencil size={15} />
-                        {t("edit")}
+                        {t("tonies.edit")}
                     </button>
                 </div>
             )}
@@ -530,4 +687,3 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         </Page>
     );
 }
-

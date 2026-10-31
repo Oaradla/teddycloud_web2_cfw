@@ -4,7 +4,17 @@ import { Sheet } from "./Sheet";
 import { useUi } from "./kit";
 
 /** a text to read and copy, e.g. JSON */
-export function TextSheet({ title, text, hint, onClose }: { title: string; text: string | null; hint?: string; onClose: () => void }) {
+export function TextSheet({
+    title,
+    text,
+    hint,
+    onClose,
+}: {
+    title: string;
+    text: string | null;
+    hint?: string;
+    onClose: () => void;
+}) {
     const ui = useUi();
     return (
         <Sheet
@@ -16,13 +26,17 @@ export function TextSheet({ title, text, hint, onClose }: { title: string; text:
                 <>
                     <button
                         className="btn"
-                        onClick={() => navigator.clipboard.writeText(text ?? "").then(() => ui.toast("ok", t("copied")))}
+                        onClick={() =>
+                            navigator.clipboard
+                                .writeText(text ?? "")
+                                .then(() => ui.toast("ok", t("common.copied")))
+                        }
                     >
                         <Copy size={16} />
-                        {t("copy")}
+                        {t("common.copy")}
                     </button>
                     <button className="btn primary" onClick={onClose}>
-                        {t("done")}
+                        {t("common.done")}
                     </button>
                 </>
             }

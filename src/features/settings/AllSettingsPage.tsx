@@ -6,7 +6,16 @@ import { useBoxes, useCfwBox, useSetting, useSettings } from "../../lib/queries"
 import { shownForBox, shownInServerSettings } from "./visibility";
 import { settingDescription, settingLabel } from "../../lib/settingsText";
 import { getPref, setPref } from "../../lib/prefs";
-import { Empty, ErrorBox, Loading, Page, Section, SearchField, Segmented, Switch } from "../../ui/kit";
+import {
+    Empty,
+    ErrorBox,
+    Loading,
+    Page,
+    Section,
+    SearchField,
+    Segmented,
+    Switch,
+} from "../../ui/kit";
 import { SettingRow } from "./SettingControls";
 import { SearchX } from "lucide-react";
 
@@ -31,11 +40,22 @@ export function AllSettingsPage() {
         const value = (k: string) => list.find((o) => o.ID === k)?.value === true;
         const shown = id
             ? (o: SettingOption) =>
-                  shownForBox(o.ID, { enabled: cfwEnabled, isCfwBox: Boolean(cfwBox?.isCfw), forced: cfwForced }, o.overlayed)
-            : (o: SettingOption) => shownInServerSettings(o.ID, { enabled: value("cfw.enabled"), showBoxSettings: value("cfw.show_box_settings") });
+                  shownForBox(
+                      o.ID,
+                      { enabled: cfwEnabled, isCfwBox: Boolean(cfwBox?.isCfw), forced: cfwForced },
+                      o.overlayed,
+                  )
+            : (o: SettingOption) =>
+                  shownInServerSettings(o.ID, {
+                      enabled: value("cfw.enabled"),
+                      showBoxSettings: value("cfw.show_box_settings"),
+                  });
         const f = query.trim().toLowerCase();
         const result: { head: SettingOption | null; items: SettingOption[] }[] = [];
-        let current: { head: SettingOption | null; items: SettingOption[] } = { head: null, items: [] };
+        let current: { head: SettingOption | null; items: SettingOption[] } = {
+            head: null,
+            items: [],
+        };
         for (const o of list) {
             if (o.internal || o.level === 0) continue;
             if (o.ID === "internal" || o.ID.startsWith("internal.")) continue;
@@ -46,7 +66,8 @@ export function AllSettingsPage() {
                 continue;
             }
             if (f) {
-                const text = `${o.ID} ${o.label} ${o.description} ${settingLabel(o)} ${settingDescription(o)} ${current.head ? settingLabel(current.head) : ""}`.toLowerCase();
+                const text =
+                    `${o.ID} ${o.label} ${o.description} ${settingLabel(o)} ${settingDescription(o)} ${current.head ? settingLabel(current.head) : ""}`.toLowerCase();
                 if (!text.includes(f)) continue;
             } else if (o.level > Number(level)) continue;
             if (ownOnly && !o.overlayed) continue;
@@ -56,12 +77,21 @@ export function AllSettingsPage() {
         return result;
     }, [settings.data, query, level, ownOnly, id, cfwBox, cfwEnabled, cfwForced]);
 
-    const title = id ? t("allBoxSettings") : t("serverSettings");
+    const title = id ? t("common.allBoxSettings") : t("common.serverSettings");
     return (
-        <Page title={title} subtitle={id ? box?.boxName ?? id : undefined} back={id ? `/box/${id}` : "/more"} narrow>
+        <Page
+            title={title}
+            subtitle={id ? (box?.boxName ?? id) : undefined}
+            back={id ? `/box/${id}` : "/more"}
+            narrow
+        >
             <div className="sticky-tools">
                 <div className="toolbar">
-                    <SearchField value={query} onChange={setQuery} placeholder={t("searchSettings")} />
+                    <SearchField
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("settings.searchSettings")}
+                    />
                 </div>
                 {!query && (
                     <div className="toolbar">
@@ -73,9 +103,9 @@ export function AllSettingsPage() {
                                     setPref("settingsLevel", v);
                                 }}
                                 options={[
-                                    { value: "1", label: t("levelBasic") },
-                                    { value: "2", label: t("levelDetail") },
-                                    { value: "3", label: t("levelExpert") },
+                                    { value: "1", label: t("settings.levelBasic") },
+                                    { value: "2", label: t("settings.levelDetail") },
+                                    { value: "3", label: t("settings.levelExpert") },
                                 ]}
                             />
                         </div>
@@ -83,17 +113,30 @@ export function AllSettingsPage() {
                 )}
                 {id && (
                     <label className="row-gap small muted" style={{ margin: "0 4px 10px" }}>
-                        <Switch checked={ownOnly} onChange={setOwnOnly} label={t("onlyOwnValues")} />
-                        {t("onlyOwnValues")}
+                        <Switch
+                            checked={ownOnly}
+                            onChange={setOwnOnly}
+                            label={t("settings.onlyOwnValues")}
+                        />
+                        {t("settings.onlyOwnValues")}
                     </label>
                 )}
             </div>
-            {id && !query && <p className="small muted" style={{ margin: "0 4px 16px" }}>{t("overlayHint")}</p>}
+            {id && !query && (
+                <p className="small muted" style={{ margin: "0 4px 16px" }}>
+                    {t("settings.overlayHint")}
+                </p>
+            )}
             {settings.isLoading && <Loading />}
             {settings.error && <ErrorBox error={settings.error} retry={() => settings.refetch()} />}
-            {settings.data && groups.length === 0 && <Empty icon={<SearchX size={28} />} title={t("nothingFound")} />}
+            {settings.data && groups.length === 0 && (
+                <Empty icon={<SearchX size={28} />} title={t("common.nothingFound")} />
+            )}
             {groups.map((g, i) => (
-                <Section key={(g.head?.ID ?? "") + i} title={g.head ? settingLabel(g.head) : t("general")}>
+                <Section
+                    key={(g.head?.ID ?? "") + i}
+                    title={g.head ? settingLabel(g.head) : t("settings.general")}
+                >
                     {g.items.map((o) => (
                         <SettingRow key={o.ID} opt={o} overlay={id} />
                     ))}

@@ -42,34 +42,78 @@ export function MorePage() {
     };
 
     return (
-        <Page title={t("more")} narrow>
-            <Section title={t("content")}>
-                <Row icon={<Upload size={17} />} title={t("upload")} to="/upload" />
-                <Row icon={<Shapes size={17} />} title={t("customModels")} to="/models" />
-                <Row icon={<Bell size={17} />} title={t("systemSounds")} sub={t("systemSoundsHint")} to="/systemsounds" />
-                <Row icon={<Printer size={17} />} title={t("teddyStudio")} sub={t("teddyStudioHint")} to="/studio" />
+        <Page title={t("common.more")} narrow>
+            <Section title={t("common.content")}>
+                <Row icon={<Upload size={17} />} title={t("common.upload")} to="/upload" />
+                <Row icon={<Shapes size={17} />} title={t("common.customModels")} to="/models" />
+                <Row
+                    icon={<Bell size={17} />}
+                    title={t("common.systemSounds")}
+                    sub={t("more.systemSoundsHint")}
+                    to="/systemsounds"
+                />
+                <Row
+                    icon={<Printer size={17} />}
+                    title={t("common.teddyStudio")}
+                    sub={t("common.teddyStudioHint")}
+                    to="/studio"
+                />
             </Section>
 
             {navPlugins.length > 0 && (
-                <Section title={t("plugins")}>
+                <Section title={t("common.plugins")}>
                     {navPlugins.map((p) => (
-                        <Row key={p.pluginId} icon={<Puzzle size={17} />} title={p.pluginName} sub={p.description} to={`/plugins/${p.pluginId}`} />
+                        <Row
+                            key={p.pluginId}
+                            icon={<Puzzle size={17} />}
+                            title={p.pluginName}
+                            sub={p.description}
+                            to={`/plugins/${p.pluginId}`}
+                        />
                     ))}
                 </Section>
             )}
 
             {(access.canServerSettings || access.admin || access.canUpdateBoxes) && (
-                <Section title={t("settings")}>
-                    {access.canServerSettings && <Row icon={<SlidersHorizontal size={17} />} title={t("serverSettings")} sub={t("serverSettingsHint")} to="/settings" />}
-                    {access.admin && <Row icon={<Activity size={17} />} title={t("system")} sub={t("systemHint")} to="/system" />}
-                    {access.admin && <Row icon={<Wrench size={17} />} title={t("boxSetup")} sub={t("boxSetupHint")} to="/setup" />}
-                    {access.canUpdateBoxes && <Row icon={<Cpu size={17} />} title={t("boxUpdate")} sub={t("boxUpdateHint")} to="/boxupdate" />}
+                <Section title={t("common.settings")}>
+                    {access.canServerSettings && (
+                        <Row
+                            icon={<SlidersHorizontal size={17} />}
+                            title={t("common.serverSettings")}
+                            sub={t("more.serverSettingsHint")}
+                            to="/settings"
+                        />
+                    )}
+                    {access.admin && (
+                        <Row
+                            icon={<Activity size={17} />}
+                            title={t("common.system")}
+                            sub={t("more.systemHint")}
+                            to="/system"
+                        />
+                    )}
+                    {access.admin && (
+                        <Row
+                            icon={<Wrench size={17} />}
+                            title={t("common.boxSetup")}
+                            sub={t("more.boxSetupHint")}
+                            to="/setup"
+                        />
+                    )}
+                    {access.canUpdateBoxes && (
+                        <Row
+                            icon={<Cpu size={17} />}
+                            title={t("common.boxUpdate")}
+                            sub={t("common.boxUpdateHint")}
+                            to="/boxupdate"
+                        />
+                    )}
                 </Section>
             )}
 
-            <Section title={t("appearance")}>
+            <Section title={t("more.appearance")}>
                 <div className="row-wrap">
-                    <Row icon={<Moon size={17} />} title={t("theme")} />
+                    <Row icon={<Moon size={17} />} title={t("common.theme")} />
                     <div style={{ padding: "0 16px 12px" }}>
                         <Segmented
                             value={theme}
@@ -79,18 +123,22 @@ export function MorePage() {
                                 applyTheme(v);
                             }}
                             options={[
-                                { value: "auto", label: t("themeAuto") },
-                                { value: "light", label: t("themeLight") },
-                                { value: "dark", label: t("themeDark") },
-                                { value: "matrix", label: t("themeMatrix") },
+                                { value: "auto", label: t("common.themeAuto") },
+                                { value: "light", label: t("common.themeLight") },
+                                { value: "dark", label: t("common.themeDark") },
+                                { value: "matrix", label: t("common.themeMatrix") },
                             ]}
                         />
                     </div>
                 </div>
                 <div className="row-wrap">
-                    <Row icon={<Languages size={17} />} title={t("language")} />
+                    <Row icon={<Languages size={17} />} title={t("common.language")} />
                     <div style={{ padding: "0 16px 12px" }}>
-                        <select className="select" value={lang} onChange={(e) => setLang(e.target.value as Lang)}>
+                        <select
+                            className="select"
+                            value={lang}
+                            onChange={(e) => setLang(e.target.value as Lang)}
+                        >
                             {Object.entries(LANGS).map(([code, name]) => (
                                 <option key={code} value={code}>
                                     {name}
@@ -102,22 +150,36 @@ export function MorePage() {
             </Section>
 
             {auth.data?.enabled && (
-                <Section title={t("account")}>
+                <Section title={t("common.account")}>
                     <Row
-                        leading={<span className="avatar">{(auth.data.username || "?").slice(0, 1).toUpperCase()}</span>}
+                        leading={
+                            <span className="avatar">
+                                {(auth.data.username || "?").slice(0, 1).toUpperCase()}
+                            </span>
+                        }
                         title={auth.data.username || "–"}
-                        sub={t("myAccount")}
+                        sub={t("common.myAccount")}
                         to="/account"
                     />
-                    <Row icon={<LogOut size={17} />} title={t("logout")} danger onClick={logout} chevron={false} />
+                    <Row
+                        icon={<LogOut size={17} />}
+                        title={t("common.logout")}
+                        danger
+                        onClick={logout}
+                        chevron={false}
+                    />
                 </Section>
             )}
             {access.canManageUsers && (
                 <Section>
-                    <Row icon={<Users size={17} />} title={t("usersAndRights")} sub={t("usersAndRightsHint")} to="/users" />
+                    <Row
+                        icon={<Users size={17} />}
+                        title={t("common.usersAndRights")}
+                        sub={t("more.usersAndRightsHint")}
+                        to="/users"
+                    />
                 </Section>
             )}
-
         </Page>
     );
 }

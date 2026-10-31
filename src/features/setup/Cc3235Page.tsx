@@ -9,7 +9,7 @@ import sop8cut from "./img/02-ch341a-sop8-remove.webp";
 import flash from "./img/cc3235-flash.webp";
 import grippers from "./img/cc3235-smd-grippers.webp";
 import { Code, DnsGuide, ExtLink, Pics, Steps, Warnings } from "./parts";
-import { st } from "./texts";
+import { t } from "../../lib/i18n";
 
 /** the CC3235 box: read the flash chip, put in the teddyCloud CA, write it back */
 export function Cc3235Page() {
@@ -21,7 +21,7 @@ export function Cc3235Page() {
     const steps = [
         <>
             <Warnings factoryReset="other" />
-            <p>{st("cc3235Prep")}</p>
+            <p>{t("setup.cc3235Prep")}</p>
             <Pics
                 items={[
                     { src: flash, alt: "IS25LP032D" },
@@ -31,11 +31,18 @@ export function Cc3235Page() {
             />
             <Code>{"sudo apt-get install flashrom"}</Code>
             <div className="mt">
-                <Segmented value={hw} onChange={setHw} options={[{ value: "ch341a", label: st("hwCh341a") }, { value: "pico", label: st("hwPico") }]} />
+                <Segmented
+                    value={hw}
+                    onChange={setHw}
+                    options={[
+                        { value: "ch341a", label: t("setup.hwCh341a") },
+                        { value: "pico", label: t("setup.hwPico") },
+                    ]}
+                />
             </div>
             {hw === "ch341a" ? (
                 <>
-                    <p>{st("ch341aText")}</p>
+                    <p>{t("setup.ch341aText")}</p>
                     <Pics
                         items={[
                             { src: programmer1, alt: "CH341A" },
@@ -49,12 +56,15 @@ export function Cc3235Page() {
                 </>
             ) : (
                 <p>
-                    {st("picoText")} <ExtLink href="https://github.com/stacksmashing/pico-serprog">pico-serprog</ExtLink>
+                    {t("setup.picoText")}{" "}
+                    <ExtLink href="https://github.com/stacksmashing/pico-serprog">
+                        pico-serprog
+                    </ExtLink>
                 </p>
             )}
         </>,
         <>
-            <p>{st("readThree")}</p>
+            <p>{t("setup.readThree")}</p>
             <Code>{`flashrom -p ${programmer} -r ${dump}-1.bin --progress
 flashrom -p ${programmer} -r ${dump}-2.bin --progress
 flashrom -p ${programmer} -r ${dump}-3.bin --progress
@@ -62,27 +72,30 @@ diff ${dump}-1.bin ${dump}-2.bin
 diff ${dump}-1.bin ${dump}-3.bin`}</Code>
             <Code>{`cc3200tool -if ${dump}-1.bin -d cc32xx read_all_files extract/
 cc3200tool -if ${dump}-1.bin -of cc32xx-flash.customca.bin -d cc32xx write_file ca.der /cert/ca.der`}</Code>
-            <p>{st("flashBack")}</p>
+            <p>{t("setup.flashBack")}</p>
             <Code>{`flashrom -p ${programmer} -w cc32xx-flash.customca.bin --progress`}</Code>
             <Notice>
-                {st("cc3235CaWarn")} <ExtLink href="https://raw.githubusercontent.com/toniebox-reverse-engineering/teddycloud/master/contrib/gencerts.sh">gencerts.sh</ExtLink>
+                {t("setup.cc3235CaWarn")}{" "}
+                <ExtLink href="https://raw.githubusercontent.com/toniebox-reverse-engineering/teddycloud/master/contrib/gencerts.sh">
+                    gencerts.sh
+                </ExtLink>
             </Notice>
         </>,
         <>
             <DnsGuide />
-            <Notice info>{st("showBoxesHint")}</Notice>
+            <Notice info>{t("setup.showBoxesHint")}</Notice>
         </>,
     ];
 
     return (
-        <Page title={st("cc3235Title")} back="/setup" narrow>
+        <Page title={t("setup.cc3235Title")} back="/setup" narrow>
             <Steps
-                titles={[st("cc3235S1"), st("cc3235S2"), st("cc3235S3")]}
+                titles={[t("setup.cc3235S1"), t("setup.cc3235S2"), t("setup.cc3235S3")]}
                 step={step}
                 setStep={setStep}
                 last={
                     <a className="btn primary" href="#/">
-                        {st("showBoxes")}
+                        {t("setup.showBoxes")}
                     </a>
                 }
             >

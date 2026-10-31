@@ -77,6 +77,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
     const [full, setFull] = useState(false);
     const itemRef = useRef<PlayItem | null>(null);
+    const pendingSeek = useRef<() => void>(undefined);
 
     useEffect(() => {
         const a = audioRef.current!;
@@ -107,18 +108,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     const play = useCallback((item: PlayItem, startAt = 0) => {
         const a = audioRef.current!;
+        // a seek still waiting for the previous item's metadata belongs to that item
+        if (pendingSeek.current) a.removeEventListener("loadedmetadata", pendingSeek.current);
+        pendingSeek.current = undefined;
         const same = itemRef.current?.id === item.id && itemRef.current?.url === item.url;
         itemRef.current = item;
         if (!same) {
             a.src = backendUrl(item.url);
-            setState({ item, playing: false, time: startAt, duration: item.length ?? 0, buffering: true });
+            setState({
+                item,
+                playing: false,
+                time: startAt,
+                duration: item.length ?? 0,
+                buffering: true,
+            });
         }
         if (startAt || !same) {
             const seekTo = () => {
                 if (startAt) a.currentTime = startAt;
             };
             if (a.readyState >= 1) seekTo();
-            else a.addEventListener("loadedmetadata", seekTo, { once: true });
+            else {
+                pendingSeek.current = seekTo;
+                a.addEventListener("loadedmetadata", seekTo, { once: true });
+            }
         }
         a.play().catch(() => setState((s) => ({ ...s, buffering: false })));
     }, []);
@@ -260,12 +273,16 @@ function MiniPlayer({ onOpen }: { onOpen: () => void }) {
                     <div className="sub">
                         {p.chapter >= 0 && item.chapters && item.chapters.length > 1
                             ? (item.chapterTitles?.[p.chapter] ??
-                              t("chapterN", { n: p.chapter + 1 }))
+                              t("common.chapterN", { n: p.chapter + 1 }))
                             : item.subtitle}
                     </div>
                 </div>
             </button>
-            <button className="icon-btn" onClick={p.toggle} aria-label={p.playing ? "pause" : "play"}>
+            <button
+                className="icon-btn"
+                onClick={p.toggle}
+                aria-label={p.playing ? t("common.pause") : t("common.play")}
+            >
                 {p.buffering && p.playing ? (
                     <span className="spinner small" />
                 ) : p.playing ? (
@@ -274,7 +291,7 @@ function MiniPlayer({ onOpen }: { onOpen: () => void }) {
                     <Play size={24} fill="currentColor" />
                 )}
             </button>
-            <button className="icon-btn muted" onClick={p.stop} aria-label="stop">
+            <button className="icon-btn muted" onClick={p.stop} aria-label={t("common.stop")}>
                 <X size={20} />
             </button>
             <div className="progress" style={{ width: `${pct}%` }} />
@@ -297,8 +314,11 @@ function FullPlayer() {
             {item.subtitle && <div className="muted">{item.subtitle}</div>}
             {hasChapters && (
                 <div className="track">
-                    {item.chapterTitles?.[p.chapter] ?? t("chapterN", { n: p.chapter + 1 })}
-                    <span className="muted"> · {p.chapter + 1}/{chapters.length}</span>
+                    {item.chapterTitles?.[p.chapter] ?? t("common.chapterN", { n: p.chapter + 1 })}
+                    <span className="muted">
+                        {" "}
+                        · {p.chapter + 1}/{chapters.length}
+                    </span>
                 </div>
             )}
             <div style={{ width: "100%", marginTop: 18 }}>
@@ -320,29 +340,61 @@ function FullPlayer() {
             </div>
             <div className="player-controls">
                 {hasChapters ? (
-                    <button className="icon-btn" onClick={() => p.jumpChapter(p.time - chapters[p.chapter] > 3 ? p.chapter : p.chapter - 1)}>
+                    <button
+                        className="icon-btn"
+                        aria-label={t("common.previousChapter")}
+                        onClick={() =>
+                            p.jumpChapter(
+                                p.time - chapters[p.chapter] > 3 ? p.chapter : p.chapter - 1,
+                            )
+                        }
+                    >
                         <SkipBack size={28} fill="currentColor" />
                     </button>
                 ) : (
-                    <button className="icon-btn" onClick={() => p.seek(p.time - 15)}>
+                    <button
+                        className="icon-btn"
+                        aria-label={t("common.back15")}
+                        onClick={() => p.seek(p.time - 15)}
+                    >
                         <RotateCcw size={26} />
                     </button>
                 )}
-                <button className="icon-btn play-big" onClick={p.toggle}>
-                    {p.playing ? <Pause size={34} fill="currentColor" /> : <Play size={34} fill="currentColor" style={{ marginLeft: 4 }} />}
+                <button
+                    className="icon-btn play-big"
+                    aria-label={p.playing ? t("common.pause") : t("common.play")}
+                    onClick={p.toggle}
+                >
+                    {p.playing ? (
+                        <Pause size={34} fill="currentColor" />
+                    ) : (
+                        <Play size={34} fill="currentColor" style={{ marginLeft: 4 }} />
+                    )}
                 </button>
                 {hasChapters ? (
-                    <button className="icon-btn" onClick={() => p.jumpChapter(p.chapter + 1)} disabled={p.chapter >= chapters.length - 1}>
+                    <button
+                        className="icon-btn"
+                        aria-label={t("common.nextChapter")}
+                        onClick={() => p.jumpChapter(p.chapter + 1)}
+                        disabled={p.chapter >= chapters.length - 1}
+                    >
                         <SkipForward size={28} fill="currentColor" />
                     </button>
                 ) : (
-                    <button className="icon-btn" onClick={() => p.seek(p.time + 30)}>
+                    <button
+                        className="icon-btn"
+                        aria-label={t("common.forward30")}
+                        onClick={() => p.seek(p.time + 30)}
+                    >
                         <RotateCw size={26} />
                     </button>
                 )}
             </div>
             {hasChapters && (
-                <div className="list tracks" style={{ width: "100%", textAlign: "left", marginTop: 8 }}>
+                <div
+                    className="list tracks"
+                    style={{ width: "100%", textAlign: "left", marginTop: 8 }}
+                >
                     {chapters.map((_, i) => (
                         <button
                             key={i}
@@ -352,10 +404,14 @@ function FullPlayer() {
                             <span className="track-no">{i + 1}</span>
                             <span className="row-body">
                                 <div className="row-title nowrap">
-                                    {item.chapterTitles?.[i] ?? t("chapterN", { n: i + 1 })}
+                                    {item.chapterTitles?.[i] ?? t("common.chapterN", { n: i + 1 })}
                                 </div>
                             </span>
-                            <ChapterTime starts={chapters} i={i} total={p.duration || item.length} />
+                            <ChapterTime
+                                starts={chapters}
+                                i={i}
+                                total={p.duration || item.length}
+                            />
                         </button>
                     ))}
                 </div>

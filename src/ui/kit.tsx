@@ -54,7 +54,12 @@ export function Page({ title, subtitle, back, right, children, narrow, compact }
                     <div className="topbar-side">
                         {back && (
                             // the "More" tab exists on the phone only; on the desktop the page is in the sidebar
-                            <button className={`btn ghost ${back === "/more" ? "mobile-only" : ""}`} onClick={goBack} style={{ paddingLeft: 2 }}>
+                            <button
+                                className={`btn ghost ${back === "/more" ? "mobile-only" : ""}`}
+                                onClick={goBack}
+                                aria-label={t("common.back")}
+                                style={{ paddingLeft: 2 }}
+                            >
                                 <ChevronLeft size={26} />
                             </button>
                         )}
@@ -182,7 +187,11 @@ export function Row({
                 className={cls}
                 onClick={disabled ? undefined : onClick}
                 onKeyDown={(e) => {
-                    if (!disabled && (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                    if (
+                        !disabled &&
+                        (e.key === "Enter" || e.key === " ") &&
+                        e.target === e.currentTarget
+                    ) {
                         e.preventDefault();
                         onClick();
                     }
@@ -297,7 +306,7 @@ export function SearchField({
             <input
                 type="search"
                 value={value}
-                placeholder={placeholder ?? t("search")}
+                placeholder={placeholder ?? t("common.search")}
                 onChange={(e) => onChange(e.target.value)}
                 autoFocus={autoFocus}
                 enterKeyHint="search"
@@ -306,7 +315,11 @@ export function SearchField({
                 spellCheck={false}
             />
             {value && (
-                <button className="clear" onClick={() => onChange("")} aria-label="clear">
+                <button
+                    className="clear"
+                    onClick={() => onChange("")}
+                    aria-label={t("common.clear")}
+                >
                     <XCircle size={17} />
                 </button>
             )}
@@ -393,12 +406,12 @@ export function ErrorBox({ error, retry }: { error: unknown; retry?: () => void 
     return (
         <Empty
             icon={<XCircle size={30} />}
-            title={t("loadFailed")}
+            title={t("common.loadFailed")}
             text={String((error as Error)?.message ?? error)}
             action={
                 retry && (
                     <button className="btn soft" onClick={retry}>
-                        {t("retry")}
+                        {t("common.retry")}
                     </button>
                 )
             }
@@ -499,21 +512,25 @@ export function UiProvider({ children }: { children: ReactNode }) {
             confirmCheck: (o) =>
                 new Promise((resolve) => {
                     setChecked(o.check?.value ?? false);
-                    setConfirmState({ ...o, resolve: (ok) => resolve({ ok, checked: checkedRef.current }) });
+                    setConfirmState({
+                        ...o,
+                        resolve: (ok) => resolve({ ok, checked: checkedRef.current }),
+                    });
                 }),
             prompt: (o) =>
                 new Promise((resolve) => {
                     setPromptValue(o.value ?? "");
                     setPromptState({ ...o, resolve });
                 }),
-            actions: (title, items) => setActionState({ title, items: items.filter((i) => !i.hidden) }),
+            actions: (title, items) =>
+                setActionState({ title, items: items.filter((i) => !i.hidden) }),
             run: async (fn, ok) => {
                 try {
                     const result = await fn();
                     if (ok) toast("ok", ok);
                     return result;
                 } catch (e) {
-                    toast("error", t("actionFailed"), String((e as Error)?.message ?? e));
+                    toast("error", t("common.actionFailed"), String((e as Error)?.message ?? e));
                     return undefined;
                 }
             },
@@ -564,13 +581,13 @@ export function UiProvider({ children }: { children: ReactNode }) {
                 footer={
                     <>
                         <button className="btn" onClick={() => closeConfirm(false)}>
-                            {t("cancel")}
+                            {t("common.cancel")}
                         </button>
                         <button
                             className={`btn ${confirmState?.danger ? "danger" : "primary"}`}
                             onClick={() => closeConfirm(true)}
                         >
-                            {confirmState?.confirm ?? t("ok")}
+                            {confirmState?.confirm ?? t("common.ok")}
                         </button>
                     </>
                 }
@@ -578,7 +595,11 @@ export function UiProvider({ children }: { children: ReactNode }) {
                 <div className="muted">{confirmState?.text}</div>
                 {confirmState?.check && (
                     <div className="list mt">
-                        <SwitchRow title={confirmState.check.label} checked={checked} onChange={setChecked} />
+                        <SwitchRow
+                            title={confirmState.check.label}
+                            checked={checked}
+                            onChange={setChecked}
+                        />
                     </div>
                 )}
             </Sheet>
@@ -590,14 +611,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
                 footer={
                     <>
                         <button className="btn" onClick={() => closePrompt(null)}>
-                            {t("cancel")}
+                            {t("common.cancel")}
                         </button>
                         <button
                             className="btn primary"
                             disabled={!promptValue.trim()}
                             onClick={() => closePrompt(promptValue.trim())}
                         >
-                            {promptState?.confirm ?? t("save")}
+                            {promptState?.confirm ?? t("common.save")}
                         </button>
                     </>
                 }
@@ -645,7 +666,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
                     ))}
                 </div>
                 <button className="btn block mt" onClick={() => setActionState(null)}>
-                    {t("cancel")}
+                    {t("common.cancel")}
                 </button>
             </Sheet>
         </UiContext.Provider>
@@ -660,7 +681,7 @@ export function ChapterTime({ starts, i, total }: { starts: number[]; i: number;
     return (
         <span className="chapter-time">
             <span>{len !== undefined ? duration(len) : "–:–"}</span>
-            <span className="start">{t("fromTime", { t: duration(starts[i]) })}</span>
+            <span className="start">{t("common.fromTime", { t: duration(starts[i]) })}</span>
         </span>
     );
 }

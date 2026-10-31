@@ -1,3 +1,5 @@
+import { textsOf } from "../lib/i18n";
+
 // Thin fetch layer for the teddyCloud API.
 //
 // The app lives at <prefix>/web/v2/index.html. <prefix> is empty for a plain installation and
@@ -54,13 +56,13 @@ const askReauth = () => {
     return reauthPending;
 };
 
-const needsReauth = async (response: Response) => {
-    if (response.status !== 403) return false;
+const forbiddenCode = async (response: Response): Promise<string | undefined> => {
+    if (response.status !== 403) return undefined;
     try {
         const data = await response.clone().json();
-        return data?.error === "reauth_required";
+        return data?.error;
     } catch {
-        return false;
+        return undefined;
     }
 };
 
@@ -70,10 +72,16 @@ export async function request(path: string, init: RequestInit = {}): Promise<Res
     const url = backendUrl(path);
     const send = () => fetch(url, { credentials: "same-origin", ...init });
     let response = await send();
-    if (await needsReauth(response)) {
+    if ((await forbiddenCode(response)) === "reauth_required") {
         if (await askReauth()) response = await send();
     }
-    if (response.status === 401 && !path.startsWith("/api/auth/")) {
+    // also when an admin asked for a new password or 2FA meanwhile: the login state shows what to do
+    const code = await forbiddenCode(response);
+    if (
+        (response.status === 401 && !path.startsWith("/api/auth/")) ||
+        code === "password_change_required" ||
+        code === "2fa_setup_required"
+    ) {
         window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
     }
     return response;
@@ -88,7 +96,10 @@ const errorFrom = async (response: Response): Promise<ApiError> => {
         /* plain text */
     }
     const message =
-        (data && (data.message || data.error)) || text || `${response.status} ${response.statusText}`;
+        textsOf<Record<string, string>>("authErrors")?.[data?.error] ||
+        (data && (data.message || data.error)) ||
+        text ||
+        `${response.status} ${response.statusText}`;
     return new ApiError(String(message), response.status, data?.error ?? "", data);
 };
 

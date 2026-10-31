@@ -10,25 +10,90 @@ import { Page, Row, Section } from "../../ui/kit";
 const GITHUB = "https://github.com/toniebox-reverse-engineering/teddycloud/";
 
 const FEATURES = [
-    ["featContent", ["featContent1", "featContent2", "featContent3", "featContent4", "featContent5", "featContent6"]],
-    ["featTonies", ["featTonies1", "featTonies2", "featTonies3", "featTonies4", "featTonies5"]],
-    ["featLibrary", ["featLibrary1", "featLibrary2", "featLibrary3", "featLibrary4"]],
-    ["featBoxes", ["featBoxes1", "featBoxes2", "featBoxes3", "featBoxes4"]],
-    ["featSetup", ["featSetup1", "featSetup2", "featSetup3"]],
-    ["featMore", ["featMore1", "featMore2", "featMore3", "featMore4"]],
+    [
+        "community.featContent",
+        [
+            "community.featContent1",
+            "community.featContent2",
+            "community.featContent3",
+            "community.featContent4",
+            "community.featContent5",
+            "community.featContent6",
+        ],
+    ],
+    [
+        "community.featTonies",
+        [
+            "community.featTonies1",
+            "community.featTonies2",
+            "community.featTonies3",
+            "community.featTonies4",
+            "community.featTonies5",
+        ],
+    ],
+    [
+        "community.featLibrary",
+        [
+            "community.featLibrary1",
+            "community.featLibrary2",
+            "community.featLibrary3",
+            "community.featLibrary4",
+        ],
+    ],
+    [
+        "community.featBoxes",
+        [
+            "community.featBoxes1",
+            "community.featBoxes2",
+            "community.featBoxes3",
+            "community.featBoxes4",
+        ],
+    ],
+    [
+        "community.featSetup",
+        ["community.featSetup1", "community.featSetup2", "community.featSetup3"],
+    ],
+    [
+        "community.featMore",
+        [
+            "community.featMore1",
+            "community.featMore2",
+            "community.featMore3",
+            "community.featMore4",
+        ],
+    ],
 ] as const;
 
 /** what teddyCloud and this web app do, with the version running */
 export function FeaturesPage() {
-    const id = useQuery({ queryKey: ["versionId"], queryFn: () => tc.getSetting("internal.version.id") });
-    const sha = useQuery({ queryKey: ["versionSha"], queryFn: () => tc.getSetting("internal.version.git_sha") });
+    const id = useQuery({
+        queryKey: ["versionId"],
+        queryFn: () => tc.getSetting("internal.version.id"),
+    });
+    const sha = useQuery({
+        queryKey: ["versionSha"],
+        queryFn: () => tc.getSetting("internal.version.git_sha"),
+    });
     const version = useQuery({ queryKey: ["version"], queryFn: tc.version });
-    const build = id.data?.endsWith("X.X.X") ? GITHUB + "tree/" + sha.data : GITHUB + "releases/tag/tc_" + id.data;
+    const build = id.data?.endsWith("X.X.X")
+        ? GITHUB + "tree/" + sha.data
+        : GITHUB + "releases/tag/tc_" + id.data;
     return (
-        <Page title={t("features")} subtitle={t("featuresIntro")} back="/community" narrow>
-            <Section title={t("version")}>
-                <Row title="teddyCloud" sub={version.data} onClick={() => window.open(build, "_blank", "noopener")} right={<ExternalLink size={16} />} chevron={false} />
-                <Row title={t("webApp")} value={`web2 ${__APP_VERSION__}`} />
+        <Page
+            title={t("community.features")}
+            subtitle={t("community.featuresIntro")}
+            back="/community"
+            narrow
+        >
+            <Section title={t("common.version")}>
+                <Row
+                    title="teddyCloud"
+                    sub={version.data}
+                    onClick={() => window.open(build, "_blank", "noopener")}
+                    right={<ExternalLink size={16} />}
+                    chevron={false}
+                />
+                <Row title={t("common.webApp")} value={`web2 ${__APP_VERSION__}`} />
             </Section>
             {FEATURES.map(([title, items]) => (
                 <Section key={title} title={t(title)}>
@@ -51,7 +116,12 @@ export function ChangesPage() {
         return [...out];
     }, []);
     return (
-        <Page title={t("changes")} subtitle={t("changesIntro")} back="/community" narrow>
+        <Page
+            title={t("community.changes")}
+            subtitle={t("community.changesIntro")}
+            back="/community"
+            narrow
+        >
             {days.map(([date, list]) => (
                 <Section key={date} title={new Date(date).toLocaleDateString()}>
                     <ul className="feature-list">
@@ -66,26 +136,33 @@ export function ChangesPage() {
 }
 
 const CREDITS = [
-    ["creditsOpenBox", "https://www.ifixit.com/Guide/Toniebox+Opening+Procedure/124139"],
-    ["creditsFonts", "https://openfontlicense.org/"],
-    ["creditsFlags", "https://gitlab.com/catamphetamine/country-flag-icons"],
-    ["creditsIcons", "https://lucide.dev/"],
-    ["creditsLogo", "https://www.flaticon.com/free-icon/dog_2829818"],
-    ["creditsClassic", "https://github.com/toniebox-reverse-engineering/teddycloud_web"],
+    ["community.creditsOpenBox", "https://www.ifixit.com/Guide/Toniebox+Opening+Procedure/124139"],
+    ["community.creditsFonts", "https://openfontlicense.org/"],
+    ["community.creditsFlags", "https://gitlab.com/catamphetamine/country-flag-icons"],
+    ["community.creditsIcons", "https://lucide.dev/"],
+    ["community.creditsLogo", "https://www.flaticon.com/free-icon/dog_2829818"],
+    ["community.creditsClassic", "https://github.com/toniebox-reverse-engineering/teddycloud_web"],
 ] as const;
 
 /** what web2 took from others, and the legal notes */
 export function CreditsPage() {
     return (
-        <Page title={t("credits")} back="/community" narrow>
+        <Page title={t("community.credits")} back="/community" narrow>
             <Section>
                 {CREDITS.map(([key, url]) => (
-                    <Row key={key} title={t(key)} sub={url} onClick={() => window.open(url, "_blank", "noopener")} right={<ExternalLink size={16} />} chevron={false} />
+                    <Row
+                        key={key}
+                        title={t(key)}
+                        sub={url}
+                        onClick={() => window.open(url, "_blank", "noopener")}
+                        right={<ExternalLink size={16} />}
+                        chevron={false}
+                    />
                 ))}
             </Section>
-            <Section title={t("legal")}>
+            <Section title={t("community.legal")}>
                 <p className="small muted" style={{ padding: "12px 16px", margin: 0 }}>
-                    {t("legalText")}
+                    {t("community.legalText")}
                 </p>
             </Section>
         </Page>
@@ -98,19 +175,39 @@ export function MeetingPage() {
     const guests = useMemo(
         () =>
             (tags.data ?? [])
-                .filter((x) => x.type !== "system" && tagInfo(x).picture && !tagInfo(x).picture.endsWith("img_unknown.png"))
-                .map((x) => ({ ruid: x.ruid, pic: tagInfo(x).picture, top: 5 + Math.random() * 75, left: 2 + Math.random() * 86, turn: Math.random() * 30 - 15 })),
+                .filter(
+                    (x) =>
+                        x.type !== "system" &&
+                        tagInfo(x).picture &&
+                        !tagInfo(x).picture.endsWith("img_unknown.png"),
+                )
+                .map((x) => ({
+                    ruid: x.ruid,
+                    pic: tagInfo(x).picture,
+                    top: 5 + Math.random() * 75,
+                    left: 2 + Math.random() * 86,
+                    turn: Math.random() * 30 - 15,
+                })),
         [tags.data],
     );
     return (
-        <Page title={t("meeting")} back="/" compact>
+        <Page title={t("community.meeting")} back="/" compact>
             <div className="meeting">
                 <div className="meeting-text">
-                    <strong>{t("meeting")}</strong>
-                    <span>{t("meetingText", { n: guests.length })}</span>
+                    <strong>{t("community.meeting")}</strong>
+                    <span>{t("community.meetingText", { n: guests.length })}</span>
                 </div>
                 {guests.map((g) => (
-                    <img key={g.ruid} src={picUrl(g.pic)} alt="" style={{ top: `${g.top}%`, left: `${g.left}%`, transform: `rotate(${g.turn}deg)` }} />
+                    <img
+                        key={g.ruid}
+                        src={picUrl(g.pic)}
+                        alt=""
+                        style={{
+                            top: `${g.top}%`,
+                            left: `${g.left}%`,
+                            transform: `rotate(${g.turn}deg)`,
+                        }}
+                    />
                 ))}
             </div>
         </Page>

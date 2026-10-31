@@ -1,17 +1,46 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Disc3, FolderOpen, Image, KeyRound, Radio, Shapes, Lock, LogIn, Plus, ShieldAlert, ShieldCheck, Trash2, Unlock, UserPlus, Users, Wifi } from "lucide-react";
+import {
+    Disc3,
+    FolderOpen,
+    Image,
+    KeyRound,
+    Radio,
+    Shapes,
+    Lock,
+    LogIn,
+    Plus,
+    ShieldAlert,
+    ShieldCheck,
+    Trash2,
+    Unlock,
+    UserPlus,
+    Users,
+    Wifi,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AclCatalog, AclGroup, auth, AuthUser } from "../../api/auth";
 import { tc } from "../../api/tc";
 import { useAccess } from "../../lib/access";
 import { useNavigate } from "react-router-dom";
 import { ago, dateTime, ruidPretty } from "../../lib/format";
-import { useAllTags, useBoxes } from "../../lib/queries";
+import { useAllTags, useBoxes, useBoxModels, useCustomModels } from "../../lib/queries";
 import { Fold } from "../../ui/Fold";
+import { TonieImage } from "../../ui/TonieImage";
 import { t } from "../../lib/i18n";
 import { buildRightsTree } from "../../lib/rightsTree";
 import { Sheet } from "../../ui/Sheet";
-import { Empty, ErrorBox, Loading, Notice, Page, Row, Section, Segmented, SwitchRow, useUi } from "../../ui/kit";
+import {
+    Empty,
+    ErrorBox,
+    Loading,
+    Notice,
+    Page,
+    Row,
+    Section,
+    Segmented,
+    SwitchRow,
+    useUi,
+} from "../../ui/kit";
 import { levelName, PasswordSheet } from "../account/AccountPage";
 import { RightsTree } from "./RightsTree";
 
@@ -22,9 +51,23 @@ export function UsersPage() {
     const access = useAccess();
     const qc = useQueryClient();
     const ui = useUi();
-    const users = useQuery({ queryKey: ["authUsers"], queryFn: auth.users, enabled: access.canManageUsers });
-    const catalog = useQuery({ queryKey: ["aclCatalog"], queryFn: auth.catalog, enabled: access.canManageUsers, retry: false });
-    const events = useQuery({ queryKey: ["authEvents"], queryFn: auth.events, enabled: access.admin, retry: false });
+    const users = useQuery({
+        queryKey: ["authUsers"],
+        queryFn: auth.users,
+        enabled: access.canManageUsers,
+    });
+    const catalog = useQuery({
+        queryKey: ["aclCatalog"],
+        queryFn: auth.catalog,
+        enabled: access.canManageUsers,
+        retry: false,
+    });
+    const events = useQuery({
+        queryKey: ["authEvents"],
+        queryFn: auth.events,
+        enabled: access.admin,
+        retry: false,
+    });
     const [edit, setEdit] = useState<AuthUser | null>(null);
     const [create, setCreate] = useState(false);
     const [group, setGroup] = useState<AclGroup | "new" | null>(null);
@@ -36,14 +79,17 @@ export function UsersPage() {
     };
 
     const groups = catalog.data?.groups ?? [];
-    const groupName = (u: AuthUser) => (u.group ? (groups.find((g) => g.id === u.group)?.name ?? u.group) : levelName(u.level));
+    const groupName = (u: AuthUser) =>
+        u.group ? (groups.find((g) => g.id === u.group)?.name ?? u.group) : levelName(u.level);
     /* users create users of the same or a lower level */
-    const allowedLevels = LEVELS.slice(Math.max(0, LEVELS.indexOf(access.mine.level as (typeof LEVELS)[number])));
+    const allowedLevels = LEVELS.slice(
+        Math.max(0, LEVELS.indexOf(access.mine.level as (typeof LEVELS)[number])),
+    );
 
     if (!access.canManageUsers)
         return (
-            <Page title={t("usersAndRights")} back="/more" narrow>
-                <Empty icon={<Lock size={28} />} title={t("noPermission")} />
+            <Page title={t("common.usersAndRights")} back="/more" narrow>
+                <Empty icon={<Lock size={28} />} title={t("users.noPermission")} />
             </Page>
         );
 
@@ -52,22 +98,33 @@ export function UsersPage() {
     const hasAdmin = u?.users.some((x) => (x.level ?? "admin") === "admin");
 
     const toggleLogin = async (on: boolean) => {
-        if (on && !hasAdmin) return ui.toast("error", t("needAdminFirst"));
+        if (on && !hasAdmin) return ui.toast("error", t("users.needAdminFirst"));
         if (on) {
-            const ok = await ui.confirm({ title: t("loginOnTitle"), text: t("loginOnText"), confirm: t("switchOn") });
+            const ok = await ui.confirm({
+                title: t("users.loginOnTitle"),
+                text: t("users.loginOnText"),
+                confirm: t("users.switchOn"),
+            });
             if (!ok) return;
         }
-        await ui.run(() => auth.setEnabled(on), on ? t("loginOnDone") : t("loginOffDone"));
+        await ui.run(
+            () => auth.setEnabled(on),
+            on ? t("users.loginOnDone") : t("users.loginOffDone"),
+        );
         refresh();
     };
 
     return (
         <Page
-            title={t("usersAndRights")}
+            title={t("common.usersAndRights")}
             back="/more"
             narrow
             right={
-                <button className="icon-btn" onClick={() => setCreate(true)} aria-label={t("addUser")}>
+                <button
+                    className="icon-btn"
+                    onClick={() => setCreate(true)}
+                    aria-label={t("users.addUser")}
+                >
                     <UserPlus size={21} />
                 </button>
             }
@@ -77,15 +134,33 @@ export function UsersPage() {
             {u && (
                 <>
                     {access.admin && (
-                        <Section title={t("webLogin")} footer={u.envOverride ? t("envOverride") : u.enabled ? t("loginOnHint") : t("loginOffHint")}>
-                            <SwitchRow icon={<LogIn size={17} />} title={t("loginRequired")} checked={u.enabled} disabled={u.envOverride} onChange={toggleLogin} />
+                        <Section
+                            title={t("users.webLogin")}
+                            footer={
+                                u.envOverride
+                                    ? t("users.envOverride")
+                                    : u.enabled
+                                      ? t("users.loginOnHint")
+                                      : t("users.loginOffHint")
+                            }
+                        >
+                            <SwitchRow
+                                icon={<LogIn size={17} />}
+                                title={t("users.loginRequired")}
+                                checked={u.enabled}
+                                disabled={u.envOverride}
+                                onChange={toggleLogin}
+                            />
                             <SwitchRow
                                 icon={<ShieldCheck size={17} />}
-                                title={t("require2faAll")}
-                                sub={t("require2faAllHint")}
+                                title={t("users.require2faAll")}
+                                sub={t("users.require2faAllHint")}
                                 checked={u.require2faAll}
                                 onChange={async (v) => {
-                                    await ui.run(() => tc.setSetting("web_auth.require_2fa", v), t("saved"));
+                                    await ui.run(
+                                        () => tc.setSetting("web_auth.require_2fa", v),
+                                        t("common.saved"),
+                                    );
                                     refresh();
                                 }}
                             />
@@ -93,32 +168,64 @@ export function UsersPage() {
                     )}
 
                     <Section
-                        title={t("usersN", { n: u.users.length, max: u.maxUsers || "–" })}
+                        title={t("users.usersN", { n: u.users.length, max: u.maxUsers || "–" })}
                         right={
                             <button className="btn ghost small" onClick={() => setCreate(true)}>
                                 <Plus size={16} />
-                                {t("addUser")}
+                                {t("users.addUser")}
                             </button>
                         }
                     >
-                        {u.users.length === 0 && <Row title={t("noUsers")} sub={t("noUsersHint")} />}
+                        {u.users.length === 0 && (
+                            <Row title={t("users.noUsers")} sub={t("users.noUsersHint")} />
+                        )}
                         {u.users.map((x) => (
                             <Row
                                 key={x.username}
-                                leading={<span className="avatar">{x.username.slice(0, 1).toUpperCase()}</span>}
+                                leading={
+                                    <span className="avatar">
+                                        {x.username.slice(0, 1).toUpperCase()}
+                                    </span>
+                                }
                                 title={
                                     <>
-                                        {x.username} {x.username === access.status?.username && <span className="badge">{t("you")}</span>}
+                                        {x.username}{" "}
+                                        {x.username === access.status?.username && (
+                                            <span className="badge">{t("users.you")}</span>
+                                        )}
                                     </>
                                 }
                                 sub={
-                                    <span className="row-gap" style={{ flexWrap: "wrap", gap: 4, marginTop: 3 }}>
-                                        <span className={`badge ${(x.level ?? "admin") === "admin" ? "accent" : ""}`}>{groupName(x)}</span>
+                                    <span
+                                        className="row-gap"
+                                        style={{ flexWrap: "wrap", gap: 4, marginTop: 3 }}
+                                    >
+                                        <span
+                                            className={`badge ${(x.level ?? "admin") === "admin" ? "accent" : ""}`}
+                                        >
+                                            {groupName(x)}
+                                        </span>
                                         {x.twoFactor && <span className="badge ok">2FA</span>}
-                                        {x.require2fa && !x.twoFactor && <span className="badge warn">{t("twoFactorPending")}</span>}
-                                        {x.mustChangePassword && <span className="badge warn">{t("passwordChangePending")}</span>}
-                                        {x.lanOnly && <span className="badge">{t("lanOnly")}</span>}
-                                        <span className="small muted">{x.lastLogin ? t("lastLogin", { when: ago(x.lastLogin * 1000) }) : t("neverLoggedIn")}</span>
+                                        {(x.require2fa || u.require2faAll) && !x.twoFactor && (
+                                            <span className="badge warn">
+                                                {t("users.twoFactorPending")}
+                                            </span>
+                                        )}
+                                        {x.mustChangePassword && (
+                                            <span className="badge warn">
+                                                {t("users.passwordChangePending")}
+                                            </span>
+                                        )}
+                                        {x.lanOnly && (
+                                            <span className="badge">{t("users.lanOnly")}</span>
+                                        )}
+                                        <span className="small muted">
+                                            {x.lastLogin
+                                                ? t("users.lastLogin", {
+                                                      when: ago(x.lastLogin * 1000),
+                                                  })
+                                                : t("users.neverLoggedIn")}
+                                        </span>
                                     </span>
                                 }
                                 onClick={() => setEdit(x)}
@@ -129,47 +236,77 @@ export function UsersPage() {
             )}
 
             {catalog.data && access.admin && (
-                <Section title={t("rightsAndGroups")} footer={t("rightsAndGroupsHint")}>
-                    <Row icon={<Users size={17} />} title={t("whatUsersMay")} sub={t("whatUsersMayHint")} onClick={() => setLimits("user")} />
-                    <Row icon={<Users size={17} />} title={t("whatChildrenMay")} sub={t("whatChildrenMayHint")} onClick={() => setLimits("guest")} />
+                <Section title={t("users.rightsAndGroups")} footer={t("users.rightsAndGroupsHint")}>
+                    <Row
+                        icon={<Users size={17} />}
+                        title={t("users.whatUsersMay")}
+                        sub={t("users.whatUsersMayHint")}
+                        onClick={() => setLimits("user")}
+                    />
+                    <Row
+                        icon={<Users size={17} />}
+                        title={t("users.whatChildrenMay")}
+                        sub={t("users.whatChildrenMayHint")}
+                        onClick={() => setLimits("guest")}
+                    />
                     {groups.map((g) => (
-                        <Row key={g.id} icon={<Users size={17} />} title={g.name} sub={t("ownGroupOf", { base: levelName(g.base) })} onClick={() => setGroup(g)} />
+                        <Row
+                            key={g.id}
+                            icon={<Users size={17} />}
+                            title={g.name}
+                            sub={t("users.ownGroupOf", { base: levelName(g.base) })}
+                            onClick={() => setGroup(g)}
+                        />
                     ))}
-                    <Row icon={<Plus size={17} />} title={t("newGroup")} accent onClick={() => setGroup("new")} chevron={false} />
+                    <Row
+                        icon={<Plus size={17} />}
+                        title={t("users.newGroup")}
+                        accent
+                        onClick={() => setGroup("new")}
+                        chevron={false}
+                    />
                 </Section>
             )}
 
             {/* not a group: what everyone may do with tonies nobody owns */}
             {catalog.data && access.admin && (
-                <Section title={t("withoutOwner")}>
-                    <Row icon={<Disc3 size={17} />} title={t("unownedTonies")} sub={t("unownedToniesHint")} onClick={() => setLimits("tonie")} />
+                <Section title={t("users.withoutOwner")}>
+                    <Row
+                        icon={<Disc3 size={17} />}
+                        title={t("users.unownedTonies")}
+                        sub={t("users.unownedToniesHint")}
+                        onClick={() => setLimits("tonie")}
+                    />
                 </Section>
             )}
 
             {events.data && (
-                <Section title={t("securityEvents")}>
+                <Section title={t("users.securityEvents")}>
                     {events.data.locked.map((l) => (
                         <Row
                             key={l.ip}
                             icon={<Lock size={17} />}
                             iconColor="var(--danger)"
-                            title={t("lockedIp", { ip: l.ip })}
-                            sub={t("lockedUntil", { when: dateTime(l.lockedUntil * 1000) })}
+                            title={t("users.lockedIp", { ip: l.ip })}
+                            sub={t("users.lockedUntil", { when: dateTime(l.lockedUntil * 1000) })}
                             right={
                                 <button
                                     className="btn small"
                                     onClick={async () => {
-                                        await ui.run(() => auth.unlock({ ip: l.ip }), t("unlocked"));
+                                        await ui.run(
+                                            () => auth.unlock({ ip: l.ip }),
+                                            t("users.unlocked"),
+                                        );
                                         events.refetch();
                                     }}
                                 >
                                     <Unlock size={14} />
-                                    {t("unlock")}
+                                    {t("users.unlock")}
                                 </button>
                             }
                         />
                     ))}
-                    {events.data.events.length === 0 && <Row title={t("noEvents")} />}
+                    {events.data.events.length === 0 && <Row title={t("users.noEvents")} />}
                     {events.data.events
                         .slice()
                         .reverse()
@@ -177,9 +314,19 @@ export function UsersPage() {
                         .map((e, i) => (
                             <Row
                                 key={i}
-                                icon={e.type.includes("fail") || e.type.includes("lock") ? <ShieldAlert size={17} /> : <ShieldCheck size={17} />}
-                                iconColor={e.type.includes("fail") || e.type.includes("lock") ? "var(--warn)" : undefined}
-                                title={`${t(`event_${e.type}` as never)}${e.username ? " · " + e.username : ""}`}
+                                icon={
+                                    e.type.includes("fail") || e.type.includes("lock") ? (
+                                        <ShieldAlert size={17} />
+                                    ) : (
+                                        <ShieldCheck size={17} />
+                                    )
+                                }
+                                iconColor={
+                                    e.type.includes("fail") || e.type.includes("lock")
+                                        ? "var(--warn)"
+                                        : undefined
+                                }
+                                title={`${t(`users.event_${e.type}` as never, { defaultValue: e.type })}${e.username ? " · " + e.username : ""}`}
                                 sub={`${e.ip} · ${dateTime(e.time * 1000)}${e.detail ? " · " + e.detail : ""}`}
                             />
                         ))}
@@ -188,17 +335,30 @@ export function UsersPage() {
 
             {client && access.admin && (
                 <Section
-                    title={t("externalAccess")}
+                    title={t("users.externalAccess")}
                     footer={
                         <>
-                            {t("externalAccessHint")} <a href="#/settings">{t("openSettings")}</a>
+                            {t("users.externalAccessHint")}{" "}
+                            <a href="#/settings">{t("users.openSettings")}</a>
                         </>
                     }
                 >
-                    {client.forwardedForIgnored && <Notice>{t("untrustedProxy", { ip: client.ip })}</Notice>}
-                    <Row icon={<Wifi size={17} />} title={t("yourAddress")} value={<span className="mono selectable">{client.ip}</span>} />
-                    <Row title={t("network")} value={t(client.lan ? "networkLan" : "networkRemote")} />
-                    <Row title={t("connection")} value={`${client.secure ? "HTTPS" : "HTTP"}${client.viaTrustedProxy ? " · " + t("viaProxy") : ""}`} />
+                    {client.forwardedForIgnored && (
+                        <Notice>{t("users.untrustedProxy", { ip: client.ip })}</Notice>
+                    )}
+                    <Row
+                        icon={<Wifi size={17} />}
+                        title={t("users.yourAddress")}
+                        value={<span className="mono selectable">{client.ip}</span>}
+                    />
+                    <Row
+                        title={t("users.network")}
+                        value={t(client.lan ? "users.networkLan" : "users.networkRemote")}
+                    />
+                    <Row
+                        title={t("users.connection")}
+                        value={`${client.secure ? "HTTPS" : "HTTP"}${client.viaTrustedProxy ? " · " + t("users.viaProxy") : ""}`}
+                    />
                 </Section>
             )}
 
@@ -209,6 +369,7 @@ export function UsersPage() {
                 allowedLevels={[...allowedLevels]}
                 minLength={u?.passwordMinLength ?? 10}
                 self={edit?.username === access.status?.username}
+                require2faAll={!!u?.require2faAll}
                 onChanged={refresh}
             />
             <CreateUserSheet
@@ -218,12 +379,23 @@ export function UsersPage() {
                 allowedLevels={[...allowedLevels]}
                 minLength={u?.passwordMinLength ?? 10}
                 first={(u?.users.length ?? 0) === 0}
+                require2faAll={!!u?.require2faAll}
                 onChanged={refresh}
             />
             {catalog.data && (
                 <>
-                    <LimitsSheet which={limits} catalog={catalog.data} onClose={() => setLimits(null)} onChanged={refresh} />
-                    <GroupSheet group={group} catalog={catalog.data} onClose={() => setGroup(null)} onChanged={refresh} />
+                    <LimitsSheet
+                        which={limits}
+                        catalog={catalog.data}
+                        onClose={() => setLimits(null)}
+                        onChanged={refresh}
+                    />
+                    <GroupSheet
+                        group={group}
+                        catalog={catalog.data}
+                        onClose={() => setGroup(null)}
+                        onChanged={refresh}
+                    />
                 </>
             )}
         </Page>
@@ -233,42 +405,107 @@ export function UsersPage() {
 /** "user", "guest" or "group:<id>" */
 const groupOptions = (levels: string[], groups: AclGroup[]) => [
     ...levels.map((l) => ({ value: l, label: levelName(l) })),
-    ...groups.filter((g) => levels.includes(g.base)).map((g) => ({ value: `group:${g.id}`, label: g.name })),
+    ...groups
+        .filter((g) => levels.includes(g.base))
+        .map((g) => ({ value: `group:${g.id}`, label: g.name })),
 ];
-const groupChange = (value: string) => (value.startsWith("group:") ? { group: value.slice(6) } : { level: value, group: "" });
+const groupChange = (value: string) =>
+    value.startsWith("group:") ? { group: value.slice(6) } : { level: value, group: "" };
 
 /** what the user owns or has shared, each list opens on a tap */
 function OwnedSection({ username, onOpen }: { username: string; onOpen: () => void }) {
-    const owned = useQuery({ queryKey: ["aclOwned", username], queryFn: () => auth.owned(username) });
+    const owned = useQuery({
+        queryKey: ["aclOwned", username],
+        queryFn: () => auth.owned(username),
+    });
     const boxes = useBoxes();
     const tags = useAllTags();
+    const boxModels = useBoxModels();
+    const models = useCustomModels();
     const navigate = useNavigate();
     if (!owned.data) return null;
     const open = (to: string) => {
         onOpen();
         navigate(to);
     };
-    const boxName = (id: string) => boxes.data?.find((b) => b.ID === id)?.boxName || id;
+    const box = (id: string) => boxes.data?.find((b) => b.ID === id);
+    const boxName = (id: string) => box(id)?.boxName || id;
+    const boxPic = (id: string) => boxModels.data?.find((m) => m.id === box(id)?.boxModel)?.img_src;
+    const tonieInfo = (ruid: string) =>
+        tags.data?.find((x) => x.ruid.toUpperCase() === ruid)?.tonieInfo;
     const tonieName = (ruid: string) => {
-        const info = tags.data?.find((x) => x.ruid.toUpperCase() === ruid)?.tonieInfo;
-        return info?.series ? `${info.series}${info.episode ? ` – ${info.episode}` : ""}` : ruidPretty(ruid);
+        const info = tonieInfo(ruid);
+        return info?.series
+            ? `${info.series}${info.episode ? ` – ${info.episode}` : ""}`
+            : ruidPretty(ruid);
     };
     const groups = [
-        { key: "boxes", title: t("boxes"), icon: <Radio size={17} />, name: boxName, to: (id: string) => `/box/${id}` },
-        { key: "tonies", title: t("tonies"), icon: <Disc3 size={17} />, name: tonieName, to: (id: string) => `/tonie/${id.toLowerCase()}` },
-        { key: "folders", title: t("library"), icon: <FolderOpen size={17} />, name: (id: string) => id, to: (id: string) => `/library?path=${encodeURIComponent(id)}` },
-        { key: "models", title: t("customModels"), icon: <Shapes size={17} />, name: (id: string) => id, to: () => "/models" },
-        { key: "images", title: t("pictures"), icon: <Image size={17} />, name: (id: string) => id, to: () => "/models" },
+        {
+            key: "boxes",
+            title: t("common.boxes"),
+            icon: <Radio size={17} />,
+            name: boxName,
+            pic: boxPic,
+            to: (id: string) => `/box/${id}`,
+        },
+        {
+            key: "tonies",
+            title: t("common.tonies"),
+            icon: <Disc3 size={17} />,
+            name: tonieName,
+            pic: (id: string) => tonieInfo(id)?.picture,
+            to: (id: string) => `/tonie/${id.toLowerCase()}`,
+        },
+        {
+            key: "folders",
+            title: t("common.library"),
+            icon: <FolderOpen size={17} />,
+            name: (id: string) => id,
+            pic: undefined,
+            to: (id: string) => `/library?path=${encodeURIComponent(id)}`,
+        },
+        {
+            key: "models",
+            title: t("common.customModels"),
+            icon: <Shapes size={17} />,
+            name: (id: string) => id,
+            pic: (id: string) => models.data?.find((m) => m.model === id)?.pic,
+            to: () => "/models",
+        },
+        {
+            key: "images",
+            title: t("common.pictures"),
+            icon: <Image size={17} />,
+            name: (id: string) => id,
+            pic: (id: string) => `/custom_img/${id}`,
+            to: () => "/models",
+        },
     ] as const;
     return (
-        <Section title={t("ownedBy", { name: username })}>
+        <Section title={t("users.ownedBy", { name: username })}>
             {groups.map((g) => {
                 const items = owned.data[g.key] ?? [];
                 const mine = items.filter((x) => x.owner).length;
                 return (
-                    <Fold key={g.key} icon={g.icon} title={g.title} sub={t("ownedCount", { n: mine, shared: items.length - mine })}>
+                    <Fold
+                        key={g.key}
+                        icon={g.icon}
+                        title={g.title}
+                        sub={t("users.ownedCount", { n: mine, shared: items.length - mine })}
+                    >
                         {items.map((x) => (
-                            <Row key={x.id} title={g.name(x.id)} sub={x.owner ? t("ownerOne") : t("sharedRights", { rights: x.granted ?? "" })} onClick={() => open(g.to(x.id))} chevron />
+                            <Row
+                                key={x.id}
+                                leading={g.pic && <TonieImage src={g.pic(x.id)} size={36} />}
+                                title={g.name(x.id)}
+                                sub={
+                                    x.owner
+                                        ? t("users.ownerOne")
+                                        : t("users.sharedRights", { rights: x.granted ?? "" })
+                                }
+                                onClick={() => open(g.to(x.id))}
+                                chevron
+                            />
                         ))}
                     </Fold>
                 );
@@ -284,6 +521,7 @@ function UserSheet({
     allowedLevels,
     minLength,
     self,
+    require2faAll,
     onChanged,
 }: {
     user: AuthUser | null;
@@ -292,15 +530,24 @@ function UserSheet({
     allowedLevels: string[];
     minLength: number;
     self: boolean;
+    require2faAll: boolean;
     onChanged: () => void;
 }) {
     const ui = useUi();
     const [pw, setPw] = useState(false);
     const [u, setU] = useState<AuthUser | null>(user);
     useEffect(() => setU(user), [user]);
-    if (!u) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
+    if (!u)
+        return (
+            <Sheet open={false} onClose={onClose}>
+                {null}
+            </Sheet>
+        );
 
-    const update = async (changes: Parameters<typeof auth.updateUser>[1], ok = t("saved")) => {
+    const update = async (
+        changes: Parameters<typeof auth.updateUser>[1],
+        ok = t("common.saved"),
+    ) => {
         const r = await ui.run(() => auth.updateUser(u.username, changes), ok);
         if (r?.user) setU(r.user);
         onChanged();
@@ -315,15 +562,21 @@ function UserSheet({
                 <div className="hero" style={{ paddingTop: 0 }}>
                     <span className="avatar big">{u.username.slice(0, 1).toUpperCase()}</span>
                     <p className="small" style={{ marginTop: 8 }}>
-                        {u.lastLogin ? t("lastLogin", { when: ago(u.lastLogin * 1000) }) : t("neverLoggedIn")}
-                        {u.createdBy ? ` · ${t("createdBy", { name: u.createdBy })}` : ""}
+                        {u.lastLogin
+                            ? t("users.lastLogin", { when: ago(u.lastLogin * 1000) })
+                            : t("users.neverLoggedIn")}
+                        {u.createdBy ? ` · ${t("users.createdBy", { name: u.createdBy })}` : ""}
                     </p>
                 </div>
-                {u.legacyHash && <Notice>{t("legacyHash")}</Notice>}
+                {u.legacyHash && <Notice>{t("users.legacyHash")}</Notice>}
                 {!self && options.some((o) => o.value === value) && (
                     <div className="choice-group">
-                        <div className="choice-label">{t("userGroup")}</div>
-                        <select className="select" value={value} onChange={(e) => update(groupChange(e.target.value))}>
+                        <div className="choice-label">{t("users.userGroup")}</div>
+                        <select
+                            className="select"
+                            value={value}
+                            onChange={(e) => update(groupChange(e.target.value))}
+                        >
                             {options.map((o) => (
                                 <option key={o.value} value={o.value}>
                                     {o.label}
@@ -333,36 +586,69 @@ function UserSheet({
                     </div>
                 )}
                 <Section>
-                    <SwitchRow icon={<ShieldCheck size={17} />} title={t("require2fa")} checked={u.require2fa} onChange={(v) => update({ require2fa: v })} />
-                    <SwitchRow icon={<Wifi size={17} />} title={t("lanOnly")} sub={t("lanOnlyHint")} checked={u.lanOnly} disabled={self} onChange={(v) => update({ lanOnly: v })} />
+                    {!require2faAll && (
+                        <SwitchRow
+                            icon={<ShieldCheck size={17} />}
+                            title={t("users.require2fa")}
+                            checked={u.require2fa}
+                            onChange={(v) => update({ require2fa: v })}
+                        />
+                    )}
+                    <SwitchRow
+                        icon={<Wifi size={17} />}
+                        title={t("users.lanOnly")}
+                        sub={t("users.lanOnlyHint")}
+                        checked={u.lanOnly}
+                        disabled={self}
+                        onChange={(v) => update({ lanOnly: v })}
+                    />
                     {!self && (
                         <SwitchRow
                             icon={<KeyRound size={17} />}
-                            title={t("mustChangePassword")}
-                            sub={t("mustChangePasswordHint")}
+                            title={t("common.mustChangePassword")}
+                            sub={t("users.mustChangePasswordHint")}
                             checked={Boolean(u.mustChangePassword)}
                             onChange={(v) => update({ mustChangePassword: v })}
                         />
                     )}
                 </Section>
                 <Section>
-                    {!self && <Row icon={<KeyRound size={17} />} title={t("setPassword")} onClick={() => setPw(true)} chevron />}
+                    {!self && (
+                        <Row
+                            icon={<KeyRound size={17} />}
+                            title={t("users.setPassword")}
+                            onClick={() => setPw(true)}
+                            chevron
+                        />
+                    )}
                     {u.twoFactor && !self && (
                         <Row
-                            title={t("reset2fa")}
-                            sub={t("reset2faHint")}
+                            title={t("users.reset2fa")}
+                            sub={t("users.reset2faHint")}
                             onClick={async () => {
-                                if (await ui.confirm({ title: t("reset2fa"), text: t("reset2faHint"), confirm: t("reset"), danger: true })) update({ reset2fa: true }, t("done"));
+                                if (
+                                    await ui.confirm({
+                                        title: t("users.reset2fa"),
+                                        text: t("users.reset2faHint"),
+                                        confirm: t("common.reset"),
+                                        danger: true,
+                                    })
+                                )
+                                    update({ reset2fa: true }, t("common.done"));
                             }}
                             chevron={false}
                         />
                     )}
                     {!self && (
                         <Row
-                            title={t("endSessions")}
+                            title={t("users.endSessions")}
                             onClick={async () => {
                                 const r = await update({ revokeSessions: true }, "");
-                                if (r) ui.toast("ok", t("sessionsEnded", { n: r.sessionsRevoked ?? 0 }));
+                                if (r)
+                                    ui.toast(
+                                        "ok",
+                                        t("common.sessionsEnded", { n: r.sessionsRevoked ?? 0 }),
+                                    );
                             }}
                             chevron={false}
                         />
@@ -370,12 +656,23 @@ function UserSheet({
                     {!self && (
                         <Row
                             icon={<Trash2 size={17} />}
-                            title={t("deleteUser")}
+                            title={t("users.deleteUser")}
                             danger
                             onClick={async () => {
-                                if (!(await ui.confirm({ title: t("deleteUserTitle", { name: u.username }), text: t("deleteUserText"), confirm: t("delete"), danger: true }))) return;
-                                const r = await ui.run(() => auth.deleteUser(u.username), t("deleted"));
-                                if (r?.authDisabled) ui.toast("info", t("loginOffDone"));
+                                if (
+                                    !(await ui.confirm({
+                                        title: t("users.deleteUserTitle", { name: u.username }),
+                                        text: t("users.deleteUserText"),
+                                        confirm: t("common.delete"),
+                                        danger: true,
+                                    }))
+                                )
+                                    return;
+                                const r = await ui.run(
+                                    () => auth.deleteUser(u.username),
+                                    t("common.deleted"),
+                                );
+                                if (r?.authDisabled) ui.toast("info", t("users.loginOffDone"));
                                 onChanged();
                                 onClose();
                             }}
@@ -383,7 +680,7 @@ function UserSheet({
                         />
                     )}
                 </Section>
-                {self && <p className="small muted">{t("editYourselfHint")}</p>}
+                {self && <p className="small muted">{t("users.editYourselfHint")}</p>}
                 <OwnedSection username={u.username} onOpen={onClose} />
             </Sheet>
             <PasswordSheet
@@ -407,6 +704,7 @@ function CreateUserSheet({
     allowedLevels,
     minLength,
     first,
+    require2faAll,
     onChanged,
 }: {
     open: boolean;
@@ -415,6 +713,7 @@ function CreateUserSheet({
     allowedLevels: string[];
     minLength: number;
     first: boolean;
+    require2faAll: boolean;
     onChanged: () => void;
 }) {
     const ui = useUi();
@@ -434,83 +733,170 @@ function CreateUserSheet({
         setRequire2fa(false);
         setMustChangePassword(false);
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-    const valid = /^[A-Za-z0-9_.@-]{1,32}$/.test(name) && password.length >= minLength;
+    const valid = /^[A-Za-z0-9_.-]{1,32}$/.test(name) && password.length >= minLength;
 
     return (
         <Sheet
             open={open}
             onClose={onClose}
-            title={t("addUser")}
+            title={t("users.addUser")}
             footer={
                 <>
                     <button className="btn" onClick={onClose}>
-                        {t("cancel")}
+                        {t("common.cancel")}
                     </button>
                     <button
                         className="btn primary"
                         disabled={!valid}
                         onClick={async () => {
-                            const r = await ui.run(() => auth.createUser({ username: name, password, lanOnly, require2fa, mustChangePassword, ...groupChange(group) }), t("userCreated"));
+                            const r = await ui.run(
+                                () =>
+                                    auth.createUser({
+                                        username: name,
+                                        password,
+                                        lanOnly,
+                                        require2fa,
+                                        mustChangePassword,
+                                        ...groupChange(group),
+                                    }),
+                                t("users.userCreated"),
+                            );
                             if (r) {
                                 onChanged();
                                 onClose();
                             }
                         }}
                     >
-                        {t("createIt")}
+                        {t("users.createIt")}
                     </button>
                 </>
             }
         >
-            {first && <Notice info>{t("firstUserHint")}</Notice>}
+            {first && <Notice info>{t("users.firstUserHint")}</Notice>}
             <div className="field">
-                <label>{t("username")}</label>
-                <input className="input" autoCapitalize="off" autoCorrect="off" autoComplete="off" value={name} onChange={(e) => setName(e.target.value.trim())} />
-                <div className="hint">{t("usernameHint")}</div>
+                <label>{t("common.username")}</label>
+                <input
+                    className="input"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    value={name}
+                    onChange={(e) => setName(e.target.value.trim())}
+                />
+                <div className="hint">{t("users.usernameHint")}</div>
             </div>
             <div className="field">
-                <label>{t("password")}</label>
-                <input className="input" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-                <div className="hint">{t("passwordMin", { n: minLength })}</div>
+                <label>{t("common.password")}</label>
+                <input
+                    className="input"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+                <div className="hint">{t("common.passwordMin", { n: minLength })}</div>
             </div>
             <div className="field">
-                <label>{t("userGroup")}</label>
-                <select className="select" value={group} onChange={(e) => setGroup(e.target.value)} disabled={first}>
+                <label>{t("users.userGroup")}</label>
+                <select
+                    className="select"
+                    value={group}
+                    onChange={(e) => setGroup(e.target.value)}
+                    disabled={first}
+                >
                     {options.map((o) => (
                         <option key={o.value} value={o.value}>
                             {o.label}
                         </option>
                     ))}
                 </select>
-                <div className="hint">{t(`groupHint_${group.startsWith("group:") ? "own" : group}` as never)}</div>
+                <div className="hint">
+                    {t(`users.groupHint_${group.startsWith("group:") ? "own" : group}` as never)}
+                </div>
             </div>
             <div className="list">
-                <SwitchRow title={t("require2fa")} checked={require2fa} onChange={setRequire2fa} />
-                <SwitchRow title={t("mustChangePassword")} checked={mustChangePassword} onChange={setMustChangePassword} />
-                <SwitchRow title={t("lanOnly")} sub={t("lanOnlyHint")} checked={lanOnly} onChange={setLanOnly} />
+                {!require2faAll && (
+                    <SwitchRow
+                        title={t("users.require2fa")}
+                        checked={require2fa}
+                        onChange={setRequire2fa}
+                    />
+                )}
+                <SwitchRow
+                    title={t("common.mustChangePassword")}
+                    checked={mustChangePassword}
+                    onChange={setMustChangePassword}
+                />
+                <SwitchRow
+                    title={t("users.lanOnly")}
+                    sub={t("users.lanOnlyHint")}
+                    checked={lanOnly}
+                    onChange={setLanOnly}
+                />
             </div>
         </Sheet>
     );
 }
 
 /** what all users of a level may do at most, or what everyone may do with tonies nobody owns */
-function LimitsSheet({ which, catalog, onClose, onChanged }: { which: "user" | "guest" | "tonie" | "box" | null; catalog: AclCatalog; onClose: () => void; onChanged: () => void }) {
+function LimitsSheet({
+    which,
+    catalog,
+    onClose,
+    onChanged,
+}: {
+    which: "user" | "guest" | "tonie" | "box" | null;
+    catalog: AclCatalog;
+    onClose: () => void;
+    onChanged: () => void;
+}) {
     const ui = useUi();
     const tree = useMemo(
-        () => (which === "tonie" ? buildRightsTree(catalog.rights.filter((r) => r.name !== "tonie.share"), [], ["tonie"]) : buildRightsTree(catalog.rights, catalog.boxSettings ?? [], undefined, catalog.boxSettingGroups ?? {})),
+        () =>
+            which === "tonie"
+                ? buildRightsTree(
+                      catalog.rights.filter((r) => r.name !== "tonie.share"),
+                      [],
+                      ["tonie"],
+                  )
+                : buildRightsTree(
+                      catalog.rights,
+                      catalog.boxSettings ?? [],
+                      undefined,
+                      catalog.boxSettingGroups ?? {},
+                  ),
         [which, catalog],
     );
-    const current = which === "user" ? catalog.levelLimits.user : which === "guest" ? catalog.levelLimits.guest : which === "tonie" ? catalog.unassigned.tonie : catalog.unassigned.box;
+    const current =
+        which === "user"
+            ? catalog.levelLimits.user
+            : which === "guest"
+              ? catalog.levelLimits.guest
+              : which === "tonie"
+                ? catalog.unassigned.tonie
+                : catalog.unassigned.box;
     const [value, setValue] = useState(current ?? "");
     useEffect(() => setValue(current ?? ""), [current, which]);
     const save = async () => {
-        const body = which === "user" ? { user: value } : which === "guest" ? { guest: value } : which === "tonie" ? { unassignedTonie: value } : { unassignedBox: value };
-        if (await ui.run(() => auth.saveLevels(body), t("saved"))) {
+        const body =
+            which === "user"
+                ? { user: value }
+                : which === "guest"
+                  ? { guest: value }
+                  : which === "tonie"
+                    ? { unassignedTonie: value }
+                    : { unassignedBox: value };
+        if (await ui.run(() => auth.saveLevels(body), t("common.saved"))) {
             onChanged();
             onClose();
         }
     };
-    const title = which === "user" ? t("whatUsersMay") : which === "guest" ? t("whatChildrenMay") : t("unownedTonies");
+    const title =
+        which === "user"
+            ? t("users.whatUsersMay")
+            : which === "guest"
+              ? t("users.whatChildrenMay")
+              : t("users.unownedTonies");
     return (
         <Sheet
             open={which !== null}
@@ -520,25 +906,52 @@ function LimitsSheet({ which, catalog, onClose, onChanged }: { which: "user" | "
             footer={
                 <>
                     <button className="btn" onClick={onClose}>
-                        {t("cancel")}
+                        {t("common.cancel")}
                     </button>
-                    <button className="btn primary" disabled={value === (current ?? "")} onClick={save}>
-                        {t("save")}
+                    <button
+                        className="btn primary"
+                        disabled={value === (current ?? "")}
+                        onClick={save}
+                    >
+                        {t("common.save")}
                     </button>
                 </>
             }
         >
             <p className="small muted" style={{ marginTop: 0 }}>
-                {which === "user" ? t("whatUsersMayHint") : which === "guest" ? t("whatChildrenMayHint") : t("unownedToniesHint")}
+                {which === "user"
+                    ? t("users.whatUsersMayHint")
+                    : which === "guest"
+                      ? t("users.whatChildrenMayHint")
+                      : t("users.unownedToniesHint")}
             </p>
             <RightsTree tree={tree} value={value} onChange={setValue} />
         </Sheet>
     );
 }
 
-function GroupSheet({ group, catalog, onClose, onChanged }: { group: AclGroup | "new" | null; catalog: AclCatalog; onClose: () => void; onChanged: () => void }) {
+function GroupSheet({
+    group,
+    catalog,
+    onClose,
+    onChanged,
+}: {
+    group: AclGroup | "new" | null;
+    catalog: AclCatalog;
+    onClose: () => void;
+    onChanged: () => void;
+}) {
     const ui = useUi();
-    const tree = useMemo(() => buildRightsTree(catalog.rights, catalog.boxSettings ?? [], undefined, catalog.boxSettingGroups ?? {}), [catalog]);
+    const tree = useMemo(
+        () =>
+            buildRightsTree(
+                catalog.rights,
+                catalog.boxSettings ?? [],
+                undefined,
+                catalog.boxSettingGroups ?? {},
+            ),
+        [catalog],
+    );
     const g = group === "new" ? null : group;
     const [name, setName] = useState("");
     const [base, setBase] = useState<"user" | "guest">("guest");
@@ -552,7 +965,7 @@ function GroupSheet({ group, catalog, onClose, onChanged }: { group: AclGroup | 
         <Sheet
             open={group !== null}
             onClose={onClose}
-            title={g ? g.name : t("newGroup")}
+            title={g ? g.name : t("users.newGroup")}
             full
             footer={
                 <>
@@ -560,10 +973,23 @@ function GroupSheet({ group, catalog, onClose, onChanged }: { group: AclGroup | 
                         <button
                             className="btn danger"
                             style={{ flex: "0 0 auto" }}
-                            aria-label={t("delete")}
+                            aria-label={t("common.delete")}
                             onClick={async () => {
-                                if (!(await ui.confirm({ title: t("deleteGroupTitle", { name: g.name }), text: t("deleteGroupText"), confirm: t("delete"), danger: true }))) return;
-                                if ((await ui.run(() => auth.deleteGroup(g.id), t("deleted"))) !== undefined) {
+                                if (
+                                    !(await ui.confirm({
+                                        title: t("users.deleteGroupTitle", { name: g.name }),
+                                        text: t("users.deleteGroupText"),
+                                        confirm: t("common.delete"),
+                                        danger: true,
+                                    }))
+                                )
+                                    return;
+                                if (
+                                    (await ui.run(
+                                        () => auth.deleteGroup(g.id),
+                                        t("common.deleted"),
+                                    )) !== undefined
+                                ) {
                                     onChanged();
                                     onClose();
                                 }
@@ -573,29 +999,45 @@ function GroupSheet({ group, catalog, onClose, onChanged }: { group: AclGroup | 
                         </button>
                     )}
                     <button className="btn" onClick={onClose}>
-                        {t("cancel")}
+                        {t("common.cancel")}
                     </button>
                     <button
                         className="btn primary"
                         disabled={!name.trim()}
                         onClick={async () => {
-                            if ((await ui.run(() => auth.saveGroup({ id: g?.id, name: name.trim(), base, rights }), t("saved"))) !== undefined) {
+                            if (
+                                (await ui.run(
+                                    () =>
+                                        auth.saveGroup({
+                                            id: g?.id,
+                                            name: name.trim(),
+                                            base,
+                                            rights,
+                                        }),
+                                    t("common.saved"),
+                                )) !== undefined
+                            ) {
                                 onChanged();
                                 onClose();
                             }
                         }}
                     >
-                        {t("save")}
+                        {t("common.save")}
                     </button>
                 </>
             }
         >
             <div className="field">
-                <label>{t("name")}</label>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("groupNamePlaceholder")} />
+                <label>{t("common.name")}</label>
+                <input
+                    className="input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t("users.groupNamePlaceholder")}
+                />
             </div>
             <div className="choice-group">
-                <div className="choice-label">{t("groupKind")}</div>
+                <div className="choice-label">{t("users.groupKind")}</div>
                 <Segmented
                     value={base}
                     onChange={setBase}
@@ -605,10 +1047,10 @@ function GroupSheet({ group, catalog, onClose, onChanged }: { group: AclGroup | 
                     ]}
                 />
                 <p className="small muted" style={{ margin: "6px 2px 0" }}>
-                    {t(`groupHint_${base}` as never)}
+                    {t(`users.groupHint_${base}` as never)}
                 </p>
             </div>
-            <div className="choice-label">{t("groupRights")}</div>
+            <div className="choice-label">{t("users.groupRights")}</div>
             <RightsTree tree={tree} value={rights} onChange={setRights} />
         </Sheet>
     );

@@ -9,7 +9,8 @@ const MAX = 110;
 function claimed(target: EventTarget | null): boolean {
     if (document.documentElement.classList.contains("no-pull")) return true; // something must not be broken off
     for (let el = target instanceof Element ? target : null; el; el = el.parentElement) {
-        if (el.matches(".sheet, .backdrop, .lightbox, input, textarea, select, [data-no-pull]")) return true;
+        if (el.matches(".sheet, .backdrop, .lightbox, input, textarea, select, [data-no-pull]"))
+            return true;
         if (el.scrollTop > 0) return true;
     }
     return document.querySelector(".sheet, .lightbox") !== null;
@@ -78,7 +79,10 @@ export function PullToRefresh() {
             style={{ transform: `translate(-50%, ${busy ? THRESHOLD : pull}px)` }}
             aria-hidden
         >
-            <RotateCw size={20} style={busy ? undefined : { transform: `rotate(${pull * 3}deg)` }} />
+            <RotateCw
+                size={20}
+                style={busy ? undefined : { transform: `rotate(${pull * 3}deg)` }}
+            />
         </div>
     );
 }

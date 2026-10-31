@@ -1,6 +1,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { strToU8, zipSync } from "fflate";
-import { CheckSquare, ExternalLink, FileDown, Share2, FolderPlus, ImagePlus, ListPlus, Pencil, Plus, Printer, RotateCcw, Save, Scissors, Square, Trash2 } from "lucide-react";
+import {
+    CheckSquare,
+    ExternalLink,
+    FileDown,
+    Share2,
+    FolderPlus,
+    ImagePlus,
+    ListPlus,
+    Pencil,
+    Plus,
+    Printer,
+    RotateCcw,
+    Save,
+    Scissors,
+    Square,
+    Trash2,
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import type { TonieInfo } from "../../api/types";
@@ -14,12 +30,33 @@ import { Sheet } from "../../ui/Sheet";
 import { useSelection } from "../../ui/useSelection";
 import { LibraryPicker } from "../library/LibraryPicker";
 import { TonieImage } from "../../ui/TonieImage";
-import { Empty, Notice, Page, Row, SearchField, Section, Segmented, SwitchRow, useUi } from "../../ui/kit";
+import {
+    Empty,
+    Notice,
+    Page,
+    Row,
+    SearchField,
+    Section,
+    Segmented,
+    SwitchRow,
+    useUi,
+} from "../../ui/kit";
 import { useAccess } from "../../lib/access";
 import { flagUrl } from "./flags";
 import { FONTS, fontFaces } from "./fonts";
 import { studioPdf } from "./pdf";
-import { ALIGN, DEFAULTS, effective, labelList, PAPER_MM, sheetGrid, textOn, type LabelSettings, type StudioItem, type StudioSettings } from "./studio";
+import {
+    ALIGN,
+    DEFAULTS,
+    effective,
+    labelList,
+    PAPER_MM,
+    sheetGrid,
+    textOn,
+    type LabelSettings,
+    type StudioItem,
+    type StudioSettings,
+} from "./studio";
 
 /*
  * TeddyStudio: labels for tonies, a picture label and a text label per tonie, laid out on a
@@ -28,10 +65,58 @@ import { ALIGN, DEFAULTS, effective, labelList, PAPER_MM, sheetGrid, textOn, typ
 
 /** label sheets with their layout (the same presets as the classic UI) */
 const PRESETS: Record<string, { label: string; settings: Partial<StudioSettings> }> = {
-    avery5080: { label: "Avery 5080", settings: { shape: "round", paper: "A4", marginTop: 5, marginLeft: 8, bleed: 1, gapX: 10, gapY: 7, border: false } },
-    averyl3415: { label: "Avery L3415 / L7105 / L7780", settings: { shape: "round", paper: "A4", marginTop: 13, marginLeft: 15, bleed: 1, gapX: 6, gapY: 6, border: false } },
-    avery40rnd: { label: "Avery 40-RND", settings: { shape: "round", paper: "A4", marginTop: 13, marginLeft: 15, bleed: 1, gapX: 6, gapY: 6, border: false } },
-    avery5160: { label: "Avery 5160", settings: { shape: "square", paper: "A4", marginTop: 5, marginLeft: 8, bleed: 1, gapX: 12, gapY: 8, border: false } },
+    avery5080: {
+        label: "Avery 5080",
+        settings: {
+            shape: "round",
+            paper: "A4",
+            marginTop: 5,
+            marginLeft: 8,
+            bleed: 1,
+            gapX: 10,
+            gapY: 7,
+            border: false,
+        },
+    },
+    averyl3415: {
+        label: "Avery L3415 / L7105 / L7780",
+        settings: {
+            shape: "round",
+            paper: "A4",
+            marginTop: 13,
+            marginLeft: 15,
+            bleed: 1,
+            gapX: 6,
+            gapY: 6,
+            border: false,
+        },
+    },
+    avery40rnd: {
+        label: "Avery 40-RND",
+        settings: {
+            shape: "round",
+            paper: "A4",
+            marginTop: 13,
+            marginLeft: 15,
+            bleed: 1,
+            gapX: 6,
+            gapY: 6,
+            border: false,
+        },
+    },
+    avery5160: {
+        label: "Avery 5160",
+        settings: {
+            shape: "square",
+            paper: "A4",
+            marginTop: 5,
+            marginLeft: 8,
+            bleed: 1,
+            gapX: 12,
+            gapY: 8,
+            border: false,
+        },
+    },
 };
 
 const load = <T,>(key: string, fallback: T): T => {
@@ -51,7 +136,10 @@ const loadItems = (): StudioItem[] => {
     }
 };
 
-const itemOf = (info: TonieInfo, id = `${info.model || info.series}-${Date.now()}-${Math.random()}`): StudioItem => ({
+const itemOf = (
+    info: TonieInfo,
+    id = `${info.model || info.series}-${Date.now()}-${Math.random()}`,
+): StudioItem => ({
     id,
     title: info.series || "",
     episode: info.episode || "",
@@ -84,10 +172,16 @@ const printSheet = (paper: StudioSettings["paper"]) => {
     document.body.appendChild(frame);
     const doc = frame.contentDocument!;
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper} portrait; margin: 0; }${PRINT_CSS}${fontFaces()}</style></head><body>${pages.map((p) => p.outerHTML).join("")}</body></html>`);
+    doc.write(
+        `<!doctype html><html><head><meta charset="utf-8"><style>@page { size: ${paper} portrait; margin: 0; }${PRINT_CSS}${fontFaces()}</style></head><body>${pages.map((p) => p.outerHTML).join("")}</body></html>`,
+    );
     doc.close();
     const images = [...doc.images];
-    Promise.all(images.map((img) => (img.complete ? Promise.resolve() : new Promise((r) => (img.onload = img.onerror = r))))).then(() => {
+    Promise.all(
+        images.map((img) =>
+            img.complete ? Promise.resolve() : new Promise((r) => (img.onload = img.onerror = r)),
+        ),
+    ).then(() => {
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
         window.setTimeout(() => frame.remove(), 1000);
@@ -138,7 +232,14 @@ const downloadCut = (s: StudioSettings, total: number) => {
     const blob =
         names.length === 1
             ? new Blob([files[names[0]]], { type: "image/svg+xml" })
-            : new Blob([zipSync(Object.fromEntries(names.map((n) => [n, strToU8(files[n])])), { level: 6 }) as BlobPart], { type: "application/zip" });
+            : new Blob(
+                  [
+                      zipSync(Object.fromEntries(names.map((n) => [n, strToU8(files[n])])), {
+                          level: 6,
+                      }) as BlobPart,
+                  ],
+                  { type: "application/zip" },
+              );
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = names.length === 1 ? names[0] : `${name}.zip`;
@@ -165,24 +266,37 @@ export function StudioPage() {
         style.textContent = fontFaces();
         document.head.appendChild(style);
     }, []);
-    useEffect(() => setPref("studio.items", JSON.stringify(items)), [items]);
-    useEffect(() => setPref("studio.settings", JSON.stringify(s)), [s]);
+    const warnedFull = useRef(false);
+    useEffect(() => {
+        if (setPref("studio.items", JSON.stringify(items)) || warnedFull.current) return;
+        warnedFull.current = true;
+        ui.toast("error", t("studio.storageFull"));
+    }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        setPref("studio.settings", JSON.stringify(s));
+    }, [s]);
     const set = (patch: Partial<StudioSettings>) => setS((prev) => ({ ...prev, ...patch }));
 
     /** adds pictures and titles not in the list yet (one per model, or per title without one) */
     const [pickFolder, setPickFolder] = useState(false);
     const addInfos = (infos: TonieInfo[]) => {
-        const key = (x: { model?: string; series?: string; episode?: string }) => x.model || `${x.series}${x.episode}`;
+        const key = (x: { model?: string; series?: string; episode?: string }) =>
+            x.model || `${x.series}${x.episode}`;
         const known = new Set(items.map((i) => i.model || i.title + i.episode));
         const fresh = infos
             .filter((info) => (info.series || info.episode) && !known.has(key(info)))
             .filter((info, i, list) => list.findIndex((x) => key(x) === key(info)) === i);
         setItems((prev) => [...prev, ...fresh.map((info) => itemOf(info))]);
-        ui.toast(fresh.length ? "ok" : "info", t("studioAdded", { n: fresh.length }));
+        ui.toast(fresh.length ? "ok" : "info", t("studio.studioAdded", { n: fresh.length }));
     };
 
     /** my tonies, without system ones and those hidden */
-    const addMine = () => addInfos((tags.data ?? []).filter((tag) => tag.type !== "system" && !tag.hide).map((tag) => tagInfo(tag)));
+    const addMine = () =>
+        addInfos(
+            (tags.data ?? [])
+                .filter((tag) => tag.type !== "system" && !tag.hide)
+                .map((tag) => tagInfo(tag)),
+        );
 
     /** every TAF and playlist with a title in a library folder and the folders below, hidden ones left out */
     const addFolder = async (folder: string) => {
@@ -190,7 +304,13 @@ export function StudioPage() {
         if (!files) return;
         addInfos(
             files
-                .filter(({ entry }) => !entry.isDir && !entry.hide && (isTaf(entry.name) || isTap(entry.name)) && entry.tonieInfo)
+                .filter(
+                    ({ entry }) =>
+                        !entry.isDir &&
+                        !entry.hide &&
+                        (isTaf(entry.name) || isTap(entry.name)) &&
+                        entry.tonieInfo,
+                )
                 .map(({ entry }) => entry.tonieInfo!),
         );
     };
@@ -205,7 +325,15 @@ export function StudioPage() {
                 reader.onloadend = () => resolve(reader.result as string);
                 reader.readAsDataURL(small);
             });
-            added.push(itemOf({ series: file.name.replace(/\.[^.]+$/, ""), episode: "", picture: pic, tracks: [], model: "" }));
+            added.push(
+                itemOf({
+                    series: file.name.replace(/\.[^.]+$/, ""),
+                    episode: "",
+                    picture: pic,
+                    tracks: [],
+                    model: "",
+                }),
+            );
         }
         setItems((prev) => [...prev, ...added]);
     };
@@ -213,9 +341,17 @@ export function StudioPage() {
     // making the PDF takes a while; phones hand out a file only on a tap, so it is offered afterwards
     const [made, setMade] = useState<{ file: File; missing: number } | null>(null);
     const pdf = async (list = items) => {
-        ui.toast("info", t("studioPdfMaking"));
+        ui.toast("info", t("studio.studioPdfMaking"));
         const r = await ui.run(() => studioPdf(list, s));
-        if (r) setMade({ file: new File([r.blob], `teddystudio-${new Date().toISOString().slice(0, 10)}.pdf`, { type: "application/pdf" }), missing: r.missing });
+        if (r)
+            setMade({
+                file: new File(
+                    [r.blob],
+                    `teddystudio-${new Date().toISOString().slice(0, 10)}.pdf`,
+                    { type: "application/pdf" },
+                ),
+                missing: r.missing,
+            });
     };
 
     /**
@@ -229,8 +365,12 @@ export function StudioPage() {
             return Promise.all(
                 items.map(async (item) => {
                     if (!/^https?:/.test(item.pic) || !item.model) return item;
-                    const hit = (await tc.searchTonies(item.model).catch(() => [])).find((x) => x.model === item.model);
-                    return hit?.picture && !/^https?:/.test(hit.picture) ? { ...item, pic: hit.picture } : item;
+                    const hit = (await tc.searchTonies(item.model).catch(() => [])).find(
+                        (x) => x.model === item.model,
+                    );
+                    return hit?.picture && !/^https?:/.test(hit.picture)
+                        ? { ...item, pic: hit.picture }
+                        : item;
                 }),
             );
         });
@@ -238,24 +378,42 @@ export function StudioPage() {
         setItems(list);
         qc.invalidateQueries({ queryKey: keys.allTags });
         setMade(null);
-        ui.toast("ok", t("studioCacheOn"));
+        ui.toast("ok", t("studio.studioCacheOn"));
         await pdf(list);
     };
 
     return (
         <Page
-            title={t("teddyStudio")}
-            subtitle={t("teddyStudioHint")}
+            title={t("common.teddyStudio")}
+            subtitle={t("common.teddyStudioHint")}
             back="/more"
             right={
                 <>
-                    <button className="icon-btn" onClick={() => downloadCut(s, labelList(items, s).length)} disabled={!items.length} aria-label={t("studioCutSvg")} title={t("studioCutSvg")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => downloadCut(s, labelList(items, s).length)}
+                        disabled={!items.length}
+                        aria-label={t("studio.studioCutSvg")}
+                        title={t("studio.studioCutSvg")}
+                    >
                         <Scissors size={20} />
                     </button>
-                    <button className="icon-btn" onClick={() => pdf()} disabled={!items.length} aria-label={t("studioPdf")} title={t("studioPdf")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => pdf()}
+                        disabled={!items.length}
+                        aria-label={t("studio.studioPdf")}
+                        title={t("studio.studioPdf")}
+                    >
                         <FileDown size={20} />
                     </button>
-                    <button className="icon-btn" onClick={() => printSheet(s.paper)} disabled={!items.length} aria-label={t("studioPrint")} title={t("studioPrint")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => printSheet(s.paper)}
+                        disabled={!items.length}
+                        aria-label={t("studio.studioPrint")}
+                        title={t("studio.studioPrint")}
+                    >
                         <Printer size={20} />
                     </button>
                 </>
@@ -264,19 +422,42 @@ export function StudioPage() {
             <div className="studio">
                 <div className="studio-side">
                     <Section
-                        title={t("studioTonies", { n: items.length })}
+                        title={t("studio.studioTonies", { n: items.length })}
                         right={
                             items.length > 0 && (
                                 <button className="btn ghost small" onClick={() => setItems([])}>
-                                    {t("clear")}
+                                    {t("common.clear")}
                                 </button>
                             )
                         }
                     >
-                        <Row icon={<Plus size={17} />} title={t("studioAdd")} accent onClick={() => setAdding(true)} chevron={false} />
-                        <Row icon={<ListPlus size={17} />} title={t("studioAddMine")} onClick={addMine} chevron={false} disabled={!tags.data} />
-                        <Row icon={<FolderPlus size={17} />} title={t("studioAddFolder")} onClick={() => setPickFolder(true)} chevron={false} />
-                        <Row icon={<ImagePlus size={17} />} title={t("studioAddImage")} sub={t("studioAddImageHint")} onClick={() => imageInput.current?.click()} chevron={false} />
+                        <Row
+                            icon={<Plus size={17} />}
+                            title={t("studio.studioAdd")}
+                            accent
+                            onClick={() => setAdding(true)}
+                            chevron={false}
+                        />
+                        <Row
+                            icon={<ListPlus size={17} />}
+                            title={t("studio.studioAddMine")}
+                            onClick={addMine}
+                            chevron={false}
+                            disabled={!tags.data}
+                        />
+                        <Row
+                            icon={<FolderPlus size={17} />}
+                            title={t("studio.studioAddFolder")}
+                            onClick={() => setPickFolder(true)}
+                            chevron={false}
+                        />
+                        <Row
+                            icon={<ImagePlus size={17} />}
+                            title={t("studio.studioAddImage")}
+                            sub={t("studio.studioAddImageHint")}
+                            onClick={() => imageInput.current?.click()}
+                            chevron={false}
+                        />
                         <input
                             ref={imageInput}
                             type="file"
@@ -301,10 +482,12 @@ export function StudioPage() {
                                         <Pencil size={16} className="muted" />
                                         <button
                                             className="icon-btn"
-                                            aria-label={t("delete")}
+                                            aria-label={t("common.delete")}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setItems((prev) => prev.filter((x) => x.id !== item.id));
+                                                setItems((prev) =>
+                                                    prev.filter((x) => x.id !== item.id),
+                                                );
                                             }}
                                         >
                                             <Trash2 size={16} />
@@ -318,7 +501,11 @@ export function StudioPage() {
                 </div>
                 <div className="studio-preview">
                     {items.length === 0 ? (
-                        <Empty icon={<Printer size={28} />} title={t("studioEmpty")} text={t("studioEmptyText")} />
+                        <Empty
+                            icon={<Printer size={28} />}
+                            title={t("studio.studioEmpty")}
+                            text={t("studio.studioEmptyText")}
+                        />
                     ) : (
                         <Sheet_ items={items} s={s} />
                     )}
@@ -330,7 +517,7 @@ export function StudioPage() {
                 open={pickFolder}
                 onClose={() => setPickFolder(false)}
                 folderMode
-                title={t("studioAddFolder")}
+                title={t("studio.studioAddFolder")}
                 onPick={(folder) => {
                     setPickFolder(false);
                     addFolder(folder);
@@ -340,17 +527,37 @@ export function StudioPage() {
                 s={s}
                 item={editing}
                 onClose={() => setEditing(null)}
-                onSave={(item) => setItems((prev) => prev.map((x) => (x.id === item.id ? item : x)))}
+                onSave={(item) =>
+                    setItems((prev) => prev.map((x) => (x.id === item.id ? item : x)))
+                }
             />
         </Page>
     );
 }
 
-function NumberField({ label, value, onChange, unit = "mm", step = 1 }: { label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number }) {
+function NumberField({
+    label,
+    value,
+    onChange,
+    unit = "mm",
+    step = 1,
+}: {
+    label: string;
+    value: number;
+    onChange: (v: number) => void;
+    unit?: string;
+    step?: number;
+}) {
     return (
         <label className="studio-field">
             <span>{label}</span>
-            <input className="input" type="number" step={step} value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+            <input
+                className="input"
+                type="number"
+                step={step}
+                value={value}
+                onChange={(e) => onChange(Number(e.target.value) || 0)}
+            />
             <span className="muted small">{unit}</span>
         </label>
     );
@@ -365,26 +572,81 @@ const LABEL_FIELDS: {
     step?: number;
     options?: () => { value: string; label: string }[];
 }[] = [
-    { key: "mode", label: () => t("studioMode"), kind: "select", options: () => [{ value: "both", label: t("studioBoth") }, { value: "image", label: t("studioImage") }, { value: "text", label: t("studioText") }] },
-    { key: "text", label: () => t("studioTextLabel"), kind: "select", options: () => [{ value: "title", label: t("studioTitle") }, { value: "tracks", label: t("studioTracks") }] },
-    { key: "font", label: () => t("studioFont"), kind: "select", options: () => FONTS.map((f) => ({ value: f.css, label: f.label })) },
-    { key: "fontSize", label: () => t("studioFontSize"), kind: "number", unit: "pt" },
-    { key: "padding", label: () => t("studioPadding"), kind: "number", unit: "mm", step: 0.5 },
-    { key: "background", label: () => t("studioBackground"), kind: "color" },
-    { key: "imageScale", label: () => t("studioImageScale"), kind: "number", unit: "%", step: 5 },
+    {
+        key: "mode",
+        label: () => t("studio.studioMode"),
+        kind: "select",
+        options: () => [
+            { value: "both", label: t("studio.studioBoth") },
+            { value: "image", label: t("studio.studioImage") },
+            { value: "text", label: t("studio.studioText") },
+        ],
+    },
+    {
+        key: "text",
+        label: () => t("studio.studioTextLabel"),
+        kind: "select",
+        options: () => [
+            { value: "title", label: t("studio.studioTitle") },
+            { value: "tracks", label: t("studio.studioTracks") },
+        ],
+    },
+    {
+        key: "font",
+        label: () => t("studio.studioFont"),
+        kind: "select",
+        options: () => FONTS.map((f) => ({ value: f.css, label: f.label })),
+    },
+    { key: "fontSize", label: () => t("studio.studioFontSize"), kind: "number", unit: "pt" },
+    {
+        key: "padding",
+        label: () => t("studio.studioPadding"),
+        kind: "number",
+        unit: "mm",
+        step: 0.5,
+    },
+    { key: "background", label: () => t("studio.studioBackground"), kind: "color" },
+    {
+        key: "imageScale",
+        label: () => t("studio.studioImageScale"),
+        kind: "number",
+        unit: "%",
+        step: 5,
+    },
     {
         key: "imageAlign",
-        label: () => t("studioImageAlign"),
+        label: () => t("studio.studioImageAlign"),
         kind: "select",
-        options: () => (["center", "top", "bottom", "left", "right"] as const).map((v) => ({ value: v, label: t(`studioAlign_${v}`) })),
+        options: () =>
+            (["center", "top", "bottom", "left", "right"] as const).map((v) => ({
+                value: v,
+                label: t(`studio.studioAlign_${v}`),
+            })),
     },
-    { key: "imageOffsetX", label: () => t("studioImageOffsetX"), kind: "number", unit: "mm", step: 0.5 },
-    { key: "imageOffsetY", label: () => t("studioImageOffsetY"), kind: "number", unit: "mm", step: 0.5 },
-    { key: "seriesFontSize", label: () => t("studioSeriesFontSize"), kind: "number", unit: "pt" },
-    { key: "seriesOnImage", label: () => t("studioSeriesOnImage"), kind: "bool" },
-    { key: "rotateSeries", label: () => t("studioRotateSeries"), kind: "bool" },
-    { key: "showModel", label: () => t("studioShowModel"), kind: "bool" },
-    { key: "flag", label: () => t("studioFlag"), kind: "bool" },
+    {
+        key: "imageOffsetX",
+        label: () => t("studio.studioImageOffsetX"),
+        kind: "number",
+        unit: "mm",
+        step: 0.5,
+    },
+    {
+        key: "imageOffsetY",
+        label: () => t("studio.studioImageOffsetY"),
+        kind: "number",
+        unit: "mm",
+        step: 0.5,
+    },
+    {
+        key: "seriesFontSize",
+        label: () => t("studio.studioSeriesFontSize"),
+        kind: "number",
+        unit: "pt",
+    },
+    { key: "seriesOnImage", label: () => t("studio.studioSeriesOnImage"), kind: "bool" },
+    { key: "rotateSeries", label: () => t("studio.studioRotateSeries"), kind: "bool" },
+    { key: "showModel", label: () => t("studio.studioShowModel"), kind: "bool" },
+    { key: "flag", label: () => t("studio.studioFlag"), kind: "bool" },
 ];
 
 /** the label settings; with changed/reset the fields that differ from the sheet get a reset button */
@@ -401,7 +663,14 @@ function LabelFields({
 }) {
     const reset = (key: keyof LabelSettings) =>
         changed?.(key) && (
-            <button type="button" className="btn ghost small" style={{ padding: 0, height: "auto" }} onClick={() => onReset?.(key)} aria-label={t("reset")} title={t("reset")}>
+            <button
+                type="button"
+                className="btn ghost small"
+                style={{ padding: 0, height: "auto" }}
+                onClick={() => onReset?.(key)}
+                aria-label={t("common.reset")}
+                title={t("common.reset")}
+            >
                 <RotateCcw size={13} />
             </button>
         );
@@ -413,7 +682,11 @@ function LabelFields({
                     {f.label()} {reset(f.key)}
                 </span>
                 {f.kind === "select" ? (
-                    <select className="select" value={String(v)} onChange={(e) => onChange({ [f.key]: e.target.value })}>
+                    <select
+                        className="select"
+                        value={String(v)}
+                        onChange={(e) => onChange({ [f.key]: e.target.value })}
+                    >
                         {f.options!().map((o) => (
                             <option key={o.value} value={o.value}>
                                 {o.label}
@@ -421,9 +694,19 @@ function LabelFields({
                         ))}
                     </select>
                 ) : f.kind === "color" ? (
-                    <input type="color" value={String(v)} onChange={(e) => onChange({ [f.key]: e.target.value })} />
+                    <input
+                        type="color"
+                        value={String(v)}
+                        onChange={(e) => onChange({ [f.key]: e.target.value })}
+                    />
                 ) : (
-                    <input className="input" type="number" step={f.step ?? 1} value={Number(v)} onChange={(e) => onChange({ [f.key]: Number(e.target.value) || 0 })} />
+                    <input
+                        className="input"
+                        type="number"
+                        step={f.step ?? 1}
+                        value={Number(v)}
+                        onChange={(e) => onChange({ [f.key]: Number(e.target.value) || 0 })}
+                    />
                 )}
                 {f.unit && <span className="muted small">{f.unit}</span>}
             </label>
@@ -431,7 +714,9 @@ function LabelFields({
     };
     return (
         <>
-            <div className="studio-settings">{LABEL_FIELDS.filter((f) => f.kind !== "bool").map(field)}</div>
+            <div className="studio-settings">
+                {LABEL_FIELDS.filter((f) => f.kind !== "bool").map(field)}
+            </div>
             {LABEL_FIELDS.filter((f) => f.kind === "bool").map((f) => (
                 <SwitchRow
                     key={f.key}
@@ -457,7 +742,13 @@ const loadTemplates = (): Record<string, StudioSettings> => {
     }
 };
 
-function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial<StudioSettings>) => void }) {
+function StudioSettingsSection({
+    s,
+    set,
+}: {
+    s: StudioSettings;
+    set: (p: Partial<StudioSettings>) => void;
+}) {
     const ui = useUi();
     const [templates, setTemplates] = useState(loadTemplates);
     const store = (next: Record<string, StudioSettings>) => {
@@ -465,12 +756,15 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
         setPref("studio.templates", JSON.stringify(next));
     };
     const saveTemplate = async () => {
-        const name = await ui.prompt({ title: t("studioSaveTemplate"), label: t("name") });
+        const name = await ui.prompt({
+            title: t("studio.studioSaveTemplate"),
+            label: t("common.name"),
+        });
         if (name) store({ ...templates, [name]: s });
     };
     const deleteTemplate = () =>
         ui.actions(
-            t("studioDeleteTemplate"),
+            t("studio.studioDeleteTemplate"),
             Object.keys(templates).map((name) => ({
                 label: name,
                 icon: <Trash2 size={17} />,
@@ -482,20 +776,22 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
             })),
         );
     return (
-        <Section title={t("studioLabels")}>
+        <Section title={t("studio.studioLabels")}>
             <div className="studio-settings">
                 <label className="studio-field wide">
-                    <span>{t("studioPreset")}</span>
+                    <span>{t("studio.studioPreset")}</span>
                     <select
                         className="select"
                         value=""
                         onChange={(e) => {
-                            const [kind, id] = e.target.value.split(":", 2);
+                            const v = e.target.value;
+                            const kind = v.slice(0, v.indexOf(":"));
+                            const id = v.slice(v.indexOf(":") + 1); // a name may contain ":"
                             if (kind === "preset") set(PRESETS[id].settings);
                             if (kind === "own") set(templates[id]);
                         }}
                     >
-                        <option value="">{t("studioPresetPick")}</option>
+                        <option value="">{t("studio.studioPresetPick")}</option>
                         {Object.entries(PRESETS).map(([id, p]) => (
                             <option key={id} value={`preset:${id}`}>
                                 {p.label}
@@ -508,40 +804,112 @@ function StudioSettingsSection({ s, set }: { s: StudioSettings; set: (p: Partial
                         ))}
                     </select>
                 </label>
-                <Segmented value={s.shape} onChange={(shape) => set({ shape })} options={[{ value: "round", label: t("studioRound") }, { value: "square", label: t("studioSquare") }]} />
+                <Segmented
+                    value={s.shape}
+                    onChange={(shape) => set({ shape })}
+                    options={[
+                        { value: "round", label: t("studio.studioRound") },
+                        { value: "square", label: t("studio.studioSquare") },
+                    ]}
+                />
                 {s.shape === "round" ? (
-                    <NumberField label={t("studioDiameter")} value={s.diameter} onChange={(diameter) => set({ diameter })} />
+                    <NumberField
+                        label={t("studio.studioDiameter")}
+                        value={s.diameter}
+                        onChange={(diameter) => set({ diameter })}
+                    />
                 ) : (
                     <>
-                        <NumberField label={t("studioWidth")} value={s.width} onChange={(width) => set({ width })} />
-                        <NumberField label={t("studioHeight")} value={s.height} onChange={(height) => set({ height })} />
+                        <NumberField
+                            label={t("studio.studioWidth")}
+                            value={s.width}
+                            onChange={(width) => set({ width })}
+                        />
+                        <NumberField
+                            label={t("studio.studioHeight")}
+                            value={s.height}
+                            onChange={(height) => set({ height })}
+                        />
                     </>
                 )}
                 <label className="studio-field">
-                    <span>{t("studioPaper")}</span>
-                    <select className="select" value={s.paper} onChange={(e) => set({ paper: e.target.value as StudioSettings["paper"] })}>
+                    <span>{t("studio.studioPaper")}</span>
+                    <select
+                        className="select"
+                        value={s.paper}
+                        onChange={(e) => set({ paper: e.target.value as StudioSettings["paper"] })}
+                    >
                         {Object.keys(PAPER_MM).map((p) => (
                             <option key={p}>{p}</option>
                         ))}
                     </select>
                 </label>
-                <NumberField label={t("studioMarginTop")} value={s.marginTop} onChange={(marginTop) => set({ marginTop })} />
-                <NumberField label={t("studioMarginLeft")} value={s.marginLeft} onChange={(marginLeft) => set({ marginLeft })} />
-                <NumberField label={t("studioGapX")} value={s.gapX} onChange={(gapX) => set({ gapX })} />
-                <NumberField label={t("studioGapY")} value={s.gapY} onChange={(gapY) => set({ gapY })} />
-                <NumberField label={t("studioBleed")} value={s.bleed} onChange={(bleed) => set({ bleed })} step={0.5} />
+                <NumberField
+                    label={t("studio.studioMarginTop")}
+                    value={s.marginTop}
+                    onChange={(marginTop) => set({ marginTop })}
+                />
+                <NumberField
+                    label={t("studio.studioMarginLeft")}
+                    value={s.marginLeft}
+                    onChange={(marginLeft) => set({ marginLeft })}
+                />
+                <NumberField
+                    label={t("studio.studioGapX")}
+                    value={s.gapX}
+                    onChange={(gapX) => set({ gapX })}
+                />
+                <NumberField
+                    label={t("studio.studioGapY")}
+                    value={s.gapY}
+                    onChange={(gapY) => set({ gapY })}
+                />
+                <NumberField
+                    label={t("studio.studioBleed")}
+                    value={s.bleed}
+                    onChange={(bleed) => set({ bleed })}
+                    step={0.5}
+                />
             </div>
-            <SwitchRow title={t("studioBorder")} sub={t("studioBorderHint")} checked={s.border} onChange={(border) => set({ border })} />
+            <SwitchRow
+                title={t("studio.studioBorder")}
+                sub={t("studio.studioBorderHint")}
+                checked={s.border}
+                onChange={(border) => set({ border })}
+            />
             <LabelFields value={s} onChange={set} />
-            <Row icon={<Save size={17} />} title={t("studioSaveTemplate")} onClick={saveTemplate} chevron={false} />
-            {Object.keys(templates).length > 0 && <Row icon={<Trash2 size={17} />} title={t("studioDeleteTemplate")} onClick={deleteTemplate} chevron={false} />}
-            <Row icon={<RotateCcw size={17} />} title={t("studioReset")} onClick={() => set(DEFAULTS)} chevron={false} />
+            <Row
+                icon={<Save size={17} />}
+                title={t("studio.studioSaveTemplate")}
+                onClick={saveTemplate}
+                chevron={false}
+            />
+            {Object.keys(templates).length > 0 && (
+                <Row
+                    icon={<Trash2 size={17} />}
+                    title={t("studio.studioDeleteTemplate")}
+                    onClick={deleteTemplate}
+                    chevron={false}
+                />
+            )}
+            <Row
+                icon={<RotateCcw size={17} />}
+                title={t("studio.studioReset")}
+                onClick={() => set(DEFAULTS)}
+                chevron={false}
+            />
         </Section>
     );
 }
 
 /** the picture of a flag, loaded when needed */
-const useFlag = (language?: string) => useQuery({ queryKey: ["flag", language], queryFn: () => flagUrl(language), enabled: Boolean(language), staleTime: Infinity }).data;
+const useFlag = (language?: string) =>
+    useQuery({
+        queryKey: ["flag", language],
+        queryFn: () => flagUrl(language),
+        enabled: Boolean(language),
+        staleTime: Infinity,
+    }).data;
 
 /** text along the upper arc of a round label, as the PDF draws it */
 function ArcText({ id, text, e, w }: { id: string; text: string; e: StudioSettings; w: number }) {
@@ -550,7 +918,16 @@ function ArcText({ id, text, e, w }: { id: string; text: string; e: StudioSettin
     return (
         <svg className="studio-arc" viewBox="0 0 100 100">
             <path id={id} d={`M ${50 - r},50 A ${r},${r} 0 0,1 ${50 + r},50`} fill="none" />
-            <text fontSize={size} fontWeight={700} fontFamily={e.font} fill="#fff" stroke="rgba(0,0,0,0.75)" strokeWidth={size / 5} paintOrder="stroke" dominantBaseline="middle">
+            <text
+                fontSize={size}
+                fontWeight={700}
+                fontFamily={e.font}
+                fill="#fff"
+                stroke="rgba(0,0,0,0.75)"
+                strokeWidth={size / 5}
+                paintOrder="stroke"
+                dominantBaseline="middle"
+            >
                 <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">
                     {text}
                 </textPath>
@@ -559,7 +936,15 @@ function ArcText({ id, text, e, w }: { id: string; text: string; e: StudioSettin
     );
 }
 
-function LabelView({ label: { item, e, kind }, s, index }: { label: ReturnType<typeof labelList>[number]; s: StudioSettings; index: number }) {
+function LabelView({
+    label: { item, e, kind },
+    s,
+    index,
+}: {
+    label: ReturnType<typeof labelList>[number];
+    s: StudioSettings;
+    index: number;
+}) {
     const { w, h } = sheetGrid(s);
     const round = s.shape === "round";
     const flag = useFlag(kind === "text" && e.flag ? item.language : undefined);
@@ -572,7 +957,12 @@ function LabelView({ label: { item, e, kind }, s, index }: { label: ReturnType<t
         border: s.border ? "0.2mm solid #999" : "none",
         fontSize: `${e.fontSize}pt`,
         fontFamily: e.font,
-        padding: kind === "text" ? (round ? `${e.padding}mm calc(10% + ${e.padding}mm)` : `${e.padding}mm`) : 0,
+        padding:
+            kind === "text"
+                ? round
+                    ? `${e.padding}mm calc(10% + ${e.padding}mm)`
+                    : `${e.padding}mm`
+                : 0,
     };
     if (kind === "image") {
         const [fx, fy] = ALIGN[e.imageAlign];
@@ -596,7 +986,10 @@ function LabelView({ label: { item, e, kind }, s, index }: { label: ReturnType<t
                     (round && e.rotateSeries ? (
                         <ArcText id={`arc-${index}`} text={item.title} e={e} w={w} />
                     ) : (
-                        <div className="studio-series" style={{ fontSize: `${e.seriesFontSize}pt` }}>
+                        <div
+                            className="studio-series"
+                            style={{ fontSize: `${e.seriesFontSize}pt` }}
+                        >
                             {item.title}
                         </div>
                     ))}
@@ -626,9 +1019,13 @@ function LabelView({ label: { item, e, kind }, s, index }: { label: ReturnType<t
 /** the printed sheets, one per page of the paper size; on screen a scaled preview of each */
 function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
     const { pw, ph, w, h, cols, rows } = sheetGrid(s);
-    const labels = labelList(items, s).map((l, i) => <LabelView key={`${l.item.id}-${l.kind}`} label={l} s={s} index={i} />);
+    const labels = labelList(items, s).map((l, i) => (
+        <LabelView key={`${l.item.id}-${l.kind}`} label={l} s={s} index={i} />
+    ));
     const perPage = cols * rows;
-    const pages = Array.from({ length: Math.max(1, Math.ceil(labels.length / perPage)) }, (_, i) => labels.slice(i * perPage, (i + 1) * perPage));
+    const pages = Array.from({ length: Math.max(1, Math.ceil(labels.length / perPage)) }, (_, i) =>
+        labels.slice(i * perPage, (i + 1) * perPage),
+    );
     return (
         <div className="studio-pages">
             {pages.map((page, i) => (
@@ -647,7 +1044,7 @@ function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
                         {page}
                     </div>
                     <div className="studio-page-no small muted">
-                        {t("studioPage", { n: i + 1, of: pages.length, per: perPage })}
+                        {t("studio.studioPage", { n: i + 1, of: pages.length, per: perPage })}
                     </div>
                 </div>
             ))}
@@ -655,14 +1052,26 @@ function Sheet_({ items, s }: { items: StudioItem[]; s: StudioSettings }) {
     );
 }
 
-function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void; onAdd: (infos: TonieInfo[]) => void }) {
+function AddSheet({
+    open,
+    onClose,
+    onAdd,
+}: {
+    open: boolean;
+    onClose: () => void;
+    onAdd: (infos: TonieInfo[]) => void;
+}) {
     const [query, setQuery] = useState("");
     const [debounced, setDebounced] = useState("");
     useEffect(() => {
         const timer = window.setTimeout(() => setDebounced(query.trim()), 300);
         return () => window.clearTimeout(timer);
     }, [query]);
-    const search = useQuery({ queryKey: ["tonieSearch", debounced], queryFn: () => tc.searchTonies(debounced), enabled: open && debounced.length >= 2 });
+    const search = useQuery({
+        queryKey: ["tonieSearch", debounced],
+        queryFn: () => tc.searchTonies(debounced),
+        enabled: open && debounced.length >= 2,
+    });
     const results = (search.data ?? []).slice(0, 60);
     const ids = results.map((_, i) => String(i));
     // a click adds one; Shift (range) or Ctrl/Cmd (single) selects several, a long press on touch screens too
@@ -676,33 +1085,54 @@ function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void
         <Sheet
             open={open}
             onClose={onClose}
-            title={t("studioAdd")}
+            title={t("studio.studioAdd")}
             full
             footer={
                 sel.selected.size > 0 ? (
                     <>
                         <button className="btn" onClick={sel.clear}>
-                            {t("cancel")}
+                            {t("common.cancel")}
                         </button>
                         <button className="btn primary" onClick={addSelected}>
-                            {t("studioAddSelected", { n: sel.selected.size })}
+                            {t("studio.studioAddSelected", { n: sel.selected.size })}
                         </button>
                     </>
                 ) : undefined
             }
         >
-            <SearchField value={query} onChange={setQuery} placeholder={t("studioSearch")} autoFocus />
-            {results.length > 0 && <div className="small muted mt">{t("studioMultiHint")}</div>}
+            <SearchField
+                value={query}
+                onChange={setQuery}
+                placeholder={t("studio.studioSearch")}
+                autoFocus
+            />
+            {results.length > 0 && (
+                <div className="small muted mt">{t("studio.studioMultiHint")}</div>
+            )}
             <div className="list mt">
                 {results.map((info, i) => (
-                    <div key={`${info.model}-${i}`} className="row-wrap" role="button" tabIndex={0} {...sel.itemProps(String(i))}>
+                    <div
+                        key={`${info.model}-${i}`}
+                        className="row-wrap"
+                        role="button"
+                        tabIndex={0}
+                        {...sel.itemProps(String(i))}
+                    >
                         <Row
                             className={sel.selected.has(String(i)) ? "checked" : ""}
                             leading={<TonieImage src={info.picture} size={40} />}
                             title={info.series}
                             sub={[info.episode, info.model].filter(Boolean).join(" · ")}
                             chevron={false}
-                            right={sel.selected.has(String(i)) ? <CheckSquare size={18} /> : sel.selecting ? <Square size={18} /> : <Plus size={18} />}
+                            right={
+                                sel.selected.has(String(i)) ? (
+                                    <CheckSquare size={18} />
+                                ) : sel.selecting ? (
+                                    <Square size={18} />
+                                ) : (
+                                    <Plus size={18} />
+                                )
+                            }
                         />
                     </div>
                 ))}
@@ -711,14 +1141,33 @@ function AddSheet({ open, onClose, onAdd }: { open: boolean; onClose: () => void
     );
 }
 
-function EditSheet({ s, item, onClose, onSave }: { s: StudioSettings; item: StudioItem | null; onClose: () => void; onSave: (item: StudioItem) => void }) {
+function EditSheet({
+    s,
+    item,
+    onClose,
+    onSave,
+}: {
+    s: StudioSettings;
+    item: StudioItem | null;
+    onClose: () => void;
+    onSave: (item: StudioItem) => void;
+}) {
     const [draft, setDraft] = useState<StudioItem | null>(item);
     useEffect(() => setDraft(item), [item]);
-    if (!draft) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
+    if (!draft)
+        return (
+            <Sheet open={false} onClose={onClose}>
+                {null}
+            </Sheet>
+        );
     const field = (key: "title" | "episode" | "pic", label: string) => (
         <div className="field">
             <label>{label}</label>
-            <input className="input" value={draft[key]} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
+            <input
+                className="input"
+                value={draft[key]}
+                onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+            />
         </div>
     );
     const overrides = draft.overrides ?? {};
@@ -726,12 +1175,12 @@ function EditSheet({ s, item, onClose, onSave }: { s: StudioSettings; item: Stud
         <Sheet
             open={!!item}
             onClose={onClose}
-            title={t("studioEdit")}
+            title={t("studio.studioEdit")}
             full
             footer={
                 <>
                     <button className="btn" onClick={onClose}>
-                        {t("cancel")}
+                        {t("common.cancel")}
                     </button>
                     <button
                         className="btn primary"
@@ -740,32 +1189,42 @@ function EditSheet({ s, item, onClose, onSave }: { s: StudioSettings; item: Stud
                             onClose();
                         }}
                     >
-                        {t("save")}
+                        {t("common.save")}
                     </button>
                 </>
             }
         >
-            {field("title", t("studioTitle"))}
-            {field("episode", t("studioEpisode"))}
-            {!draft.pic.startsWith("data:") && field("pic", t("studioPicture"))}
+            {field("title", t("studio.studioTitle"))}
+            {field("episode", t("studio.studioEpisode"))}
+            {!draft.pic.startsWith("data:") && field("pic", t("studio.studioPicture"))}
             <div className="field">
-                <label>{t("studioTracks")}</label>
-                <textarea className="input" rows={6} value={draft.tracks.join("\n")} onChange={(e) => setDraft({ ...draft, tracks: e.target.value.split("\n") })} />
+                <label>{t("studio.studioTracks")}</label>
+                <textarea
+                    className="input"
+                    rows={6}
+                    value={draft.tracks.join("\n")}
+                    onChange={(e) => setDraft({ ...draft, tracks: e.target.value.split("\n") })}
+                />
             </div>
             <Section
-                title={t("studioThisLabel")}
-                footer={t("studioThisLabelHint")}
+                title={t("studio.studioThisLabel")}
+                footer={t("studio.studioThisLabelHint")}
                 right={
                     Object.keys(overrides).length > 0 && (
-                        <button className="btn ghost small" onClick={() => setDraft({ ...draft, overrides: undefined })}>
-                            {t("reset")}
+                        <button
+                            className="btn ghost small"
+                            onClick={() => setDraft({ ...draft, overrides: undefined })}
+                        >
+                            {t("common.reset")}
                         </button>
                     )
                 }
             >
                 <LabelFields
                     value={effective(s, draft)}
-                    onChange={(patch) => setDraft({ ...draft, overrides: { ...overrides, ...patch } })}
+                    onChange={(patch) =>
+                        setDraft({ ...draft, overrides: { ...overrides, ...patch } })
+                    }
                     changed={(key) => key in overrides}
                     onReset={(key) => {
                         const { [key]: _, ...rest } = overrides;
@@ -778,28 +1237,44 @@ function EditSheet({ s, item, onClose, onSave }: { s: StudioSettings; item: Stud
 }
 
 /** the finished PDF: share (phones), save or open it */
-function PdfSheet({ made, onClose, onCachePictures }: { made: { file: File; missing: number } | null; onClose: () => void; onCachePictures: () => Promise<void> }) {
+function PdfSheet({
+    made,
+    onClose,
+    onCachePictures,
+}: {
+    made: { file: File; missing: number } | null;
+    onClose: () => void;
+    onCachePictures: () => Promise<void>;
+}) {
     const access = useAccess();
     const [busy, setBusy] = useState(false);
-    const canShare = made !== null && typeof navigator.canShare === "function" && navigator.canShare({ files: [made.file] });
+    const canShare =
+        made !== null &&
+        typeof navigator.canShare === "function" &&
+        navigator.canShare({ files: [made.file] });
     const cacheImages = async () => {
         setBusy(true);
         await onCachePictures();
         setBusy(false);
     };
     return (
-        <Sheet open={made !== null} onClose={onClose} title={t("studioPdfReady")}>
+        <Sheet open={made !== null} onClose={onClose} title={t("studio.studioPdfReady")}>
             {made && made.missing > 0 && (
                 <Notice>
-                    {t("studioPdfMissing", { n: made.missing })}. {t("studioPdfMissingHint")}
+                    {t("studio.studioPdfMissing", { n: made.missing })}.{" "}
+                    {t("studio.studioPdfMissingHint")}
                     {access.canServerSettings && (
                         <div className="mt">
-                            <button className="btn soft small" onClick={cacheImages} disabled={busy}>
+                            <button
+                                className="btn soft small"
+                                onClick={cacheImages}
+                                disabled={busy}
+                            >
                                 {busy ? <span className="spinner small" /> : null}
-                                {t("studioCacheTurnOn")}
+                                {t("studio.studioCacheTurnOn")}
                             </button>
                             <div className="small muted" style={{ marginTop: 6 }}>
-                                {t("studioCacheTurnOnHint")}
+                                {t("studio.studioCacheTurnOnHint")}
                             </div>
                         </div>
                     )}
@@ -809,19 +1284,29 @@ function PdfSheet({ made, onClose, onCachePictures }: { made: { file: File; miss
                 {canShare && (
                     <Row
                         icon={<Share2 size={17} />}
-                        title={t("studioPdfShare")}
-                        sub={t("studioPdfShareHint")}
-                        onClick={() => navigator.share({ files: [made!.file], title: made!.file.name }).then(onClose, () => undefined)}
+                        title={t("studio.studioPdfShare")}
+                        sub={t("studio.studioPdfShareHint")}
+                        onClick={() =>
+                            navigator
+                                .share({ files: [made!.file], title: made!.file.name })
+                                .then(onClose, () => undefined)
+                        }
                         chevron={false}
                     />
                 )}
-                <Row icon={<FileDown size={17} />} title={t("studioPdf")} sub={made?.file.name} onClick={() => {
+                <Row
+                    icon={<FileDown size={17} />}
+                    title={t("studio.studioPdf")}
+                    sub={made?.file.name}
+                    onClick={() => {
                         if (made) saveFile(made.file.name, made.file, "application/pdf");
                         onClose();
-                    }} chevron={false} />
+                    }}
+                    chevron={false}
+                />
                 <Row
                     icon={<ExternalLink size={17} />}
-                    title={t("studioPdfOpen")}
+                    title={t("studio.studioPdfOpen")}
                     onClick={() => {
                         if (made) window.open(URL.createObjectURL(made.file), "_blank");
                         onClose();

@@ -10,9 +10,9 @@ import { UiProvider } from "./ui/kit";
 import "./styles.css";
 
 applyTheme(getPref("theme", "auto") as Theme);
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () =>
-    applyTheme(getPref("theme", "auto") as Theme),
-);
+window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => applyTheme(getPref("theme", "auto") as Theme));
 
 const standalone =
     window.matchMedia("(display-mode: standalone)").matches ||

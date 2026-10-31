@@ -1,4 +1,15 @@
-import { BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, ChevronDown, ChevronRight, Gamepad2, Info, Radio, Settings2 } from "lucide-react";
+import {
+    BatteryCharging,
+    BatteryFull,
+    BatteryLow,
+    BatteryMedium,
+    ChevronDown,
+    ChevronRight,
+    Gamepad2,
+    Info,
+    Radio,
+    Settings2,
+} from "lucide-react";
 import { useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
@@ -8,7 +19,15 @@ import { CFW_CAP } from "../../api/types";
 import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
 import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
-import { keys, useAllTags, useBoxes, useBoxImage, useBoxState, useCfwBox, useSetting } from "../../lib/queries";
+import {
+    keys,
+    useAllTags,
+    useBoxes,
+    useBoxImage,
+    useBoxState,
+    useCfwBox,
+    useSetting,
+} from "../../lib/queries";
 import { Empty, ErrorBox, Notice, Page } from "../../ui/kit";
 import { NewVersionNotice } from "../more/SystemPage";
 import { FigurePic } from "../../ui/FigurePic";
@@ -19,24 +38,26 @@ export function BoxesPage() {
     const cfwEnabled = useQuery({ queryKey: ["cfwEnabled"], queryFn: tc.cfwEnabled });
     const access = useAccess();
     return (
-        <Page title={t("boxes")}>
+        <Page title={t("common.boxes")}>
             {access.admin && <AdminNotices boxes={boxes.data ?? []} />}
             {boxes.isLoading && <BoxSkeleton />}
             {boxes.error && <ErrorBox error={boxes.error} retry={() => boxes.refetch()} />}
             {boxes.data && boxes.data.length === 0 && (
                 <Empty
                     icon={<Radio size={30} />}
-                    title={t("noBoxes")}
-                    text={t("noBoxesText")}
+                    title={t("common.noBoxes")}
+                    text={t("boxes.noBoxesText")}
                     action={
                         <a className="btn primary" href="#/setup">
-                            {t("boxSetup")}
+                            {t("common.boxSetup")}
                         </a>
                     }
                 />
             )}
             <div className="grid-boxes">
-                {boxes.data?.map((box) => <BoxCard key={box.ID} box={box} />)}
+                {boxes.data?.map((box) => (
+                    <BoxCard key={box.ID} box={box} />
+                ))}
             </div>
             {cfwEnabled.data === "true" && <CfwControls />}
         </Page>
@@ -47,21 +68,26 @@ export function BoxesPage() {
 function AdminNotices({ boxes }: { boxes: Box[] }) {
     const allowNew = useSetting("core.allowNewBox");
     const apiAccess = useQueries({
-        queries: boxes.map((b) => ({ queryKey: [...keys.settings(b.ID), "toniebox.api_access"], queryFn: () => tc.getSetting("toniebox.api_access", b.ID) })),
+        queries: boxes.map((b) => ({
+            queryKey: [...keys.settings(b.ID), "toniebox.api_access"],
+            queryFn: () => tc.getSetting("toniebox.api_access", b.ID),
+        })),
     });
-    const withoutApi = boxes.filter((_, i) => apiAccess[i]?.data === "false").map((b) => b.boxName || b.ID);
+    const withoutApi = boxes
+        .filter((_, i) => apiAccess[i]?.data === "false")
+        .map((b) => b.boxName || b.ID);
     return (
         <>
             <NewVersionNotice />
             {allowNew.data === "true" && (
                 <Notice>
-                    <strong>{t("newBoxesAllowed")}</strong>
+                    <strong>{t("boxes.newBoxesAllowed")}</strong>
                     <br />
-                    {t("newBoxesAllowedText")}
+                    {t("boxes.newBoxesAllowedText")}
                     {withoutApi.length > 0 && (
                         <>
                             <br />
-                            {t("boxesWithoutApi", { names: withoutApi.join(", ") })}
+                            {t("boxes.boxesWithoutApi", { names: withoutApi.join(", ") })}
                         </>
                     )}
                 </Notice>
@@ -74,22 +100,27 @@ function AdminNotices({ boxes }: { boxes: Box[] }) {
 function CfwControls() {
     const [open, setOpen] = useState(false);
     const items = [
-        ["cfwControlsRestart", "cfwControlsRestartText"],
-        ["cfwControlsBothEars", "cfwControlsBothEarsText"],
-        ["cfwControlsAnyTag", "cfwControlsAnyTagText"],
-        ["cfwControlsEvent", "cfwControlsEventText"],
-        ["cfwControlsLocks", "cfwControlsLocksText"],
+        ["boxes.cfwControlsRestart", "boxes.cfwControlsRestartText"],
+        ["boxes.cfwControlsBothEars", "boxes.cfwControlsBothEarsText"],
+        ["boxes.cfwControlsAnyTag", "boxes.cfwControlsAnyTagText"],
+        ["boxes.cfwControlsEvent", "boxes.cfwControlsEventText"],
+        ["boxes.cfwControlsLocks", "boxes.cfwControlsLocksText"],
     ] as const;
     return (
         <div className="mt small muted">
-            <button className="btn ghost small" style={{ color: "var(--fg-2)", paddingLeft: 0, gap: 6 }} onClick={() => setOpen(!open)} aria-expanded={open}>
+            <button
+                className="btn ghost small"
+                style={{ color: "var(--fg-2)", paddingLeft: 0, gap: 6 }}
+                onClick={() => setOpen(!open)}
+                aria-expanded={open}
+            >
                 <Info size={14} />
-                {t("cfwControls")}
+                {t("boxes.cfwControls")}
                 {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
             {open && (
                 <div style={{ maxWidth: 720, lineHeight: 1.5 }}>
-                    <p>{t("cfwControlsIntro")}</p>
+                    <p>{t("boxes.cfwControlsIntro")}</p>
                     {items.map(([title, text]) => (
                         <p key={title}>
                             <strong>{t(title)}</strong>
@@ -134,11 +165,17 @@ export const batteryInfo = (cfw?: CfwBox) => {
     ) : (
         <BatteryMedium size={15} />
     );
-    const cls = b.critical ? "danger" : b.low || (percent !== undefined && percent < 15) ? "warn" : b.station ? "ok" : "";
+    const cls = b.critical
+        ? "danger"
+        : b.low || (percent !== undefined && percent < 15)
+          ? "warn"
+          : b.station
+            ? "ok"
+            : "";
     return {
         icon,
         cls,
-        text: b.station ? t("charging") : percent !== undefined ? `${percent} %` : volts,
+        text: b.station ? t("boxes.charging") : percent !== undefined ? `${percent} %` : volts,
         volts,
         percent,
         remaining: !b.station && b.remainingMin ? durationText(b.remainingMin) : undefined,
@@ -150,7 +187,12 @@ export const batteryInfo = (cfw?: CfwBox) => {
 };
 
 export const remoteAvailable = (cfw?: CfwBox) =>
-    Boolean(cfw?.isCfw && cfw.settings?.enabled && cfw.settings.remoteControl && cfw.capabilities & CFW_CAP.remote);
+    Boolean(
+        cfw?.isCfw &&
+        cfw.settings?.enabled &&
+        cfw.settings.remoteControl &&
+        cfw.capabilities & CFW_CAP.remote,
+    );
 
 function BoxCard({ box }: { box: Box }) {
     const access = useAccess();
@@ -168,13 +210,19 @@ function BoxCard({ box }: { box: Box }) {
         <div className="card">
             <Link to={`/box/${box.ID}`} className="box-card">
                 <div className="box-card-head">
-                    {img ? <img src={img} alt="" /> : <div style={{ width: 52, height: 52 }} className="tonie-pic-fallback"><Radio size={24} /></div>}
+                    {img ? (
+                        <img src={img} alt="" />
+                    ) : (
+                        <div style={{ width: 52, height: 52 }} className="tonie-pic-fallback">
+                            <Radio size={24} />
+                        </div>
+                    )}
                     <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="box-card-name">{box.boxName || box.ID}</div>
                         <div className="box-card-meta">
                             <span className={`badge ${online ? "ok" : ""}`}>
                                 <span className={`dot ${online ? "ok" : ""}`} />
-                                {online ? t("online") : t("offline")}
+                                {online ? t("boxes.online") : t("boxes.offline")}
                             </span>
                             {!online && s?.lastSeen ? <span>{ago(s.lastSeen)}</span> : null}
                             {battery && (
@@ -197,10 +245,21 @@ function BoxCard({ box }: { box: Box }) {
                             <TonieImage size={56} />
                         )}
                         <div style={{ minWidth: 0 }}>
-                            <div className="label">{online ? t("onTheBox") : t("lastTonie")}</div>
-                            <div className="title">{tag ? figureTitle(tag) : s.lastRuid.toUpperCase()}</div>
+                            <div className="label">
+                                {online ? t("boxes.onTheBox") : t("boxes.lastTonie")}
+                            </div>
+                            <div className="title">
+                                {tag ? figureTitle(tag) : s.lastRuid.toUpperCase()}
+                            </div>
                             <div className="sub">
-                                {[tag ? (linkedContent(tag) ? "→ " + contentTitle(linkedContent(tag)!) : figureSubtitle(tag)) : "", s.lastRuidTime ? ago(s.lastRuidTime) : ""]
+                                {[
+                                    tag
+                                        ? linkedContent(tag)
+                                            ? "→ " + contentTitle(linkedContent(tag)!)
+                                            : figureSubtitle(tag)
+                                        : "",
+                                    s.lastRuidTime ? ago(s.lastRuidTime) : "",
+                                ]
                                     .filter(Boolean)
                                     .join(" · ")}
                             </div>
@@ -209,14 +268,20 @@ function BoxCard({ box }: { box: Box }) {
                 )}
             </Link>
             <div className="box-card-actions" style={{ padding: "0 16px 16px", marginTop: 0 }}>
-                <button className="btn small" onClick={() => navigate(`/box/${box.ID}?focus=settings`)}>
+                <button
+                    className="btn small"
+                    onClick={() => navigate(`/box/${box.ID}?focus=settings`)}
+                >
                     <Settings2 size={16} />
-                    {t("settings")}
+                    {t("common.settings")}
                 </button>
                 {remoteAvailable(cfw) && online && access.can("box", box.ID, "box.cfw") && (
-                    <button className="btn small soft" onClick={() => navigate(`/box/${box.ID}?focus=remote`)}>
+                    <button
+                        className="btn small soft"
+                        onClick={() => navigate(`/box/${box.ID}?focus=remote`)}
+                    >
                         <Gamepad2 size={16} />
-                        {t("remote")}
+                        {t("boxes.remote")}
                     </button>
                 )}
             </div>

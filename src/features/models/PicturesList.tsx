@@ -10,20 +10,25 @@ import { TonieImage } from "../../ui/TonieImage";
 
 /** the pictures in custom_img, with the custom tonies showing them; deletable as the server allows */
 export function PicturesList({ models }: { models: CustomModel[] }) {
-    const files = useQuery({ queryKey: ["files", "custom_img"], queryFn: () => tc.files("", "custom_img") });
+    const files = useQuery({
+        queryKey: ["files", "custom_img"],
+        queryFn: () => tc.files("", "custom_img"),
+    });
     const access = useAccess();
     const ui = useUi();
     const qc = useQueryClient();
 
     const remove = async (name: string, users: CustomModel[]) => {
         const yes = await ui.confirm({
-            title: t("deletePicture"),
-            text: users.length ? t("deletePictureShown", { name, n: users.length }) : t("deleteText", { name }),
-            confirm: t("delete"),
+            title: t("models.deletePicture"),
+            text: users.length
+                ? t("models.deletePictureShown", { name, n: users.length })
+                : t("common.deleteText", { name }),
+            confirm: t("common.delete"),
             danger: true,
         });
         if (!yes) return;
-        await ui.run(() => tc.deleteCustomImage(name), t("deleted"));
+        await ui.run(() => tc.deleteCustomImage(name), t("common.deleted"));
         qc.invalidateQueries({ queryKey: ["files", "custom_img"] });
         qc.invalidateQueries({ queryKey: keys.customModels });
         qc.invalidateQueries({ queryKey: ["aclMine"] });
@@ -31,8 +36,11 @@ export function PicturesList({ models }: { models: CustomModel[] }) {
 
     if (files.isLoading) return <Loading />;
     if (files.error) return <ErrorBox error={files.error} retry={() => files.refetch()} />;
-    const pictures = (files.data ?? []).filter((f) => !f.isDir && f.name !== "." && f.name !== "..");
-    if (!pictures.length) return <Empty icon={<Image size={28} />} title={t("noPictures")} />;
+    const pictures = (files.data ?? []).filter(
+        (f) => !f.isDir && f.name !== "." && f.name !== "..",
+    );
+    if (!pictures.length)
+        return <Empty icon={<Image size={28} />} title={t("models.noPictures")} />;
     return (
         <div className="list">
             {pictures.map((f) => {
@@ -42,10 +50,18 @@ export function PicturesList({ models }: { models: CustomModel[] }) {
                         key={f.name}
                         leading={<TonieImage src={`/custom_img/${f.name}`} size={46} />}
                         title={f.name}
-                        sub={users.length ? users.map((m) => m.series || m.model).join(", ") : t("pictureUnused")}
+                        sub={
+                            users.length
+                                ? users.map((m) => m.series || m.model).join(", ")
+                                : t("models.pictureUnused")
+                        }
                         right={
                             access.mayDeleteImage(f.name) && (
-                                <button className="icon-btn" onClick={() => remove(f.name, users)} aria-label={t("delete")}>
+                                <button
+                                    className="icon-btn"
+                                    onClick={() => remove(f.name, users)}
+                                    aria-label={t("common.delete")}
+                                >
                                     <Trash2 size={18} />
                                 </button>
                             )

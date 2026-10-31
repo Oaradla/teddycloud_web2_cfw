@@ -7,7 +7,11 @@ import { Empty, Page, Row, SearchField, Section, Segmented } from "../../ui/kit"
 
 type Kind = "all" | Notification["kind"];
 
-const ICON = { ok: <CheckCircle2 size={17} />, info: <Info size={17} />, error: <XCircle size={17} /> };
+const ICON = {
+    ok: <CheckCircle2 size={17} />,
+    info: <Info size={17} />,
+    error: <XCircle size={17} />,
+};
 const COLOR = { ok: "var(--ok)", info: undefined, error: "var(--danger)" };
 
 /** what the app reported earlier: the messages of the toasts */
@@ -19,16 +23,25 @@ export function NotificationsPage() {
     const [unread] = useState(() => new Set(all.filter((n) => !n.read).map((n) => n.id)));
     useEffect(() => notifications.markRead(), []);
     const f = query.trim().toLowerCase();
-    const list = all.filter((n) => (kind === "all" || n.kind === kind) && (!f || `${n.text} ${n.detail ?? ""}`.toLowerCase().includes(f)));
+    const list = all.filter(
+        (n) =>
+            (kind === "all" || n.kind === kind) &&
+            (!f || `${n.text} ${n.detail ?? ""}`.toLowerCase().includes(f)),
+    );
 
     return (
         <Page
-            title={t("notifications")}
+            title={t("more.notifications")}
             back="/system"
             narrow
             right={
                 all.length > 0 && (
-                    <button className="icon-btn" onClick={() => notifications.remove(list.map((n) => n.id))} aria-label={t("deleteShown")} title={t("deleteShown")}>
+                    <button
+                        className="icon-btn"
+                        onClick={() => notifications.remove(list.map((n) => n.id))}
+                        aria-label={t("more.deleteShown")}
+                        title={t("more.deleteShown")}
+                    >
                         <Trash2 size={20} />
                     </button>
                 )
@@ -43,16 +56,16 @@ export function NotificationsPage() {
                         value={kind}
                         onChange={setKind}
                         options={[
-                            { value: "all", label: t("all") },
-                            { value: "ok", label: t("kindOk") },
-                            { value: "info", label: t("kindInfo") },
-                            { value: "error", label: t("kindError") },
+                            { value: "all", label: t("common.all") },
+                            { value: "ok", label: t("more.kindOk") },
+                            { value: "info", label: t("more.kindInfo") },
+                            { value: "error", label: t("more.kindError") },
                         ]}
                     />
                 </div>
             </div>
             {list.length === 0 ? (
-                <Empty icon={<CheckCheck size={28} />} title={t("noNotifications")} />
+                <Empty icon={<CheckCheck size={28} />} title={t("more.noNotifications")} />
             ) : (
                 <Section>
                     {list.map((n) => (
@@ -63,7 +76,11 @@ export function NotificationsPage() {
                             title={unread.has(n.id) ? <strong>{n.text}</strong> : n.text}
                             sub={[n.detail, dateTime(n.time)].filter(Boolean).join(" · ")}
                             right={
-                                <button className="icon-btn" aria-label={t("delete")} onClick={() => notifications.remove([n.id])}>
+                                <button
+                                    className="icon-btn"
+                                    aria-label={t("common.delete")}
+                                    onClick={() => notifications.remove([n.id])}
+                                >
                                     <Trash2 size={16} />
                                 </button>
                             }

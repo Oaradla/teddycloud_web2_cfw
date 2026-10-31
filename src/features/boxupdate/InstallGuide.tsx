@@ -26,7 +26,7 @@ const Steps = ({ chip }: { chip: "cc3200" | "esp32" }) => {
         <ol className="guide-steps">
             {Array.from({ length: STEPS[chip] }, (_, i) => i + 1).map((n) => (
                 <li key={n}>
-                    <StepText text={t(`guide_${chip}_${n}` as Key, { host })} />
+                    <StepText text={t(`boxupdate.guide_${chip}_${n}` as Key, { host })} />
                 </li>
             ))}
         </ol>
@@ -40,32 +40,37 @@ const Steps = ({ chip }: { chip: "cc3200" | "esp32" }) => {
 export function InstallGuide({ open: initiallyOpen }: { open: boolean }) {
     const [open, setOpen] = useState(initiallyOpen);
     return (
-        <Section title={t("guideTitle")}>
+        <Section title={t("boxupdate.guideTitle")}>
             <Row
                 icon={<BookOpen size={17} />}
-                title={open ? t("guideHide") : t("guideShow")}
-                sub={t("guideIntro")}
+                title={open ? t("boxupdate.guideHide") : t("boxupdate.guideShow")}
+                sub={t("boxupdate.guideIntro")}
                 right={open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 onClick={() => setOpen(!open)}
                 chevron={false}
             />
             {open && (
                 <div style={{ padding: "4px 16px 12px" }}>
-                    <h3 className="guide-chip">{t("guideCc3200")}</h3>
+                    <h3 className="guide-chip">{t("boxupdate.guideCc3200")}</h3>
                     <Steps chip="cc3200" />
                     <p className="small">
-                        {t("guideCardZip")}{" "}
+                        {t("boxupdate.guideCardZip")}{" "}
                         <a className="btn small" href="#/setup/cc3200?way=card">
                             <HardDrive size={15} />
-                            {t("guideCardZipLink")}
+                            {t("boxupdate.guideCardZipLink")}
                         </a>
                     </p>
-                    <h3 className="guide-chip">{t("guideEsp32")}</h3>
+                    <h3 className="guide-chip">{t("boxupdate.guideEsp32")}</h3>
                     <Steps chip="esp32" />
                 </div>
             )}
             {open && (
-                <Row icon={<Wrench size={17} />} title={t("boxSetup")} sub={t("guideBoxSetupHint")} to="/setup" />
+                <Row
+                    icon={<Wrench size={17} />}
+                    title={t("common.boxSetup")}
+                    sub={t("boxupdate.guideBoxSetupHint")}
+                    to="/setup"
+                />
             )}
         </Section>
     );

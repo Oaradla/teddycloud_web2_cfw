@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { contentTitle, figureInfo, figureSubtitle, figureTitle, linkedContent, sourceLabel } from "../../lib/format";
+import {
+    contentTitle,
+    figureInfo,
+    figureSubtitle,
+    figureTitle,
+    linkedContent,
+    sourceLabel,
+} from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { TagWithBox, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
@@ -27,13 +34,19 @@ export function TagPicker({
             if (!f) return !x.hide;
             const i = figureInfo(x);
             const l = linkedContent(x);
-            return `${i.series} ${i.episode} ${l?.series ?? ""} ${l?.episode ?? ""} ${x.ruid} ${x.source}`.toLowerCase().includes(f);
+            return `${i.series} ${i.episode} ${l?.series ?? ""} ${l?.episode ?? ""} ${x.ruid} ${x.source}`
+                .toLowerCase()
+                .includes(f);
         })
         .sort((a, b) => figureTitle(a).localeCompare(figureTitle(b), undefined, { numeric: true }));
     return (
-        <Sheet open={open} onClose={onClose} title={title ?? t("chooseTonie")} full>
+        <Sheet open={open} onClose={onClose} title={title ?? t("tonies.chooseTonie")} full>
             <div style={{ marginBottom: 12 }}>
-                <SearchField value={filter} onChange={setFilter} placeholder={t("searchTonies")} />
+                <SearchField
+                    value={filter}
+                    onChange={setFilter}
+                    placeholder={t("tonies.searchTonies")}
+                />
             </div>
             {tags.isLoading && <Loading />}
             <div className="list">
@@ -48,7 +61,13 @@ export function TagPicker({
                                 </div>
                             }
                             title={figureTitle(x)}
-                            sub={l ? `→ ${contentTitle(l)}` : x.source ? `→ ${sourceLabel(x.source)}` : figureSubtitle(x) || x.ruid.toUpperCase()}
+                            sub={
+                                l
+                                    ? `→ ${contentTitle(l)}`
+                                    : x.source
+                                      ? `→ ${sourceLabel(x.source)}`
+                                      : figureSubtitle(x) || x.ruid.toUpperCase()
+                            }
                             onClick={() => {
                                 onPick(x);
                                 onClose();

@@ -30,7 +30,9 @@ const radioApi = () => {
         apiBase = fetch(SERVERS)
             .then((r) => (r.ok ? r.json() : []))
             .then((list: { name: string }[]) =>
-                list.length ? `https://${list[Math.floor(Math.random() * list.length)].name}/json` : FALLBACK,
+                list.length
+                    ? `https://${list[Math.floor(Math.random() * list.length)].name}/json`
+                    : FALLBACK,
             )
             .catch(() => FALLBACK);
     return apiBase;
@@ -82,7 +84,7 @@ export function StreamPicker({
     };
 
     return (
-        <Sheet open={open} onClose={onClose} title={t("streamUrl")} full>
+        <Sheet open={open} onClose={onClose} title={t("tonies.streamUrl")} full>
             <form
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -91,27 +93,54 @@ export function StreamPicker({
                 className="section"
             >
                 <div className="field" style={{ marginBottom: 8 }}>
-                    <label>{t("streamUrlManual")}</label>
+                    <label>{t("tonies.streamUrlManual")}</label>
                     <div className="row-gap">
-                        <input className="input mono" type="url" inputMode="url" placeholder="https://…" value={url} onChange={(e) => setUrl(e.target.value)} />
-                        <button className="btn primary" disabled={!/^https?:\/\//i.test(url.trim())} aria-label={t("assign")}>
+                        <input
+                            className="input mono"
+                            type="url"
+                            inputMode="url"
+                            placeholder="https://…"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                        />
+                        <button
+                            className="btn primary"
+                            disabled={!/^https?:\/\//i.test(url.trim())}
+                            aria-label={t("common.assign")}
+                        >
                             <Check size={18} />
                         </button>
                     </div>
-                    <div className="hint">{t("streamUrlHint")}</div>
+                    <div className="hint">{t("tonies.streamUrlHint")}</div>
                 </div>
             </form>
 
             <div className="section-head">
-                <h2 className="section-title">{t("findRadio")}</h2>
+                <h2 className="section-title">{t("tonies.findRadio")}</h2>
             </div>
             <div style={{ marginBottom: 12 }}>
-                <SearchField value={query} onChange={setQuery} placeholder={t("findRadioPlaceholder")} />
+                <SearchField
+                    value={query}
+                    onChange={setQuery}
+                    placeholder={t("tonies.findRadioPlaceholder")}
+                />
             </div>
-            {debounced.length < 2 && <p className="small muted" style={{ textAlign: "center" }}>{t("findRadioHint")}</p>}
+            {debounced.length < 2 && (
+                <p className="small muted" style={{ textAlign: "center" }}>
+                    {t("tonies.findRadioHint")}
+                </p>
+            )}
             {stations.isLoading && debounced.length >= 2 && <Loading />}
-            {stations.error && <p className="small" style={{ color: "var(--danger)" }}>{String((stations.error as Error).message)}</p>}
-            {stations.data && stations.data.length === 0 && <p className="small muted" style={{ textAlign: "center" }}>{t("nothingFound")}</p>}
+            {stations.error && (
+                <p className="small" style={{ color: "var(--danger)" }}>
+                    {String((stations.error as Error).message)}
+                </p>
+            )}
+            {stations.data && stations.data.length === 0 && (
+                <p className="small muted" style={{ textAlign: "center" }}>
+                    {t("common.nothingFound")}
+                </p>
+            )}
             {stations.data && stations.data.length > 0 && (
                 <div className="list">
                     {stations.data.map((s) => (
@@ -120,24 +149,46 @@ export function StreamPicker({
                             leading={
                                 <span className="file-icon">
                                     {s.favicon ? (
-                                        <img src={s.favicon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+                                        <img
+                                            src={s.favicon}
+                                            alt=""
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer"
+                                            onError={(e) =>
+                                                ((e.target as HTMLImageElement).style.display =
+                                                    "none")
+                                            }
+                                        />
                                     ) : (
                                         <Radio size={20} />
                                     )}
                                 </span>
                             }
                             title={s.name.trim()}
-                            sub={[s.countrycode, s.language, s.bitrate ? `${s.bitrate} kbit/s` : "", s.codec].filter(Boolean).join(" · ")}
+                            sub={[
+                                s.countrycode,
+                                s.language,
+                                s.bitrate ? `${s.bitrate} kbit/s` : "",
+                                s.codec,
+                            ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             onClick={() => pick(s.url_resolved || s.url)}
                             chevron={false}
                             right={
                                 <button
                                     className="icon-btn muted"
-                                    aria-label={t("preview")}
-                                    title={t("preview")}
+                                    aria-label={t("tonies.preview")}
+                                    title={t("tonies.preview")}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        player.play({ id: "radio:" + s.stationuuid, title: s.name.trim(), subtitle: t("preview"), pic: s.favicon, url: s.url_resolved || s.url });
+                                        player.play({
+                                            id: "radio:" + s.stationuuid,
+                                            title: s.name.trim(),
+                                            subtitle: t("tonies.preview"),
+                                            pic: s.favicon,
+                                            url: s.url_resolved || s.url,
+                                        });
                                     }}
                                 >
                                     <Headphones size={19} />
@@ -148,7 +199,7 @@ export function StreamPicker({
                 </div>
             )}
             <p className="small muted" style={{ textAlign: "center", marginTop: 14 }}>
-                {t("radioSource")}
+                {t("tonies.radioSource")}
             </p>
         </Sheet>
     );

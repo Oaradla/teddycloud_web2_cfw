@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { getPref } from "../lib/prefs";
 
-const CHARS = "アァイィウゥエェオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const CHARS =
+    "アァイィウゥエェオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** the falling characters of the matrix theme, drawn on a canvas behind the page */
 export function MatrixRain() {
