@@ -42,6 +42,11 @@ const macOfCertificate = (der: Uint8Array): string => {
  * and the card content, all from the release package teddyCloud keeps. The box stays connected
  * from the backup to the bootloader.
  */
+const errorText = (e: unknown) =>
+    e instanceof Cc3200Error
+        ? t(`setup.cc3200Errors.${e.key}` as Key, e.values)
+        : String((e as Error)?.message ?? e);
+
 export function Cc3200Browser() {
     const ui = useUi();
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, retry: false });
@@ -65,7 +70,7 @@ export function Cc3200Browser() {
     const backup = useRef<{ flash: Uint8Array; files: Map<string, Uint8Array> } | null>(null);
     const [backupSaved, setBackupSaved] = useState(false);
     const [backupStored, setBackupStored] = useState("");
-    const [failed, setFailed] = useState<string[]>([]);
+    const [failed, setFailed] = useState<{ name: string; error: unknown }[]>([]);
     const [mac, setMac] = useState("");
     const [certsDone, setCertsDone] = useState(false);
     const [bootloaderDone, setBootloaderDone] = useState(false);
@@ -81,10 +86,7 @@ export function Cc3200Browser() {
             const done = await what();
             if (done) setResult({ ok: true, text: done });
         } catch (e) {
-            const message =
-                e instanceof Cc3200Error
-                    ? t(`setup.cc3200Errors.${e.key}` as Key, e.values)
-                    : (e as Error).message;
+            const message = errorText(e);
             addLog(`error: ${message}`);
             ui.toast("error", message);
             setResult({ ok: false, text: message });
@@ -144,7 +146,10 @@ export function Cc3200Browser() {
             // the flash dump also stays on the server, as with the ESP32 box
             const stored = await tc
                 .storeFlashDump(`CC3200_${found || "unknown"}`, flash)
-                .catch(() => "");
+                .catch((e) => {
+                    addLog(t("setup.cc3200BackupNotStored", { reason: String(e?.message ?? e) }));
+                    return "";
+                });
             setBackupStored(stored);
             if (stored) {
                 setBackupSaved(true);
@@ -305,7 +310,11 @@ export function Cc3200Browser() {
                 <>
                     {failed.length > 0 && (
                         <Notice>
-                            {t("setup.cc3200BackupFailed", { list: failed.join("; ") })}
+                            {t("setup.cc3200BackupFailed", {
+                                list: failed
+                                    .map((f) => (f.name ? `${f.name}: ` : "") + errorText(f.error))
+                                    .join("; "),
+                            })}
                         </Notice>
                     )}
                     <div className="field mt">

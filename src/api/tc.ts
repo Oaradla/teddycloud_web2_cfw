@@ -41,6 +41,11 @@ const settingTaken = async (answer: Promise<Response>) => {
     if ((await (await answer).text()).trim() === "ERROR") throw new Error(t("common.saveFailed"));
 };
 
+/** the server reads at most 255 bytes of query; lists and uploads send "path=<path>&special=library" */
+const checkPath = (path: string) => {
+    if (encodeURIComponent(path).length > 234) throw new Error(t("library.pathTooLong"));
+};
+
 export const tc = {
     /* ---------- boxes ---------- */
     boxes: () => getJson<{ boxes: Box[] }>("/api/getBoxes").then((r) => r.boxes ?? []),
@@ -151,8 +156,10 @@ export const tc = {
         getJson<{ files: FileEntry[] }>(`/api/fileIndexV2${q({ path, special, overlay })}`).then(
             (r) => r.files ?? [],
         ),
-    dirCreate: (path: string, special = "library") =>
-        postText(`/api/dirCreate${q({ special })}`, path),
+    dirCreate: async (path: string, special = "library") => {
+        checkPath(path);
+        return postText(`/api/dirCreate${q({ special })}`, path);
+    },
     /** models: also the custom tonies used only by what is deleted */
     fileDelete: (
         path: string,
@@ -221,9 +228,7 @@ export const tc = {
         if (r.trim() !== "OK") throw new Error(r || "failed");
     },
     fileMove: async (source: string, target: string, special = "library") => {
-        // the server cuts a longer target short without an error
-        if (new TextEncoder().encode(target).length > 258)
-            throw new Error(t("library.pathTooLong"));
+        checkPath(target);
         return postText(
             `/api/fileMove${q({ special })}`,
             `source=${encodeURIComponent(source)}&target=${encodeURIComponent(target)}`,

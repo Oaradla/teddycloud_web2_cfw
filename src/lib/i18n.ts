@@ -5,9 +5,11 @@ import type en from "../translations/en.json";
 import { getPref, setPref } from "./prefs";
 
 type Leaves<T, P extends string = ""> = {
-    [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
+    [K in keyof T & string]: T[K] extends string
+        ? `${P}${K extends `${infer B}_${"one" | "other"}` ? B : K}`
+        : Leaves<T[K], `${P}${K}.`>;
 }[keyof T & string];
-/** every text key, e.g. "boxes.noBoxes" */
+/** every text key, e.g. "boxes.noBoxes"; plurals ("_one", "_other") without the suffix, picked by vars.count */
 export type Key = Leaves<typeof en>;
 
 export const LANGS = {

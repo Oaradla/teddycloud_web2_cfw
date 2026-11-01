@@ -534,6 +534,9 @@ function UserSheet({
     onChanged: () => void;
 }) {
     const ui = useUi();
+    const access = useAccess();
+    // only admins change their own login rules
+    const mayEdit = !self || access.admin;
     const [pw, setPw] = useState(false);
     const [u, setU] = useState<AuthUser | null>(user);
     useEffect(() => setU(user), [user]);
@@ -585,33 +588,35 @@ function UserSheet({
                         </select>
                     </div>
                 )}
-                <Section>
-                    {!require2faAll && (
+                {mayEdit && (
+                    <Section>
+                        {!require2faAll && (
+                            <SwitchRow
+                                icon={<ShieldCheck size={17} />}
+                                title={t("users.require2fa")}
+                                checked={u.require2fa}
+                                onChange={(v) => update({ require2fa: v })}
+                            />
+                        )}
                         <SwitchRow
-                            icon={<ShieldCheck size={17} />}
-                            title={t("users.require2fa")}
-                            checked={u.require2fa}
-                            onChange={(v) => update({ require2fa: v })}
+                            icon={<Wifi size={17} />}
+                            title={t("users.lanOnly")}
+                            sub={t("users.lanOnlyHint")}
+                            checked={u.lanOnly}
+                            disabled={self}
+                            onChange={(v) => update({ lanOnly: v })}
                         />
-                    )}
-                    <SwitchRow
-                        icon={<Wifi size={17} />}
-                        title={t("users.lanOnly")}
-                        sub={t("users.lanOnlyHint")}
-                        checked={u.lanOnly}
-                        disabled={self}
-                        onChange={(v) => update({ lanOnly: v })}
-                    />
-                    {!self && (
-                        <SwitchRow
-                            icon={<KeyRound size={17} />}
-                            title={t("common.mustChangePassword")}
-                            sub={t("users.mustChangePasswordHint")}
-                            checked={Boolean(u.mustChangePassword)}
-                            onChange={(v) => update({ mustChangePassword: v })}
-                        />
-                    )}
-                </Section>
+                        {!self && (
+                            <SwitchRow
+                                icon={<KeyRound size={17} />}
+                                title={t("common.mustChangePassword")}
+                                sub={t("users.mustChangePasswordHint")}
+                                checked={Boolean(u.mustChangePassword)}
+                                onChange={(v) => update({ mustChangePassword: v })}
+                            />
+                        )}
+                    </Section>
+                )}
                 <Section>
                     {!self && (
                         <Row

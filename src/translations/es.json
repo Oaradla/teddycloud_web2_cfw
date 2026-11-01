@@ -239,7 +239,8 @@
         "back15": "Retroceder 15 segundos",
         "forward30": "Avanzar 30 segundos",
         "moveUp": "Subir",
-        "moveDown": "Bajar"
+        "moveDown": "Bajar",
+        "networkError": "Error de red"
     },
     "upload": {
         "addCover": "Añadir una portada",
@@ -317,7 +318,8 @@
         "deleteModelsToo": "Eliminar también los tonies propios que no se usan en ningún otro sitio ({{n}}), con sus imágenes",
         "deleteN": "¿Eliminar {{n}} elementos?",
         "deleteNText": "Los archivos y carpetas seleccionados se eliminan definitivamente.",
-        "failedN": "Falló en {{n}} elementos",
+        "failedN_one": "Falló en un elemento",
+        "failedN_other": "Falló en {{count}} elementos",
         "descending": "Descendente",
         "details": "Detalles",
         "downloadFailed": "Error en la descarga",
@@ -341,6 +343,8 @@
         "move": "Mover",
         "moveTo": "Mover a",
         "moved": "Movido",
+        "alreadyInFolder": "Ya está en esta carpeta.",
+        "moveIntoItself": "Una carpeta no se puede mover dentro de sí misma ni a una de sus subcarpetas.",
         "nChapters": "{{n}} capítulos",
         "nTracks": "Cargar {{n}} capítulos",
         "newFolder": "Nueva carpeta",
@@ -389,9 +393,10 @@
         "unheard": "Sin escuchar",
         "unusedTafs": "Archivos tonie sin usar",
         "unusedTafsHint": "Archivos TAF de la biblioteca que ningún tonie ni ninguna lista usa",
+        "unusedTafsBrokenTaps": "No se pudieron leer estas listas; los archivos TAF que solo usan ellas aparecen igualmente: {{list}}",
         "uploadHere": "Subir aquí",
         "wholeFile": "Archivo completo",
-        "pathTooLong": "La ruta es demasiado larga"
+        "pathTooLong": "La ruta es demasiado larga. El servidor no podría abrir la carpeta; elige un nombre más corto."
     },
     "models": {
         "addPicture": "Elegir una imagen",
@@ -1098,7 +1103,40 @@
         "no battery log for this box": "No hay registro de batería para esta caja",
         "no release package with a card tree for this build": "No hay paquete de versión con árbol de tarjeta para esta compilación",
         "invalid JSON": "JSON no válido",
-        "ruid missing or invalid": "ID de etiqueta ausente o no válido"
+        "ruid missing or invalid": "ID de etiqueta ausente o no válido",
+        "the box is not online": "La caja no está en línea",
+        "kind must be profile, event or none": "El tipo debe ser perfil, evento o ninguno",
+        "an event tag needs 1 to 16 actions": "Una etiqueta de evento necesita de 1 a 16 acciones",
+        "an action needs action 1 to 18 and mode 0 to 3": "Una acción necesita acción de 1 a 18 y modo de 0 a 3",
+        "an action needs value 0 to 16383 (actions 17 and 18: minutes 0 to 65535)": "Una acción necesita un valor de 0 a 16383 (acciones 17 y 18: minutos de 0 a 65535)",
+        "volume must be 0 to 15": "El volumen debe estar entre 0 y 15",
+        "tag missing": "Falta la etiqueta",
+        "no complete ESP32 app image": "No es una imagen de app ESP32 completa",
+        "the SHA-256 digest at the end of the image does not match": "El resumen SHA-256 al final de la imagen no coincide",
+        "flash mode or size not DIO, 80 MHz, 8 MB": "Modo o tamaño de flash distinto de DIO, 80 MHz, 8 MB",
+        "image larger than an app slot": "Imagen más grande que una ranura de app",
+        "checksum or appended SHA-256 of the image wrong": "Suma de comprobación o SHA-256 añadido de la imagen incorrectos",
+        "server block missing or not once": "Falta el bloque de servidor o no aparece exactamente una vez",
+        "the image carries a build block: an ESP32 build from before 2026-10-14": "La imagen tiene un bloque de build: una build de ESP32 anterior al 14-10-2026",
+        "build date and time of the app description empty or unreadable": "Fecha y hora de build de la descripción de la app vacías o ilegibles",
+        "a host may hold letters, digits, dots and dashes only": "Un host solo puede contener letras, dígitos, puntos y guiones",
+        "the port cannot be patched in this version of the original firmware": "El puerto no se puede parchear en esta versión del firmware original",
+        "the patched image is no app image": "La imagen parcheada no es una imagen de app",
+        "no valid build block": "No hay un bloque de build válido",
+        "not an image of the custom firmware (family marker CFW1 missing)": "No es una imagen del firmware personalizado (falta la marca CFW1)",
+        "debug build, the box would refuse it": "Build de depuración, la caja la rechazaría",
+        "not an application image": "No es una imagen de aplicación",
+        "neither an app image nor a flash dump with the original firmware in an app slot": "Ni una imagen de app ni un volcado de flash con el firmware original en una ranura de app",
+        "patches apply to the original firmware only": "Los parches solo se aplican al firmware original",
+        "could not store the image": "No se pudo guardar la imagen",
+        "patches apply to the original firmware of the ESP32 box only": "Los parches solo se aplican al firmware original de la caja ESP32",
+        "no image in the package": "No hay ninguna imagen en el paquete",
+        "the package could not be kept for the installation in the browser": "No se pudo conservar el paquete para la instalación en el navegador",
+        "no setup page (an HTML file of at most 65536 bytes)": "No es una página de configuración (un archivo HTML de 65536 bytes como máximo)",
+        "could not store the page": "No se pudo guardar la página",
+        "patches apply to a single original image, not to a release package": "Los parches se aplican a una sola imagen original, no a un paquete de release",
+        "release without a usable image": "Release sin una imagen utilizable",
+        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "No hay ningún repositorio de GitHub configurado (cfw.firmware.github_repo, owner/name)"
     },
     "account": {
         "codeFromApp": "Código de 6 dígitos de la app",
@@ -1864,6 +1902,62 @@
             "frontend_default_ui": {
                 "label": "Interfaz web predeterminada",
                 "description": "Qué abre la dirección de teddyCloud: la interfaz clásica o web2 (la nueva, en /web/v2/), si está instalada"
+            },
+            "core_server_cert_file_web_crt": {
+                "label": "Certificado web",
+                "description": "Certificado propio para la interfaz web HTTPS"
+            },
+            "core_server_cert_file_web_key": {
+                "label": "Clave del certificado web",
+                "description": "Clave del certificado web propio"
+            },
+            "web_auth_require_2fa": {
+                "label": "Exigir 2FA",
+                "description": "Todos los usuarios deben configurar la autenticación de dos factores"
+            },
+            "web_auth_password_min_length": {
+                "label": "Longitud mínima de la contraseña",
+                "description": "Número mínimo de caracteres de una contraseña"
+            },
+            "web_auth_session_days": {
+                "label": "Duración de la sesión (días)",
+                "description": "Tiempo máximo que se permanece conectado"
+            },
+            "web_auth_session_idle_hours": {
+                "label": "Cierre por inactividad (horas)",
+                "description": "Sin uso, la sesión termina tras este tiempo"
+            },
+            "web_auth_lockout_attempts": {
+                "label": "Intentos fallidos hasta el bloqueo",
+                "description": "Tras tantos inicios de sesión erróneos se bloquea"
+            },
+            "web_auth_lockout_minutes": {
+                "label": "Tiempo de bloqueo (minutos)",
+                "description": "Duración de un bloqueo tras demasiados intentos fallidos"
+            },
+            "web_auth_trusted_proxies": {
+                "label": "Proxies inversos de confianza",
+                "description": "Direcciones cuyo X-Forwarded-For se acepta"
+            },
+            "web_auth_lan_networks": {
+                "label": "Redes locales",
+                "description": "Estas redes cuentan como LAN (p. ej. para «solo desde la LAN»)"
+            },
+            "web_auth_remote_access": {
+                "label": "Interfaz web desde fuera",
+                "description": "Permitir el acceso a la interfaz web desde Internet"
+            },
+            "web_auth_remote_https_only": {
+                "label": "Desde fuera solo HTTPS",
+                "description": "Permitir el acceso desde fuera solo por HTTPS"
+            },
+            "web_auth_allow_networks": {
+                "label": "Redes permitidas",
+                "description": "Solo estas redes pueden acceder a la interfaz web (vacío: todas)"
+            },
+            "web_auth_deny_networks": {
+                "label": "Redes bloqueadas",
+                "description": "Estas redes se rechazan siempre"
             }
         },
         "groups": {
@@ -1901,7 +1995,8 @@
             "tonie_json": "Tonie JSON",
             "debug": "Depuración",
             "debug_web": "Interfaz web",
-            "mqtt_server_cert": "Certificado"
+            "mqtt_server_cert": "Certificado",
+            "web_auth": "Seguridad del inicio de sesión"
         },
         "values": {
             "toniebox_max_vol_spk": {
@@ -2237,8 +2332,11 @@
             "verifyFailed": "{{name}} se lee distinto de lo que se escribió.",
             "certsMissing": "Falta en la caja: {{names}}",
             "noPreloader": "El paquete no contiene ningún preloader.",
-            "noMcuimg": "/sys/mcuimg.bin no estaba en la copia de seguridad."
-        }
+            "noMcuimg": "/sys/mcuimg.bin no estaba en la copia de seguridad.",
+            "unnamedFiles_one": "Un archivo no tiene nombre en la tabla de archivos ni un nombre conocido.",
+            "unnamedFiles_other": "{{count}} archivos no tienen nombre en la tabla de archivos ni un nombre conocido."
+        },
+        "cc3200BackupNotStored": "La copia de seguridad no se guardó en el servidor: {{reason}}"
     },
     "studio": {
         "studioAdd": "Añadir tonie",
@@ -2325,6 +2423,8 @@
         "cross_site": "La solicitud se ha rechazado porque no procedía de la interfaz web.",
         "exists": "Este usuario ya existe.",
         "invalid_code": "El código es incorrecto o ya se ha usado.",
+        "code_required": "Introduce el código de tu app de autenticación o un código de recuperación.",
+        "tfa_locked": "Demasiados códigos incorrectos. La confirmación está bloqueada durante un tiempo.",
         "invalid_user": "Solo letras, dígitos, '.', '_' y '-' (máx. 32).",
         "limit": "Se ha alcanzado el número máximo de usuarios.",
         "login_disabled": "Esto requiere un inicio de sesión activo.",
@@ -2350,6 +2450,14 @@
         "not_found": "Usuario no encontrado.",
         "save_failed": "No se pudo guardar.",
         "no_users": "Crea un usuario antes de activar la protección de inicio de sesión.",
-        "https_required": "Se requiere HTTPS."
+        "https_required": "Se requiere HTTPS.",
+        "unauthorized": "Usuario o contraseña incorrectos, o la sesión ha caducado.",
+        "challenge_invalid": "El inicio de sesión ha caducado. Vuelve a iniciar sesión.",
+        "session_failed": "El servidor no pudo crear una sesión.",
+        "invalid_body": "La solicitud estaba incompleta o no era válida.",
+        "failed": "El servidor no pudo hacerlo.",
+        "env_override": "La protección de inicio de sesión está desactivada en el servidor (TEDDYCLOUD_WEB_AUTH_DISABLE).",
+        "invalid_target": "Tipo o ID desconocido.",
+        "2fa_setup_required": "Configura primero la autenticación de dos factores."
     }
 }

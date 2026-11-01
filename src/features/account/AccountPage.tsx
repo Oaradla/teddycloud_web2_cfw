@@ -10,6 +10,7 @@ import {
 import qrcode from "qrcode-generator";
 import { useState } from "react";
 import { auth } from "../../api/auth";
+import type { ApiError } from "../../api/client";
 import { tc } from "../../api/tc";
 import { useAccess } from "../../lib/access";
 import { ago } from "../../lib/format";
@@ -235,47 +236,61 @@ export function PasswordSheet({
     onSaved?: (mustChange: boolean) => void;
 }) {
     const ui = useUi();
+    const qc = useQueryClient();
     const [current, setCurrent] = useState("");
     const [next, setNext] = useState("");
     const [repeat, setRepeat] = useState("");
     const [code, setCode] = useState("");
     const [mustChange, setMustChange] = useState(false);
+    const [busy, setBusy] = useState(false);
     const needsCode = own && twoFactor;
     const valid =
         next.length >= minLength && next === repeat && (!own || current) && (!needsCode || code);
+    // nothing typed stays for the next opening
+    const close = () => {
+        setCurrent("");
+        setCode("");
+        setNext("");
+        setRepeat("");
+        setMustChange(false);
+        onClose();
+    };
     const save = async () => {
-        const r = await ui.run(
-            () =>
-                auth.setPassword(
-                    username,
-                    next,
-                    own ? current : undefined,
-                    !own && mustChange,
-                    needsCode ? code : undefined,
-                ),
-            t("account.passwordChanged"),
-        );
-        if (r) {
-            setCurrent("");
-            setCode("");
-            setNext("");
-            setRepeat("");
-            setMustChange(false);
-            onSaved?.(!own && mustChange);
-            onClose();
+        if (busy) return;
+        setBusy(true);
+        try {
+            await auth.setPassword(
+                username,
+                next,
+                own ? current : undefined,
+                !own && mustChange,
+                needsCode ? code : undefined,
+            );
+        } catch (e) {
+            ui.toast("error", t("common.actionFailed"), (e as Error).message);
+            // the server uses a code up only when the change succeeds
+            if (["invalid_code", "tfa_locked"].includes((e as ApiError).code)) setCode("");
+            return;
+        } finally {
+            setBusy(false);
         }
+        ui.toast("ok", t("account.passwordChanged"));
+        // a recovery code used here counts down the ones left
+        if (needsCode) qc.invalidateQueries({ queryKey: ["auth"] });
+        onSaved?.(!own && mustChange);
+        close();
     };
     return (
         <Sheet
             open={open}
-            onClose={onClose}
+            onClose={close}
             title={own ? t("common.changePassword") : t("account.passwordFor", { name: username })}
             footer={
                 <>
-                    <button className="btn" onClick={onClose}>
+                    <button className="btn" onClick={close}>
                         {t("common.cancel")}
                     </button>
-                    <button className="btn primary" disabled={!valid} onClick={save}>
+                    <button className="btn primary" disabled={!valid || busy} onClick={save}>
                         {t("common.save")}
                     </button>
                 </>

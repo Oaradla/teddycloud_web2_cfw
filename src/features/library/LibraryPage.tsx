@@ -139,6 +139,8 @@ export function LibraryPage() {
     const [playlist, setPlaylist] = useState<PlaylistStart | null>(null);
     const [text, setText] = useState<{ title: string; text: string; hint?: string } | null>(null);
     const [unusedOpen, setUnusedOpen] = useState(false);
+    /** a move or delete runs: no second one on the same items */
+    const [busy, setBusy] = useState(false);
     const ui = useUi();
     const access = useAccess();
     const qc = useQueryClient();
@@ -237,6 +239,7 @@ export function LibraryPage() {
 
     /** deletes files and folders (with content), asking for the custom tonies used only by them */
     const removeMany = async (xs: FileEntry[]) => {
+        if (busy) return;
         let count = 0;
         for (const x of xs)
             if (x.isDir)
@@ -263,6 +266,7 @@ export function LibraryPage() {
                 : undefined,
         });
         if (!ok) return;
+        setBusy(true);
         let failed = 0;
         for (const x of xs) {
             const p = joinPath(path, x.name);
@@ -272,27 +276,50 @@ export function LibraryPage() {
                     : tc.fileDelete(p, false, "library", undefined, checked)
             ).catch(() => failed++);
         }
+        setBusy(false);
         if (checked && models.length) {
             qc.invalidateQueries({ queryKey: ["customModels"] });
             qc.invalidateQueries({ queryKey: ["aclMine"] });
             invalidateTags();
         }
-        if (failed) ui.toast("error", t("library.failedN", { n: failed }));
+        if (failed) ui.toast("error", t("library.failedN", { count: failed }));
         else ui.toast("ok", t("common.deleted"));
         refresh();
     };
     const remove = (x: FileEntry) => removeMany([x]);
 
+    /** moves the items; the ones that failed stay selected, each with the server's reason */
     const move = async (target: string) => {
-        if (!moveFor || joinPath(target) === joinPath(path)) return;
-        let failed = 0;
-        for (const x of moveFor)
+        if (!moveFor || busy) return;
+        if (joinPath(target) === joinPath(path))
+            return ui.toast("info", t("library.alreadyInFolder"));
+        const into = (x: FileEntry) =>
+            `${joinPath(target)}/`.startsWith(`${joinPath(path, x.name)}/`);
+        if (moveFor.some((x) => x.isDir && into(x)))
+            return ui.toast("error", t("library.moveIntoItself"));
+        const fileNames = new Set(moveFor.filter((x) => !x.isDir).map((x) => x.name));
+        // the server moves a file's "<file>.json" along with it
+        const items = moveFor.filter(
+            (x) => !(x.name.endsWith(".json") && fileNames.has(x.name.slice(0, -5))),
+        );
+        const failed: { name: string; reason: string }[] = [];
+        setBusy(true);
+        for (const x of items)
             await tc
                 .fileMove(joinPath(path, x.name), joinPath(target, x.name))
-                .catch(() => failed++);
-        if (failed) ui.toast("error", t("library.failedN", { n: failed }));
-        else ui.toast("ok", t("library.moved"));
+                .catch((e) => failed.push({ name: x.name, reason: String(e?.message ?? e) }));
+        setBusy(false);
         refresh();
+        if (failed.length && sel.selecting) sel.setSelected(new Set(failed.map((f) => f.name)));
+        else sel.clear();
+        if (!failed.length) ui.toast("ok", t("library.moved"));
+        else if (items.length === 1) ui.toast("error", t("common.actionFailed"), failed[0].reason);
+        else
+            ui.toast(
+                "error",
+                t("library.failedN", { count: failed.length }),
+                failed.map((f) => `${f.name}: ${f.reason}`).join("\n"),
+            );
     };
 
     const download = (x: FileEntry) => {
@@ -949,7 +976,7 @@ export function LibraryPage() {
                     </span>
                     <button
                         className="icon-btn"
-                        disabled={!selectedFiles.length}
+                        disabled={!selectedFiles.length || busy}
                         onClick={deleteSelected}
                         aria-label={t("common.delete")}
                     >
@@ -957,7 +984,7 @@ export function LibraryPage() {
                     </button>
                     <button
                         className="icon-btn"
-                        disabled={!selectedFiles.length}
+                        disabled={!selectedFiles.length || busy}
                         onClick={() => setMoveFor(selectedFiles)}
                         aria-label={t("library.move")}
                     >
@@ -1011,10 +1038,7 @@ export function LibraryPage() {
                 folderMode
                 startPath={path}
                 title={t("library.moveTo")}
-                onPick={async (target) => {
-                    await move(target);
-                    sel.clear();
-                }}
+                onPick={move}
             />
             <ModelEditor start={coverFor} onClose={() => setCoverFor(null)} onSaved={refresh} />
             <DownloadSheet

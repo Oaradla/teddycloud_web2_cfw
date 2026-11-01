@@ -136,7 +136,8 @@
         "back15": "Back 15 seconds",
         "forward30": "Forward 30 seconds",
         "moveUp": "Move up",
-        "moveDown": "Move down"
+        "moveDown": "Move down",
+        "networkError": "Network error"
     },
     "tonies": {
         "tonie": "Tonie",
@@ -320,6 +321,8 @@
         "move": "Move",
         "moveTo": "Move to",
         "moved": "Moved",
+        "alreadyInFolder": "This is already in this folder.",
+        "moveIntoItself": "A folder cannot be moved into itself or one of its subfolders.",
         "model": "Model",
         "chooseContent": "Choose content",
         "chooseFolder": "Choose a folder",
@@ -339,6 +342,7 @@
         "uploadHere": "Upload here",
         "unusedTafs": "Unused tonie files",
         "unusedTafsHint": "TAF files of the library that no tonie and no playlist uses",
+        "unusedTafsBrokenTaps": "These playlists could not be read; TAF files used only by them are still listed: {{list}}",
         "noUnusedTafs": "All tonie files are in use",
         "customJsonSnippet": "Entries for tonies.custom.json",
         "customJsonSnippetSelected": "Entries for tonies.custom.json ({{n}} selected)",
@@ -415,10 +419,11 @@
         "selectFiles": "Tap files",
         "deleteN": "Delete {{n}} items?",
         "deleteNText": "The selected files and folders are deleted for good.",
-        "failedN": "Failed for {{n}} items",
+        "failedN_one": "Failed for one item",
+        "failedN_other": "Failed for {{count}} items",
         "deleteFolderText": "“{{name}}” and everything in it ({{n}} items) will be deleted for good.",
         "deleteModelsToo": "Also delete the custom tonies used nowhere else ({{n}}), with their pictures",
-        "pathTooLong": "The path is too long"
+        "pathTooLong": "The path is too long. The server could not open the folder; please choose a shorter name."
     },
     "settings": {
         "general": "General",
@@ -1465,8 +1470,11 @@
             "verifyFailed": "{{name}} reads back different from what was written.",
             "certsMissing": "Missing on the box: {{names}}",
             "noPreloader": "The package has no preloader.",
-            "noMcuimg": "/sys/mcuimg.bin was not in the backup."
-        }
+            "noMcuimg": "/sys/mcuimg.bin was not in the backup.",
+            "unnamedFiles_one": "One file has no name in the file table and no known name.",
+            "unnamedFiles_other": "{{count}} files have no name in the file table and no known name."
+        },
+        "cc3200BackupNotStored": "Backup not stored on the server: {{reason}}"
     },
     "tonieboxes": {
         "esp32BoxFlashing": {
@@ -1515,6 +1523,8 @@
         "cross_site": "The request was rejected because it did not come from the web interface.",
         "exists": "This user already exists.",
         "invalid_code": "The code is wrong or was already used.",
+        "code_required": "Please enter the code from your authenticator app or a recovery code.",
+        "tfa_locked": "Too many wrong codes. Confirming is locked for a while.",
         "invalid_user": "Letters, digits, '.', '_' and '-' only (max. 32).",
         "limit": "The maximum number of users is reached.",
         "login_disabled": "This needs an active login.",
@@ -1540,6 +1550,14 @@
         "not_found": "User not found.",
         "save_failed": "Could not save.",
         "no_users": "Create a user before enabling login protection.",
-        "https_required": "HTTPS is required."
+        "https_required": "HTTPS is required.",
+        "unauthorized": "Wrong username or password, or the login has expired.",
+        "challenge_invalid": "The login expired. Please log in again.",
+        "session_failed": "The server could not create a session.",
+        "invalid_body": "The request was incomplete or invalid.",
+        "failed": "The server could not do this.",
+        "env_override": "Login protection is switched off on the server (TEDDYCLOUD_WEB_AUTH_DISABLE).",
+        "invalid_target": "Unknown type or ID.",
+        "2fa_setup_required": "Set up two-factor authentication first."
     }
 }

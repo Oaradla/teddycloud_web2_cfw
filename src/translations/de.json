@@ -136,7 +136,8 @@
         "back15": "15 Sekunden zurück",
         "forward30": "30 Sekunden vor",
         "moveUp": "Nach oben",
-        "moveDown": "Nach unten"
+        "moveDown": "Nach unten",
+        "networkError": "Netzwerkfehler"
     },
     "tonies": {
         "tonie": "Tonie",
@@ -320,6 +321,8 @@
         "move": "Verschieben",
         "moveTo": "Verschieben nach",
         "moved": "Verschoben",
+        "alreadyInFolder": "Das liegt schon in diesem Ordner.",
+        "moveIntoItself": "Ein Ordner kann nicht in sich selbst oder einen seiner Unterordner verschoben werden.",
         "model": "Modell",
         "chooseContent": "Inhalt wählen",
         "chooseFolder": "Ordner wählen",
@@ -339,6 +342,7 @@
         "uploadHere": "Hierher hochladen",
         "unusedTafs": "Ungenutzte Tonie-Dateien",
         "unusedTafsHint": "TAF-Dateien der Bibliothek, die kein Tonie und keine Playlist verwendet",
+        "unusedTafsBrokenTaps": "Diese Playlists ließen sich nicht lesen; TAF-Dateien, die nur sie verwenden, stehen trotzdem in der Liste: {{list}}",
         "noUnusedTafs": "Alle Tonie-Dateien werden verwendet",
         "customJsonSnippet": "Einträge für tonies.custom.json",
         "customJsonSnippetSelected": "Einträge für tonies.custom.json ({{n}} ausgewählt)",
@@ -415,10 +419,11 @@
         "selectFiles": "Dateien antippen",
         "deleteN": "{{n}} Einträge löschen?",
         "deleteNText": "Die ausgewählten Dateien und Ordner werden endgültig gelöscht.",
-        "failedN": "Bei {{n}} Einträgen hat es nicht geklappt",
+        "failedN_one": "Bei einem Eintrag hat es nicht geklappt",
+        "failedN_other": "Bei {{count}} Einträgen hat es nicht geklappt",
         "deleteFolderText": "„{{name}}“ und alles darin ({{n}} Einträge) wird endgültig gelöscht.",
         "deleteModelsToo": "Eigene Figuren mitlöschen, die sonst nirgends verwendet werden ({{n}}), samt ihren Bildern",
-        "pathTooLong": "Der Pfad ist zu lang"
+        "pathTooLong": "Der Pfad ist zu lang. Der Server könnte den Ordner nicht öffnen; bitte einen kürzeren Namen wählen."
     },
     "settings": {
         "general": "Allgemein",
@@ -1094,6 +1099,62 @@
             "frontend_default_ui": {
                 "label": "Standard-Weboberfläche",
                 "description": "Was die Adresse von teddyCloud öffnet: die klassische Oberfläche oder web2 (die neue, unter /web/v2/), wenn sie installiert ist"
+            },
+            "core_server_cert_file_web_crt": {
+                "label": "Web-Zertifikat",
+                "description": "Eigenes Zertifikat für die HTTPS-Weboberfläche"
+            },
+            "core_server_cert_file_web_key": {
+                "label": "Web-Zertifikat-Schlüssel",
+                "description": "Schlüssel zum eigenen Web-Zertifikat"
+            },
+            "web_auth_require_2fa": {
+                "label": "2FA verlangen",
+                "description": "Alle Nutzer müssen eine Zwei-Faktor-Anmeldung einrichten"
+            },
+            "web_auth_password_min_length": {
+                "label": "Mindestlänge Passwort",
+                "description": "So viele Zeichen muss ein Passwort mindestens haben"
+            },
+            "web_auth_session_days": {
+                "label": "Sitzungsdauer (Tage)",
+                "description": "So lange bleibt man höchstens angemeldet"
+            },
+            "web_auth_session_idle_hours": {
+                "label": "Abmeldung bei Inaktivität (Stunden)",
+                "description": "Ohne Nutzung endet die Sitzung nach dieser Zeit"
+            },
+            "web_auth_lockout_attempts": {
+                "label": "Fehlversuche bis zur Sperre",
+                "description": "Nach so vielen falschen Anmeldungen wird gesperrt"
+            },
+            "web_auth_lockout_minutes": {
+                "label": "Sperrzeit (Minuten)",
+                "description": "So lange dauert eine Sperre nach zu vielen Fehlversuchen"
+            },
+            "web_auth_trusted_proxies": {
+                "label": "Vertrauenswürdige Reverse-Proxys",
+                "description": "Adressen, deren X-Forwarded-For übernommen wird"
+            },
+            "web_auth_lan_networks": {
+                "label": "Lokale Netze",
+                "description": "Diese Netze gelten als LAN (z.B. für „Admin nur aus dem LAN“)"
+            },
+            "web_auth_remote_access": {
+                "label": "Weboberfläche von außen",
+                "description": "Zugriff auf die Weboberfläche aus dem Internet erlauben"
+            },
+            "web_auth_remote_https_only": {
+                "label": "Von außen nur HTTPS",
+                "description": "Zugriffe von außen nur über HTTPS erlauben"
+            },
+            "web_auth_allow_networks": {
+                "label": "Erlaubte Netze",
+                "description": "Nur diese Netze dürfen auf die Weboberfläche (leer: alle)"
+            },
+            "web_auth_deny_networks": {
+                "label": "Gesperrte Netze",
+                "description": "Diese Netze werden immer abgewiesen"
             }
         },
         "groups": {
@@ -1131,7 +1192,8 @@
             "tonie_json": "Tonie JSON",
             "debug": "Debug",
             "debug_web": "Weboberfläche",
-            "mqtt_server_cert": "Zertifikat"
+            "mqtt_server_cert": "Zertifikat",
+            "web_auth": "Sicherheit der Anmeldung"
         },
         "values": {
             "toniebox_led": {
@@ -2249,8 +2311,11 @@
             "verifyFailed": "{{name}} liest sich anders zurück als geschrieben.",
             "certsMissing": "Fehlt auf der Box: {{names}}",
             "noPreloader": "Das Paket enthält keinen Preloader.",
-            "noMcuimg": "/sys/mcuimg.bin war nicht in der Sicherung."
-        }
+            "noMcuimg": "/sys/mcuimg.bin war nicht in der Sicherung.",
+            "unnamedFiles_one": "Eine Datei hat keinen Namen in der Dateitabelle und keinen bekannten Namen.",
+            "unnamedFiles_other": "{{count}} Dateien haben keinen Namen in der Dateitabelle und keinen bekannten Namen."
+        },
+        "cc3200BackupNotStored": "Sicherung nicht auf dem Server gespeichert: {{reason}}"
     },
     "tonieboxes": {
         "esp32BoxFlashing": {
@@ -2316,7 +2381,40 @@
         "no battery log for this box": "Kein Akku-Protokoll für diese Box",
         "no release package with a card tree for this build": "Kein Release-Paket mit Kartenbaum für diesen Build",
         "invalid JSON": "Ungültiges JSON",
-        "ruid missing or invalid": "Tag-ID fehlt oder ist ungültig"
+        "ruid missing or invalid": "Tag-ID fehlt oder ist ungültig",
+        "the box is not online": "Die Box ist nicht online",
+        "kind must be profile, event or none": "Art muss Profil, Ereignis oder keine sein",
+        "an event tag needs 1 to 16 actions": "Ein Ereignis-Tag braucht 1 bis 16 Aktionen",
+        "an action needs action 1 to 18 and mode 0 to 3": "Eine Aktion braucht Aktion 1 bis 18 und Modus 0 bis 3",
+        "an action needs value 0 to 16383 (actions 17 and 18: minutes 0 to 65535)": "Eine Aktion braucht einen Wert von 0 bis 16383 (Aktionen 17 und 18: Minuten 0 bis 65535)",
+        "volume must be 0 to 15": "Lautstärke muss 0 bis 15 sein",
+        "tag missing": "Tag fehlt",
+        "no complete ESP32 app image": "Kein vollständiges ESP32-App-Image",
+        "the SHA-256 digest at the end of the image does not match": "Die SHA-256-Prüfsumme am Ende des Images stimmt nicht",
+        "flash mode or size not DIO, 80 MHz, 8 MB": "Flash-Modus oder -Größe nicht DIO, 80 MHz, 8 MB",
+        "image larger than an app slot": "Image größer als ein App-Slot",
+        "checksum or appended SHA-256 of the image wrong": "Prüfsumme oder angehängtes SHA-256 des Images falsch",
+        "server block missing or not once": "Server-Block fehlt oder ist nicht genau einmal vorhanden",
+        "the image carries a build block: an ESP32 build from before 2026-10-14": "Das Image hat einen Build-Block: ein ESP32-Build von vor dem 14.10.2026",
+        "build date and time of the app description empty or unreadable": "Build-Datum und -Zeit der App-Beschreibung leer oder unlesbar",
+        "a host may hold letters, digits, dots and dashes only": "Ein Host darf nur Buchstaben, Ziffern, Punkte und Bindestriche enthalten",
+        "the port cannot be patched in this version of the original firmware": "Der Port lässt sich in dieser Version der Original-Firmware nicht patchen",
+        "the patched image is no app image": "Das gepatchte Image ist kein App-Image",
+        "no valid build block": "Kein gültiger Build-Block",
+        "not an image of the custom firmware (family marker CFW1 missing)": "Kein Image der Custom-Firmware (Kennung CFW1 fehlt)",
+        "debug build, the box would refuse it": "Debug-Build, die Box würde ihn ablehnen",
+        "not an application image": "Kein App-Image",
+        "neither an app image nor a flash dump with the original firmware in an app slot": "Weder ein App-Image noch ein Flash-Abbild mit der Original-Firmware in einem App-Slot",
+        "patches apply to the original firmware only": "Patches gelten nur für die Original-Firmware",
+        "could not store the image": "Image konnte nicht gespeichert werden",
+        "patches apply to the original firmware of the ESP32 box only": "Patches gelten nur für die Original-Firmware der ESP32-Box",
+        "no image in the package": "Kein Image im Paket",
+        "the package could not be kept for the installation in the browser": "Das Paket konnte nicht für die Installation im Browser aufbewahrt werden",
+        "no setup page (an HTML file of at most 65536 bytes)": "Keine Setup-Seite (eine HTML-Datei mit höchstens 65536 Bytes)",
+        "could not store the page": "Seite konnte nicht gespeichert werden",
+        "patches apply to a single original image, not to a release package": "Patches gelten für ein einzelnes Original-Image, nicht für ein Release-Paket",
+        "release without a usable image": "Release ohne brauchbares Image",
+        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "Kein GitHub-Repository eingestellt (cfw.firmware.github_repo, owner/name)"
     },
     "authErrors": {
         "2fa_required": "Für dieses Konto ist die Zwei-Faktor-Authentifizierung Pflicht.",
@@ -2325,6 +2423,8 @@
         "cross_site": "Die Anfrage wurde abgelehnt, weil sie nicht von der Weboberfläche kam.",
         "exists": "Diesen Nutzer gibt es schon.",
         "invalid_code": "Der Code ist falsch oder wurde schon verwendet.",
+        "code_required": "Bitte gib den Code aus deiner Authenticator-App oder einen Wiederherstellungscode ein.",
+        "tfa_locked": "Zu viele falsche Codes. Die Bestätigung ist für eine Weile gesperrt.",
         "invalid_user": "Nur Buchstaben, Ziffern, '.', '_' und '-' (max. 32).",
         "limit": "Die maximale Anzahl an Nutzern ist erreicht.",
         "login_disabled": "Dafür ist eine aktive Anmeldung nötig.",
@@ -2350,6 +2450,14 @@
         "not_found": "Nutzer nicht gefunden.",
         "save_failed": "Speichern fehlgeschlagen.",
         "no_users": "Lege zuerst einen Nutzer an, bevor du die Anmeldung einschaltest.",
-        "https_required": "HTTPS ist nötig."
+        "https_required": "HTTPS ist nötig.",
+        "unauthorized": "Benutzername oder Passwort falsch, oder die Anmeldung ist abgelaufen.",
+        "challenge_invalid": "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.",
+        "session_failed": "Der Server konnte keine Sitzung anlegen.",
+        "invalid_body": "Die Anfrage war unvollständig oder ungültig.",
+        "failed": "Der Server konnte das nicht ausführen.",
+        "env_override": "Der Anmeldeschutz ist auf dem Server abgeschaltet (TEDDYCLOUD_WEB_AUTH_DISABLE).",
+        "invalid_target": "Unbekannter Typ oder unbekannte ID.",
+        "2fa_setup_required": "Bitte zuerst die Zwei-Faktor-Anmeldung einrichten."
     }
 }

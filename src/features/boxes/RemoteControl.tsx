@@ -24,6 +24,7 @@ import {
     tagInfo,
     tagTitle,
 } from "../../lib/format";
+import { cfwMessage } from "../boxupdate/cfwMessages";
 import { t } from "../../lib/i18n";
 import { keys, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
@@ -55,9 +56,10 @@ export function RemoteControl({ boxId }: { boxId: string }) {
         if ("vibrate" in navigator) navigator.vibrate?.(10);
         try {
             const r = await tc.cfwRemote(boxId, command, extra);
-            if (r && r.ok === false) ui.toast("error", t("boxes.commandFailed"), r.message);
+            if (r && r.ok === false)
+                ui.toast("error", t("boxes.commandFailed"), cfwMessage(r.message));
         } catch (e) {
-            ui.toast("error", t("boxes.commandFailed"), String((e as Error).message));
+            ui.toast("error", t("boxes.commandFailed"), cfwMessage(String((e as Error).message)));
         }
         window.clearTimeout(refreshTimer.current);
         refreshTimer.current = window.setTimeout(() => status.refetch(), 1200);

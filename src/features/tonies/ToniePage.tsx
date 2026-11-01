@@ -55,6 +55,7 @@ import { ChapterTime, ErrorBox, Loading, Page, Row, Section, SwitchRow, useUi } 
 import { FigurePic } from "../../ui/FigurePic";
 import { TonieImage } from "../../ui/TonieImage";
 import { remoteAvailable } from "../boxes/BoxesPage";
+import { cfwThrow } from "../boxupdate/cfwMessages";
 import { DownloadSheet } from "../library/DownloadSheet";
 import { LibraryPicker } from "../library/LibraryPicker";
 import { CfwTagSettings } from "./CfwTagSettings";
@@ -169,7 +170,10 @@ function TonieDetail({
 
     const playOnBox = () => {
         const send = (id: string) =>
-            ui.run(() => tc.cfwRemote(id, "play", { ruid: tag.ruid }), t("tonies.commandSent"));
+            ui.run(
+                () => tc.cfwRemote(id, "play", { ruid: tag.ruid }).catch(cfwThrow),
+                t("tonies.commandSent"),
+            );
         if (remoteBoxes.length === 1) send(remoteBoxes[0].id);
         else
             ui.actions(
@@ -452,7 +456,13 @@ function TonieDetail({
                 />
             </Section>
 
-            {showCfw && <CfwTagSettings key={tag.ruid} ruid={tag.ruid} />}
+            {showCfw && (
+                <CfwTagSettings
+                    key={tag.ruid}
+                    ruid={tag.ruid}
+                    canEdit={access.can("tonie", tag.ruid, "tonie.edit")}
+                />
+            )}
 
             {canShare("tonie", tag.ruid) && (
                 <Section>

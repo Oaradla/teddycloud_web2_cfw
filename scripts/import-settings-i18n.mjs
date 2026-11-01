@@ -25,7 +25,13 @@ for (const source of sources) {
     const classic = JSON.parse(readFileSync(source, "utf8"));
     const texts = JSON.parse(readFileSync(translation(lang), "utf8"));
     const { options = {}, groups = {}, values = {} } = classic.settings ?? {};
-    texts.settings = { ...texts.settings, options, groups, values };
+    // own texts of settings the classic UI does not translate stay
+    texts.settings = {
+        ...texts.settings,
+        options: { ...texts.settings.options, ...options },
+        groups: { ...texts.settings.groups, ...groups },
+        values,
+    };
     console.log(
         `${lang}: ${Object.keys(options).length} options, ${Object.keys(groups).length} groups, ${Object.keys(values).length} value lists`,
     );

@@ -221,10 +221,11 @@ export function UploadPage() {
             setItems([]);
             setName("");
             setCover(null);
-            qc.invalidateQueries({ queryKey: ["files"] });
         } catch (e) {
             ui.toast("error", t("upload.uploadFailed"), String((e as Error).message));
         } finally {
+            // also after a failure: files before the failed one are stored
+            qc.invalidateQueries({ queryKey: ["files"] });
             setBusy(null);
             running.current = false;
         }

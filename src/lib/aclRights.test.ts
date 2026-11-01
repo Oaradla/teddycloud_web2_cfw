@@ -33,4 +33,15 @@ describe("mineAllows", () => {
             ),
         ).toBe(false);
     });
+
+    it("takes a folder entry without rights as no rights, not those of its parent", () => {
+        const folders = {
+            "": { rights: ["folder.read", "folder.write"] },
+            private: { rights: [] },
+        };
+        expect(mineAllows({ ...mine, folders }, "folder", "private/alice", "folder.read")).toBe(
+            false,
+        );
+        expect(mineAllows({ ...mine, folders }, "folder", "other", "folder.read")).toBe(true);
+    });
 });

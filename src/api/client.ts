@@ -1,4 +1,4 @@
-import { textsOf } from "../lib/i18n";
+import { t, textsOf } from "../lib/i18n";
 
 // Thin fetch layer for the teddyCloud API.
 //
@@ -162,7 +162,7 @@ export function postForm(
                 reject(new ApiError(xhr.responseText || `HTTP ${xhr.status}`, xhr.status));
             }
         };
-        xhr.onerror = () => reject(new ApiError("Netzwerkfehler", 0));
+        xhr.onerror = () => reject(new ApiError(t("common.networkError"), 0));
         xhr.send(form);
     });
 }

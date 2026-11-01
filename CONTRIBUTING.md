@@ -31,6 +31,8 @@ Every language is one JSON file, nested by area; the area is the folder in `src/
 uses the text, `common` when several do, `setup` for the box setup. German and English are
 complete, Spanish, French, Italian and Polish fall back to English per key. A new text goes into
 all six files. `t()` only takes keys that exist in `en.json`, so a typo is a build error.
+A text with a number is an i18next plural (`_one`, `_other`, Polish also `_few`, `_many`), called
+without the suffix and with `count`.
 
 `src/translations/translations.test.ts` checks that German and English have the same keys, that
 no language has keys English does not know, and that every language keeps the placeholders.

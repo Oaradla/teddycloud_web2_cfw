@@ -33,7 +33,9 @@ describe("translations", () => {
     });
 
     it.each(others)("%s has no keys English does not know", (lang) => {
-        expect(Object.keys(texts(load(lang))).filter((k) => !(k in en))).toEqual([]);
+        // plural forms English does not have (Polish "_few", "_many") belong to its "_other"
+        const known = (k: string) => k.replace(/_(zero|two|few|many)$/, "_other") in en;
+        expect(Object.keys(texts(load(lang))).filter((k) => !known(k))).toEqual([]);
     });
 
     it.each(others.filter((l) => l !== "de"))("%s has every German text", (lang) => {

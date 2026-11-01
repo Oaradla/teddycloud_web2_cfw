@@ -5,10 +5,10 @@ import { bytes, isTap, isTaf, parentPath } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { useBoxes } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
-import { Empty, ErrorBox, Loading, Row, useUi } from "../../ui/kit";
+import { Empty, ErrorBox, Loading, Notice, Row, useUi } from "../../ui/kit";
 import { TonieImage } from "../../ui/TonieImage";
 
-/** TAFs of the library that no tonie and no playlist uses; any read that fails fails the list */
+/** TAFs of the library that no tonie and no playlist uses; playlists that cannot be read are named */
 export function UnusedTafsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     const ui = useUi();
     const qc = useQueryClient();
@@ -23,14 +23,17 @@ export function UnusedTafsSheet({ open, onClose }: { open: boolean; onClose: () 
             ]);
             const files = await tc.walkTree("/");
             const used = new Set(tags.flat().map((x) => x.source));
+            const broken: string[] = [];
             for (const { path } of files.filter((f) => isTap(f.entry.name))) {
-                const tap = await tc.readTap(path);
-                tap.files?.forEach((f) => used.add(f.filepath));
-                if (tap.filepath) used.add(tap.filepath);
+                const tap = await tc.readTap(path).catch(() => null);
+                if (!tap) broken.push(path);
+                tap?.files?.forEach((f) => used.add(f.filepath));
+                if (tap?.filepath) used.add(tap.filepath);
             }
-            return files.filter(
+            const tafs = files.filter(
                 (f) => isTaf(f.entry.name) && !used.has("lib://" + f.path.replace(/^\//, "")),
             );
+            return { tafs, broken };
         },
     });
 
@@ -56,12 +59,17 @@ export function UnusedTafsSheet({ open, onClose }: { open: boolean; onClose: () 
             {unused.error && !unused.isFetching && (
                 <ErrorBox error={unused.error} retry={() => unused.refetch()} />
             )}
-            {unused.data && unused.data.length === 0 && (
+            {unused.data && unused.data.broken.length > 0 && (
+                <Notice>
+                    {t("library.unusedTafsBrokenTaps", { list: unused.data.broken.join(", ") })}
+                </Notice>
+            )}
+            {unused.data && unused.data.tafs.length === 0 && (
                 <Empty icon={<FileAudio size={28} />} title={t("library.noUnusedTafs")} />
             )}
-            {unused.data && unused.data.length > 0 && !unused.isFetching && (
+            {unused.data && unused.data.tafs.length > 0 && !unused.isFetching && (
                 <div className="list">
-                    {unused.data.map(({ path, entry }) => (
+                    {unused.data.tafs.map(({ path, entry }) => (
                         <Row
                             key={path}
                             leading={

@@ -674,7 +674,7 @@ export class Cc3200 {
         const slash = (name: string) => (name.startsWith("/") ? name : "/" + name);
         const named = all.filter((f) => f.name).map((f) => f.name);
         const files = named.filter((name) => !SYSTEM_FILES_SKIPPED.includes(slash(name)));
-        const failed: string[] = [];
+        const failed: { name: string; error: unknown }[] = [];
         // some boxes keep no names in the table; the box still finds its files by name, so the
         // known ones are asked for one by one (like cc3200tool's --by-file-id, but with names)
         const unnamed = all.length - named.length;
@@ -692,13 +692,12 @@ export class Cc3200 {
                 if (!SYSTEM_FILES_SKIPPED.includes(name)) files.push(name);
             }
             this.log(`${found} of them found by a known name`);
+            if (notFound.length) this.log(`not found by name: ${notFound.join(", ")}`);
             if (found < unnamed)
-                failed.push(
-                    `${unnamed - found} files have no name in the file table and no known name` +
-                        (notFound.length
-                            ? ` (the box does not find ${notFound.join(", ")} by name)`
-                            : ""),
-                );
+                failed.push({
+                    name: "",
+                    error: new Cc3200Error("unnamedFiles", { count: unnamed - found }),
+                });
         }
         const out = new Map<string, Uint8Array>();
         for (const [i, name] of files.entries()) {
@@ -706,7 +705,7 @@ export class Cc3200 {
             try {
                 out.set(name, await this.readFile(name));
             } catch (e) {
-                failed.push(`${name}: ${(e as Error).message}`);
+                failed.push({ name, error: e });
                 this.log(`${name}: ${(e as Error).message}`);
             }
         }

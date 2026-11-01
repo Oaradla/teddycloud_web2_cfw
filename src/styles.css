@@ -1367,6 +1367,7 @@ input[type="range"].slider::-moz-range-thumb {
     font-size: 13px;
     color: var(--fg-2);
     word-break: break-word;
+    white-space: pre-line;
 }
 @keyframes toast-in {
     from {

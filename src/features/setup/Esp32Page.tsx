@@ -429,12 +429,20 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
                 {(state.downloadLink || state.downloadLinkPatched) && (
                     <div className="row-gap mt" style={{ flexWrap: "wrap" }}>
                         {state.downloadLink && (
-                            <a className="btn small" href={state.downloadLink} download>
+                            <a
+                                className="btn small"
+                                href={state.downloadLink}
+                                download={state.filename || "ESP32_backup.bin"}
+                            >
                                 {t("setup.downloadOriginal")}
                             </a>
                         )}
                         {state.downloadLinkPatched && (
-                            <a className="btn small" href={state.downloadLinkPatched} download>
+                            <a
+                                className="btn small"
+                                href={state.downloadLinkPatched}
+                                download={`patched_${state.chipMac.replace(/:/g, "")}.bin`}
+                            >
                                 {t("setup.downloadPatched")}
                             </a>
                         )}

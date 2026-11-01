@@ -835,7 +835,9 @@ export const useESP32Flasher = (
 
                 setState((prev) => ({
                     ...prev,
-                    state: t("tonieboxes.esp32BoxFlashing.esp32flasher.uploadFailed"),
+                    state:
+                        t("tonieboxes.esp32BoxFlashing.esp32flasher.uploadFailed") +
+                        (body ? `: ${body}` : ""),
                     actionInProgress: false,
                     error: true,
                 }));
@@ -1076,11 +1078,21 @@ export const useESP32Flasher = (
                 mac,
                 chip: flasher.current_chip,
             });
-            // a backup named after another box would give this one that box's identity
-            const fileMac = /[0-9a-f]{12}/i.exec(state.flashName)?.[0].toLowerCase();
+            // a backup of another box (named by the server) would give this one that box's identity
+            const fileMac = /(?:^|_)(?:ESP32|patched)_([0-9a-f]{12})(?![0-9a-z])/i
+                .exec(state.flashName)?.[1]
+                .toLowerCase();
             const chipMac = (mac ?? "").replace(/:/g, "").toLowerCase();
-            if (fileMac && chipMac && fileMac !== chipMac)
-                throw new Error(t("setup.esp32ResetOtherBox", { file: fileMac, box: chipMac }));
+            if (fileMac && chipMac && fileMac !== chipMac) {
+                setState((prev) => ({
+                    ...prev,
+                    state: t("setup.esp32ResetOtherBox", { file: fileMac, box: chipMac }),
+                    connected: false,
+                    actionInProgress: false,
+                    error: true,
+                }));
+                return;
+            }
 
             if (mac) {
                 setState((prev) => ({

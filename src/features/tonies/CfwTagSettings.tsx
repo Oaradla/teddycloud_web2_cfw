@@ -3,13 +3,14 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { tc } from "../../api/tc";
 import type { CfwProfile, CfwTag } from "../../api/types";
+import { cfwMessage, cfwThrow } from "../boxupdate/cfwMessages";
 import { t } from "../../lib/i18n";
 import { Row, Section, Segmented, useUi } from "../../ui/kit";
 import { CfwEventFields, EMPTY_EVENT } from "./CfwEventFields";
 import { CfwProfileFields, EMPTY_PROFILE } from "./CfwProfileFields";
 
 /** settings of the custom firmware for a tag: the profile that travels with the figure, or an event tag */
-export function CfwTagSettings({ ruid }: { ruid: string }) {
+export function CfwTagSettings({ ruid, canEdit }: { ruid: string; canEdit: boolean }) {
     const ui = useUi();
     const qc = useQueryClient();
     const tag = useQuery({
@@ -37,9 +38,9 @@ export function CfwTagSettings({ ruid }: { ruid: string }) {
                 : draft.kind === "event"
                   ? { kind: "event", event: draft.event ?? EMPTY_EVENT }
                   : { kind: "none" };
-        const r = await ui.run(() => tc.cfwSetTag(ruid, body));
+        const r = await ui.run(() => tc.cfwSetTag(ruid, body).catch(cfwThrow));
         setSaving(false);
-        if (r && r.ok === false) ui.toast("error", t("common.saveFailed"), r.message);
+        if (r && r.ok === false) ui.toast("error", t("common.saveFailed"), cfwMessage(r.message));
         else if (r) {
             ui.toast("ok", t("common.saved"));
             qc.invalidateQueries({ queryKey: ["cfwTag", ruid] });
@@ -83,7 +84,7 @@ export function CfwTagSettings({ ruid }: { ruid: string }) {
                     />
                 </div>
             )}
-            {dirty && (
+            {dirty && canEdit && (
                 <div className="btn-row mt">
                     <button className="btn" onClick={() => setDraft(tag.data!)}>
                         {t("tonies.discard")}

@@ -35,6 +35,7 @@ import {
     useUi,
 } from "../../ui/kit";
 import { useSelection } from "../../ui/useSelection";
+import { remoteAvailable } from "../boxes/BoxesPage";
 import { cfwMessage } from "./cfwMessages";
 import { InstallGuide } from "./InstallGuide";
 
@@ -460,7 +461,7 @@ function BoxCard({
                 </span>
                 <button
                     className="btn small soft"
-                    disabled={!box.helloValid}
+                    disabled={!box.helloValid || !remoteAvailable(box)}
                     title={t("boxupdate.deliverNowHint")}
                     onClick={async () =>
                         notify(
