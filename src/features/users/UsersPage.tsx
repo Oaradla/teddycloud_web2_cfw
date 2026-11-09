@@ -27,7 +27,7 @@ import { useAllTags, useBoxes, useBoxModels, useCustomModels } from "../../lib/q
 import { Fold } from "../../ui/Fold";
 import { TonieImage } from "../../ui/TonieImage";
 import { t } from "../../lib/i18n";
-import { buildRightsTree } from "../../lib/rightsTree";
+import { buildRightsTree, listToNodes } from "../../lib/rightsTree";
 import { Sheet } from "../../ui/Sheet";
 import {
     Empty,
@@ -42,7 +42,7 @@ import {
     useUi,
 } from "../../ui/kit";
 import { levelName, PasswordSheet } from "../account/AccountPage";
-import { RightsTree } from "./RightsTree";
+import { rightName, RightsTree } from "./RightsTree";
 
 const LEVELS = ["admin", "user", "guest"] as const;
 
@@ -501,7 +501,11 @@ function OwnedSection({ username, onOpen }: { username: string; onOpen: () => vo
                                 sub={
                                     x.owner
                                         ? t("users.ownerOne")
-                                        : t("users.sharedRights", { rights: x.granted ?? "" })
+                                        : t("users.sharedRights", {
+                                              rights: listToNodes(x.granted)
+                                                  .map((node) => rightName(node))
+                                                  .join(", "),
+                                          })
                                 }
                                 onClick={() => open(g.to(x.id))}
                                 chevron
@@ -578,7 +582,10 @@ function UserSheet({
                         <select
                             className="select"
                             value={value}
-                            onChange={(e) => update(groupChange(e.target.value))}
+                            // only a real choice: password managers set fields by script
+                            onChange={(e) =>
+                                e.nativeEvent.isTrusted && update(groupChange(e.target.value))
+                            }
                         >
                             {options.map((o) => (
                                 <option key={o.value} value={o.value}>
@@ -785,6 +792,7 @@ function CreateUserSheet({
                     autoCapitalize="off"
                     autoCorrect="off"
                     autoComplete="off"
+                    maxLength={32}
                     value={name}
                     onChange={(e) => setName(e.target.value.trim())}
                 />
@@ -796,6 +804,7 @@ function CreateUserSheet({
                     className="input"
                     type="password"
                     autoComplete="new-password"
+                    maxLength={128}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                 />
@@ -806,7 +815,8 @@ function CreateUserSheet({
                 <select
                     className="select"
                     value={group}
-                    onChange={(e) => setGroup(e.target.value)}
+                    // only a real choice: password managers set fields by script
+                    onChange={(e) => e.nativeEvent.isTrusted && setGroup(e.target.value)}
                     disabled={first}
                 >
                     {options.map((o) => (

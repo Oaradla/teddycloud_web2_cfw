@@ -7,6 +7,7 @@ import { t } from "../../lib/i18n";
 import { TagWithBox, useCfwBoxes, useInvalidateTags, useSetting } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
 import { Loading, Notice, Row, Section, Segmented, useUi } from "../../ui/kit";
+import { EMPTY_EVENT } from "./CfwEventFields";
 import {
     CfwProfileFields,
     EMPTY_PROFILE,
@@ -144,7 +145,7 @@ export function BulkEditSheet({
                     } else if (kind === "event" && cur.kind !== "event") {
                         await tc.cfwSetTag(tag.ruid, {
                             kind: "event",
-                            event: { tones: true, actions: [] },
+                            event: EMPTY_EVENT,
                         });
                     }
                 }

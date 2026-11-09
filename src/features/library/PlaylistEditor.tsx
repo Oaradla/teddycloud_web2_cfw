@@ -14,11 +14,13 @@ import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import type { FileEntry, Tap } from "../../api/types";
 import { baseName, isAudio, parentPath, stripExt } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { useInvalidateTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
 import { Empty, Loading, Notice, useUi } from "../../ui/kit";
 import { TagPicker } from "../tonies/TagPicker";
+import { confirmReplace } from "../upload/confirmReplace";
 import { LibraryPicker } from "./LibraryPicker";
 
 /** how the editor starts: a new playlist in a folder (maybe with files), or an existing TAP */
@@ -55,6 +57,7 @@ export function PlaylistEditor({
     onClose: () => void;
 }) {
     const ui = useUi();
+    const access = useAccess();
     const qc = useQueryClient();
     const invalidateTags = useInvalidateTags();
     const [name, setName] = useState("");
@@ -170,8 +173,9 @@ export function PlaylistEditor({
         if (!items.length) return ui.toast("error", t("library.playlistEmpty"));
         if (canBuild && tafPath.trim() && !/^lib:\/\/.+\.taf$/i.test(tafPath.trim()))
             return ui.toast("error", t("library.tapTafPathHint"));
-        setSaving(true);
         const fileName = tapPath ? baseName(tapPath) : `${clean}.tap`;
+        if (!tapPath && !(await confirmReplace(ui, dir, [fileName]))) return;
+        setSaving(true);
         const target = tapPath ?? `${dir.replace(/\/$/, "")}/${fileName}`;
         const tap: Tap = {
             type: "tap",
@@ -466,10 +470,17 @@ export function PlaylistEditor({
                 open={assign}
                 onClose={() => setAssign(false)}
                 title={t("common.assignToTonie")}
+                right="tonie.assign"
                 onPick={async (tag) => {
                     if (!done) return;
                     await ui.run(
-                        () => tc.assignSource(tag, toLib(done.tap), tag.overlay || undefined),
+                        () =>
+                            tc.assignSource(
+                                tag,
+                                toLib(done.tap),
+                                tag.overlay || undefined,
+                                access.can("tonie", tag.ruid, "tonie.edit"),
+                            ),
                         t("common.contentAssigned"),
                     );
                     invalidateTags();

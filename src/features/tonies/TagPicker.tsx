@@ -7,29 +7,34 @@ import {
     linkedContent,
     sourceLabel,
 } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { TagWithBox, useAllTags } from "../../lib/queries";
 import { Sheet } from "../../ui/Sheet";
-import { Loading, Row, SearchField } from "../../ui/kit";
+import { Loading, Row, SearchField, useUi } from "../../ui/kit";
 import { FigurePic } from "../../ui/FigurePic";
 
-/** picks one of the tonies (tags) known to the boxes */
+/** picks one of the tonies (tags) known to the boxes that the user has the right on */
 export function TagPicker({
     open,
     onClose,
     onPick,
     title,
+    right,
 }: {
     open: boolean;
     onClose: () => void;
     onPick: (tag: TagWithBox) => void;
     title?: string;
+    right: "tonie.assign" | "tonie.edit";
 }) {
     const tags = useAllTags();
+    const access = useAccess();
+    const ui = useUi();
     const [filter, setFilter] = useState("");
     const f = filter.trim().toLowerCase();
     const list = (tags.data ?? [])
-        .filter((x) => x.type !== "system")
+        .filter((x) => x.type !== "system" && access.can("tonie", x.ruid, right))
         .filter((x) => {
             if (!f) return !x.hide;
             const i = figureInfo(x);
@@ -68,7 +73,20 @@ export function TagPicker({
                                       ? `→ ${sourceLabel(x.source)}`
                                       : figureSubtitle(x) || x.ruid.toUpperCase()
                             }
-                            onClick={() => {
+                            onClick={async () => {
+                                if (
+                                    right === "tonie.assign" &&
+                                    x.source &&
+                                    !(await ui.confirm({
+                                        title: t("tonies.replaceContent"),
+                                        text: t("tonies.replaceContentText", {
+                                            tonie: figureTitle(x),
+                                            current: l ? contentTitle(l) : sourceLabel(x.source),
+                                        }),
+                                        confirm: t("upload.replace"),
+                                    }))
+                                )
+                                    return;
                                 onPick(x);
                                 onClose();
                             }}

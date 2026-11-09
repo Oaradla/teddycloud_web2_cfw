@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-    CloudDownload,
     Headphones,
     ListMusic,
     Lock,
@@ -198,14 +197,6 @@ export function RemoteControl({ boxId }: { boxId: string }) {
                 >
                     <RefreshCw size={15} />
                     {t("boxes.remoteRefresh")}
-                </button>
-                <button
-                    className="btn soft small"
-                    disabled={!connected}
-                    onClick={() => send("updateCheck")}
-                >
-                    <CloudDownload size={15} />
-                    {t("boxes.remoteUpdateCheck")}
                 </button>
             </div>
             <div className="small muted" style={{ marginTop: 8 }}>

@@ -41,6 +41,8 @@
         "ledOn": "On",
         "ledDimmed": "Dimmed",
         "ledOff": "Off",
+        "ledDimmedPermanent": "Dimmed permanently",
+        "ledOffPermanent": "Off permanently",
         "slapLock": "Lock slapping",
         "tiltLock": "Lock tilting",
         "volumeLock": "Lock volume",
@@ -121,7 +123,6 @@
         "sessionsEnded": "{{n}} session(s) ended",
         "reset": "Reset",
         "share": "Share",
-        "shareHint": "Owners and who may do what with it",
         "fromTime": "from {{t}}",
         "imageFolderReadOnly": "The picture folder (custom_img) on the server is not writable, e.g. mounted read-only.",
         "themeAuto": "Automatic",
@@ -137,7 +138,9 @@
         "forward30": "Forward 30 seconds",
         "moveUp": "Move up",
         "moveDown": "Move down",
-        "networkError": "Network error"
+        "networkError": "Network error",
+        "owners": "Owners",
+        "ownersHint": "Who it belongs to; owners assign further owners"
     },
     "tonies": {
         "tonie": "Tonie",
@@ -165,6 +168,7 @@
         "cloudOffHint": "Never load content from the Tonie cloud",
         "playOnBox": "Play on box",
         "contentHint": "Own content from the library replaces the original as long as it is assigned.",
+        "eventNoSource": "An event tag plays no content, so its content is hidden. Assigned content stays stored so you can switch back quickly, but no box gets it. Boxes without the custom firmware hear a notice instead.",
         "originalContent": "Original content",
         "noContentYet": "No content yet",
         "stream": "Stream",
@@ -174,6 +178,8 @@
         "streamUrlHint": "Web radio or audio URL; the tonie is set to live",
         "removeContent": "Remove own content",
         "removeContentText": "The tonie plays its original content again. The file stays in the library.",
+        "replaceContent": "Replace content?",
+        "replaceContentText": "{{tonie}} plays “{{current}}”. Play the new content instead?",
         "contentRemoved": "Content removed",
         "nextEpisode": "Assign the next episode",
         "prevEpisode": "Assign the previous episode",
@@ -279,6 +285,9 @@
         "cfwEventScopeGlobal": "Whole box",
         "cfwEventTones": "Confirmation tones",
         "cfwEventTonesHint": "Rising for \"on\", falling for \"off\"; the LED always confirms.",
+        "cfwEventTemporary": "Only until switch-off",
+        "cfwEventTemporaryHint": "Holds until the box switches off and is not stored; a lasting change of the same setting ends it.",
+        "cfwEventTemporaryOld": "These boxes have an older custom firmware: they do not take this tag and keep its earlier version, whose settings stay: {{boxes}}",
         "cfwAddAction": "Add action",
         "cfwRemoveAction": "Remove action",
         "cfwSecondEarsIgnored": "Only the first action of this kind is set with the ears.",
@@ -294,6 +303,8 @@
         "cfwLed0": "On",
         "cfwLed1": "Off (after the bright phase)",
         "cfwLed2": "Dimmed",
+        "cfwLed5": "Off permanently",
+        "cfwLed6": "Dimmed permanently",
         "cfwAction_resume": "Resume (remember progress)",
         "cfwAction_shuffle": "Shuffle",
         "cfwAction_sleepTimer": "Sleep timer (lasting)",
@@ -312,6 +323,7 @@
         "cfwAction_bothEarsOff": "Switch off with both ears",
         "cfwAction_idleOffBattery": "Switch-off time on battery",
         "cfwAction_idleOffStation": "Switch-off time on the charging station",
+        "cfwAction_sleepTimerOnceGlobal": "Sleep timer (once, for the next figure)",
         "cfwIdleMinutesHint": "0 = 10 min as in the original"
     },
     "library": {
@@ -399,6 +411,9 @@
         "editPlaylist": "Edit playlist",
         "splitTaf": "Split into chapters",
         "splitTafText": "Each of the {{n}} chapters becomes a TAF of its own, with a playlist that puts the album together again. Everything goes into a new folder named like the TAF; the TAF itself moves there unchanged, linked tonies keep playing it. The playlist puts together a TAF of its own (with the cover and titles of the original); to have a tonie play it, link the tonie to the playlist.",
+        "splitTafTextKeep": "Each of the {{n}} chapters becomes a TAF of its own, with a playlist that puts the album together again. Everything goes into a new folder named like the TAF, inside a folder you choose next; the TAF itself stays where it is, linked tonies keep playing it. The playlist puts together a TAF of its own (with the cover and titles of the original); to have a tonie play it, link the tonie to the playlist.",
+        "splitElsewhere": "Create the new folder elsewhere (the TAF stays where it is)",
+        "splitTafInto": "Folder for the chapters",
         "splitTafRun": "Split",
         "splitting": "Splitting …",
         "splitDone": "Split",
@@ -419,6 +434,7 @@
         "selectFiles": "Tap files",
         "deleteN": "Delete {{n}} items?",
         "deleteNText": "The selected files and folders are deleted for good.",
+        "deleteUsedBy": "These tonies play it and lose their content: {{names}}.",
         "failedN_one": "Failed for one item",
         "failedN_other": "Failed for {{count}} items",
         "deleteFolderText": "“{{name}}” and everything in it ({{n}} items) will be deleted for good.",
@@ -443,6 +459,7 @@
     "upload": {
         "files": "Files",
         "tapToChange": "Tap to change",
+        "noWriteRight": "You may not add files to this folder. Tap to choose another one.",
         "targetFolder": "Target folder",
         "chooseFilesHint": "MP3, M4A, OGG, FLAC, WAV … or ready TAF files",
         "modeTaf": "Create a tonie file",
@@ -483,9 +500,11 @@
         "starting": "Starting …",
         "coverNotSaved": "Cover picture not saved",
         "exists": "“{{name}}” already exists in this folder. Replace it? Tonies that play it get the new content.",
+        "existsMany": "These files already exist in this folder: {{names}}. Replace them? Tonies that play them get the new content.",
         "replace": "Replace"
     },
     "boxes": {
+        "searchBoxes": "Search boxes",
         "online": "Online",
         "offline": "Offline",
         "onlineNow": "Connected right now",
@@ -547,7 +566,6 @@
         "remoteAsOf": "As of {{when}}",
         "remoteQueued": "{{n}} command(s) waiting",
         "remoteRefresh": "Ask for the state",
-        "remoteUpdateCheck": "Check for a firmware update",
         "remoteLast": "Last command: {{command}} – {{result}}, {{when}}",
         "result_0": "done",
         "result_1": "not possible right now",
@@ -826,11 +844,11 @@
         "usernameHint": "Letters, digits and . _ -, at most 32 characters",
         "firstUserHint": "The first user becomes admin.",
         "groupHint_admin": "May do everything, users and server settings too",
-        "groupHint_user": "Owns boxes and tonies and can share them with others",
-        "groupHint_guest": "Gets only what is shared with them – e.g. for children",
+        "groupHint_user": "Owns boxes, tonies and folders, assigns further owners and shares folders",
+        "groupHint_guest": "Only gets what they own or what is shared with them – e.g. for children",
         "groupHint_own": "Own group with own rights",
         "rightsAndGroups": "Rights and groups",
-        "rightsAndGroupsHint": "Admins may always do everything. Owners share single boxes, tonies and folders themselves.",
+        "rightsAndGroupsHint": "Admins may always do everything. Owners assign further owners of their boxes and tonies and share folders themselves.",
         "whatUsersMay": "What users may do at most",
         "whatUsersMayHint": "Upper limit for everyone in the group “User”",
         "whatChildrenMay": "What children may do at most",
@@ -855,6 +873,7 @@
         "owners": "Owners",
         "ownersHint": "Owners may do everything with it and can share it further.",
         "ownersAdminOnly": "An admin sets the owners.",
+        "ownerRequired": "At least one owner is needed; only an admin can remove the last one.",
         "sharedWith": "Shared with",
         "shareWith": "Share with",
         "shareAdd": "Share with someone",
@@ -870,13 +889,13 @@
             "settings": "All settings",
             "cfw": "Remote control",
             "update": "Firmware update",
-            "share": "Share"
+            "share": "Assign owners"
         },
         "right_tonie": {
             "view": "View and play",
             "assign": "Assign audio",
             "edit": "Edit (live, cloud, model)",
-            "share": "Share"
+            "share": "Assign owners"
         },
         "right_folder": {
             "read": "Read",
@@ -911,13 +930,22 @@
         "event_sessions_revoked": "Sessions ended",
         "event_user_created": "User created",
         "event_user_deleted": "User deleted",
-        "event_user_updated": "User changed"
+        "event_user_updated": "User changed",
+        "ownersTitle": "Owners: {{name}}",
+        "ownersOnlyHint": "Owners may do everything with it and assign further owners. A tonie placed on another user's box shows up for that user without belonging to them; they can hide it for themselves."
     },
     "more": {
         "serverSettingsHint": "All options, searchable",
         "systemHint": "Version, statistics, restart",
         "appearance": "Appearance",
         "statistics": "Statistics",
+        "stats": {
+            "connections": "Connections made to this server",
+            "reverse_requests": "Reverse proxy calls made by clients",
+            "cloud_requests": "Cloud requests executed",
+            "cloud_blocked": "Blocked cloud requests",
+            "cloud_failed": "Failed cloud requests"
+        },
         "reloadToniesJson": "Reload tonies.json",
         "restartServer": "Restart TeddyCloud",
         "restartServerText": "Boxes lose their connection briefly.",
@@ -934,6 +962,7 @@
         "newVersion": "New teddyCloud version",
         "newVersionText": "GitHub has a newer version of teddyCloud.",
         "newVersionTextDevelop": "GitHub has a newer state of teddyCloud's develop branch.",
+        "newVersionTextRc": "GitHub has a newer release candidate of teddyCloud.",
         "openOnGithub": "View on GitHub",
         "securityIncident": "There was an unwanted access to TeddyCloud (e.g. from the internet). Details are in the server log.",
         "systemSoundsHint": "Sounds of the box, e.g. at power-on or on low battery",
@@ -1111,6 +1140,8 @@
         "sponsorHint": "If you like teddyCloud: help with a sponsorship or a tip."
     },
     "studio": {
+        "studioClearList": "Clear the list?",
+        "studioClearListText": "All {{n}} tonies and their texts and pictures are removed from the list.",
         "studioPage": "Page {{n}} of {{of}} · {{per}} labels per sheet",
         "studioCutSvg": "Cut lines as SVG (laser cutter)",
         "studioAddFolder": "Add a library folder",

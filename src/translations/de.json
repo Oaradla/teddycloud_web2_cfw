@@ -41,6 +41,8 @@
         "ledOn": "An",
         "ledDimmed": "Gedimmt",
         "ledOff": "Aus",
+        "ledDimmedPermanent": "Dauerhaft gedimmt",
+        "ledOffPermanent": "Dauerhaft aus",
         "slapLock": "Klopfen sperren",
         "tiltLock": "Kippen sperren",
         "volumeLock": "Lautstärke sperren",
@@ -121,7 +123,6 @@
         "sessionsEnded": "{{n}} Sitzung(en) beendet",
         "reset": "Zurücksetzen",
         "share": "Teilen",
-        "shareHint": "Besitzer und wer was damit darf",
         "fromTime": "ab {{t}}",
         "imageFolderReadOnly": "Der Bildordner (custom_img) auf dem Server ist nicht beschreibbar, z.B. schreibgeschützt eingebunden.",
         "themeAuto": "Automatisch",
@@ -137,7 +138,9 @@
         "forward30": "30 Sekunden vor",
         "moveUp": "Nach oben",
         "moveDown": "Nach unten",
-        "networkError": "Netzwerkfehler"
+        "networkError": "Netzwerkfehler",
+        "owners": "Besitzer",
+        "ownersHint": "Wem es gehört; Besitzer legen weitere Besitzer fest"
     },
     "tonies": {
         "tonie": "Tonie",
@@ -165,6 +168,7 @@
         "cloudOffHint": "Nie Inhalte aus der Tonie-Cloud laden",
         "playOnBox": "Auf Box abspielen",
         "contentHint": "Ein eigener Inhalt aus der Bibliothek ersetzt das Original, solange er zugewiesen ist.",
+        "eventNoSource": "Ein Event-Tag spielt keinen Inhalt ab, deshalb ist der Inhalt ausgeblendet. Ein zugewiesener Inhalt bleibt gespeichert, damit du schnell zurückwechseln kannst, wird aber an keine Box ausgeliefert. Boxen ohne Custom Firmware hören stattdessen eine Ansage.",
         "originalContent": "Original-Inhalt",
         "noContentYet": "Noch kein Inhalt",
         "stream": "Stream",
@@ -174,6 +178,8 @@
         "streamUrlHint": "Webradio oder Audio-URL; der Tonie wird auf Live gestellt",
         "removeContent": "Eigenen Inhalt entfernen",
         "removeContentText": "Der Tonie spielt danach wieder seinen Original-Inhalt. Die Datei bleibt in der Bibliothek.",
+        "replaceContent": "Inhalt ersetzen?",
+        "replaceContentText": "{{tonie}} spielt „{{current}}“. Stattdessen den neuen Inhalt abspielen?",
         "contentRemoved": "Inhalt entfernt",
         "nextEpisode": "Nächste Folge zuweisen",
         "prevEpisode": "Vorherige Folge zuweisen",
@@ -279,6 +285,9 @@
         "cfwEventScopeGlobal": "Ganze Box",
         "cfwEventTones": "Bestätigungstöne",
         "cfwEventTonesHint": "Steigend für „an“, fallend für „aus“; die LED bestätigt immer.",
+        "cfwEventTemporary": "Nur bis zum Ausschalten",
+        "cfwEventTemporaryHint": "Gilt, bis die Box ausgeht, und wird nicht gespeichert; eine dauerhafte Änderung derselben Einstellung beendet den Wert.",
+        "cfwEventTemporaryOld": "Diese Boxen haben eine ältere Custom Firmware: Sie übernehmen diesen Tag nicht und behalten seine frühere Fassung, deren Einstellungen bleiben: {{boxes}}",
         "cfwAddAction": "Aktion hinzufügen",
         "cfwRemoveAction": "Aktion entfernen",
         "cfwSecondEarsIgnored": "Nur die erste Aktion dieser Art wird mit den Ohren eingestellt.",
@@ -294,6 +303,8 @@
         "cfwLed0": "An",
         "cfwLed1": "Aus (nach der Hell-Phase)",
         "cfwLed2": "Gedimmt",
+        "cfwLed5": "Dauerhaft aus",
+        "cfwLed6": "Dauerhaft gedimmt",
         "cfwAction_resume": "Fortsetzen (Fortschritt merken)",
         "cfwAction_shuffle": "Zufallswiedergabe",
         "cfwAction_sleepTimer": "Sleep-Timer (dauerhaft)",
@@ -312,6 +323,7 @@
         "cfwAction_bothEarsOff": "Ausschalten mit beiden Ohren",
         "cfwAction_idleOffBattery": "Ausschaltzeit im Akkubetrieb",
         "cfwAction_idleOffStation": "Ausschaltzeit auf der Ladestation",
+        "cfwAction_sleepTimerOnceGlobal": "Sleep-Timer (einmalig, für die nächste Figur)",
         "cfwIdleMinutesHint": "0 = 10 Min. wie im Original"
     },
     "library": {
@@ -399,6 +411,9 @@
         "editPlaylist": "Playlist bearbeiten",
         "splitTaf": "In Kapitel aufteilen",
         "splitTafText": "Jedes der {{n}} Kapitel wird eine eigene TAF, dazu eine Playlist, die das Album wieder zusammensetzt. Alles kommt in einen neuen Ordner mit dem Namen der TAF; die TAF selbst wandert unverändert mit hinein, verknüpfte Tonies spielen sie weiter. Die Playlist setzt ein eigenes TAF zusammen (mit Cover und Titeln des Originals); soll ein Tonie sie spielen, verknüpfe ihn mit der Playlist.",
+        "splitTafTextKeep": "Jedes der {{n}} Kapitel wird eine eigene TAF, dazu eine Playlist, die das Album wieder zusammensetzt. Alles kommt in einen neuen Ordner mit dem Namen der TAF, in einem Ordner, den du als Nächstes wählst; die TAF selbst bleibt, wo sie ist, verknüpfte Tonies spielen sie weiter. Die Playlist setzt ein eigenes TAF zusammen (mit Cover und Titeln des Originals); soll ein Tonie sie spielen, verknüpfe ihn mit der Playlist.",
+        "splitElsewhere": "Neuen Ordner woanders anlegen (die TAF bleibt, wo sie ist)",
+        "splitTafInto": "Ordner für die Kapitel",
         "splitTafRun": "Aufteilen",
         "splitting": "Teile auf …",
         "splitDone": "Aufgeteilt",
@@ -419,6 +434,7 @@
         "selectFiles": "Dateien antippen",
         "deleteN": "{{n}} Einträge löschen?",
         "deleteNText": "Die ausgewählten Dateien und Ordner werden endgültig gelöscht.",
+        "deleteUsedBy": "Diese Tonies spielen es ab und verlieren ihren Inhalt: {{names}}.",
         "failedN_one": "Bei einem Eintrag hat es nicht geklappt",
         "failedN_other": "Bei {{count}} Einträgen hat es nicht geklappt",
         "deleteFolderText": "„{{name}}“ und alles darin ({{n}} Einträge) wird endgültig gelöscht.",
@@ -846,7 +862,7 @@
             },
             "toniebox_led": {
                 "label": "LED-Helligkeit",
-                "description": "LED, während die Box bereit ist"
+                "description": "LED, während die Box bereit ist; dauerhaft aus und dauerhaft gedimmt nur mit Custom Firmware (andere Boxen: aus bzw. gedimmt)"
             },
             "toniebox_overrideFields": {
                 "label": "Unbekannte Felder überschreiben",
@@ -946,7 +962,7 @@
             },
             "cfw_update_channel": {
                 "label": "Update-Kanal",
-                "description": "Welche Firmware-Images die Box nimmt: nur Release oder auch Beta/Alpha"
+                "description": "Nur für die automatische Auslieferung: welche Firmware-Images die Box nimmt, nur Release oder auch Beta/Alpha (Keiner: kein Image). Ein zugewiesenes Image wird unabhängig von seinem Kanal ausgeliefert"
             },
             "cfw_update_mode": {
                 "label": "Update-Auslieferung",
@@ -1199,7 +1215,9 @@
             "toniebox_led": {
                 "0": "An",
                 "1": "Aus",
-                "2": "Gedimmt"
+                "2": "Gedimmt",
+                "5": "Dauerhaft aus",
+                "6": "Dauerhaft gedimmt"
             },
             "cfw_update_channel": {
                 "0": "Keiner",
@@ -1284,6 +1302,7 @@
     "upload": {
         "files": "Dateien",
         "tapToChange": "Tippen zum Ändern",
+        "noWriteRight": "In diesen Ordner darfst du keine Dateien legen. Tippen, um einen anderen zu wählen.",
         "targetFolder": "Zielordner",
         "chooseFilesHint": "MP3, M4A, OGG, FLAC, WAV … oder fertige TAF-Dateien",
         "modeTaf": "Tonie-Datei erstellen",
@@ -1324,9 +1343,11 @@
         "starting": "Starte …",
         "coverNotSaved": "Cover-Bild nicht gespeichert",
         "exists": "„{{name}}“ gibt es in diesem Ordner schon. Ersetzen? Tonies, die es abspielen, bekommen den neuen Inhalt.",
+        "existsMany": "Diese Dateien gibt es in diesem Ordner schon: {{names}}. Ersetzen? Tonies, die sie abspielen, bekommen den neuen Inhalt.",
         "replace": "Ersetzen"
     },
     "boxes": {
+        "searchBoxes": "Boxen durchsuchen",
         "online": "Online",
         "offline": "Offline",
         "onlineNow": "Gerade verbunden",
@@ -1388,7 +1409,6 @@
         "remoteAsOf": "Stand {{when}}",
         "remoteQueued": "{{n}} Befehl(e) warten",
         "remoteRefresh": "Status abfragen",
-        "remoteUpdateCheck": "Nach Firmware-Update suchen",
         "remoteLast": "Letzter Befehl: {{command}} – {{result}}, {{when}}",
         "result_0": "ausgeführt",
         "result_1": "gerade nicht möglich",
@@ -1667,11 +1687,11 @@
         "usernameHint": "Buchstaben, Ziffern und . _ -, höchstens 32 Zeichen",
         "firstUserHint": "Der erste Nutzer wird Admin.",
         "groupHint_admin": "Darf alles, auch Nutzer und Server-Einstellungen",
-        "groupHint_user": "Besitzt eigene Boxen und Tonies und kann sie mit anderen teilen",
-        "groupHint_guest": "Bekommt nur, was mit ihm geteilt wird – z.B. für Kinder",
+        "groupHint_user": "Besitzt eigene Boxen, Tonies und Ordner, legt weitere Besitzer fest und teilt Ordner",
+        "groupHint_guest": "Bekommt nur, was ihm gehört oder freigegeben wird – z.B. für Kinder",
         "groupHint_own": "Eigene Gruppe mit eigenen Rechten",
         "rightsAndGroups": "Rechte und Gruppen",
-        "rightsAndGroupsHint": "Admins dürfen immer alles. Freigaben für einzelne Boxen, Tonies und Ordner machen die Besitzer dort selbst.",
+        "rightsAndGroupsHint": "Admins dürfen immer alles. Besitzer legen für ihre Boxen und Tonies weitere Besitzer fest und geben Ordner selbst frei.",
         "whatUsersMay": "Was Nutzer höchstens dürfen",
         "whatUsersMayHint": "Obergrenze für alle in der Gruppe „Nutzer“",
         "whatChildrenMay": "Was Kinder höchstens dürfen",
@@ -1696,6 +1716,7 @@
         "owners": "Besitzer",
         "ownersHint": "Besitzer dürfen alles damit und können es weiter teilen.",
         "ownersAdminOnly": "Die Besitzer legt ein Admin fest.",
+        "ownerRequired": "Mindestens ein Besitzer ist nötig; nur ein Admin kann den letzten entfernen.",
         "sharedWith": "Geteilt mit",
         "shareWith": "Teilen mit",
         "shareAdd": "Mit jemandem teilen",
@@ -1711,13 +1732,13 @@
             "settings": "Alle Einstellungen",
             "cfw": "Fernsteuerung",
             "update": "Firmware-Update",
-            "share": "Teilen"
+            "share": "Besitzer festlegen"
         },
         "right_tonie": {
             "view": "Sehen und abspielen",
             "assign": "Audio zuweisen",
             "edit": "Bearbeiten (Live, Cloud, Modell)",
-            "share": "Teilen"
+            "share": "Besitzer festlegen"
         },
         "right_folder": {
             "read": "Lesen",
@@ -1752,13 +1773,22 @@
         "event_sessions_revoked": "Sitzungen beendet",
         "event_user_created": "Nutzer angelegt",
         "event_user_deleted": "Nutzer gelöscht",
-        "event_user_updated": "Nutzer geändert"
+        "event_user_updated": "Nutzer geändert",
+        "ownersTitle": "Besitzer: {{name}}",
+        "ownersOnlyHint": "Besitzer dürfen alles damit und legen weitere Besitzer fest. Steht ein Tonie auf der Box eines anderen Nutzers, sieht dieser ihn, ohne dass er ihm gehört, und kann ihn für sich ausblenden."
     },
     "more": {
         "serverSettingsHint": "Alle Optionen, durchsuchbar",
         "systemHint": "Version, Statistik, Neustart",
         "appearance": "Darstellung",
         "statistics": "Statistik",
+        "stats": {
+            "connections": "Verbindungen zu diesem Server",
+            "reverse_requests": "Reverse Proxy-Aufrufe von Clients",
+            "cloud_requests": "Cloudanfragen ausgeführt",
+            "cloud_blocked": "Cloudanfragen blockiert",
+            "cloud_failed": "Fehlgeschlagene Cloudanfragen"
+        },
         "reloadToniesJson": "tonies.json neu laden",
         "restartServer": "TeddyCloud neu starten",
         "restartServerText": "Boxen verlieren kurz die Verbindung.",
@@ -1775,6 +1805,7 @@
         "newVersion": "Neue teddyCloud-Version",
         "newVersionText": "Auf GitHub gibt es eine neuere Version von teddyCloud.",
         "newVersionTextDevelop": "Auf GitHub gibt es einen neueren Stand des Develop-Zweigs von teddyCloud.",
+        "newVersionTextRc": "Auf GitHub gibt es einen neueren Release-Kandidaten von teddyCloud.",
         "openOnGithub": "Auf GitHub ansehen",
         "securityIncident": "Es gab einen unerwünschten Zugriff auf TeddyCloud (z.B. aus dem Internet). Details stehen im Log des Servers.",
         "systemSoundsHint": "Klänge der Box, z.B. beim Einschalten oder bei leerem Akku",
@@ -1952,6 +1983,8 @@
         "sponsorHint": "Wenn dir teddyCloud gefällt: mit einem Sponsoring oder Trinkgeld helfen."
     },
     "studio": {
+        "studioClearList": "Liste leeren?",
+        "studioClearListText": "Alle {{n}} Tonies samt ihren Texten und Bildern werden aus der Liste entfernt.",
         "studioPage": "Seite {{n}} von {{of}} · {{per}} Etiketten pro Blatt",
         "studioCutSvg": "Schnittlinien als SVG (Lasercutter)",
         "studioAddFolder": "Ordner aus der Bibliothek hinzufügen",
@@ -2414,7 +2447,10 @@
         "could not store the page": "Seite konnte nicht gespeichert werden",
         "patches apply to a single original image, not to a release package": "Patches gelten für ein einzelnes Original-Image, nicht für ein Release-Paket",
         "release without a usable image": "Release ohne brauchbares Image",
-        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "Kein GitHub-Repository eingestellt (cfw.firmware.github_repo, owner/name)"
+        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "Kein GitHub-Repository eingestellt (cfw.firmware.github_repo, owner/name)",
+        "assigned, but \"Firmware update\" is off for this box, so it is not offered": "Zugewiesen, aber „Firmware-Update“ ist für diese Box aus, daher wird es nicht angeboten",
+        "assigned; the box already runs this image": "Zugewiesen; die Box läuft bereits mit diesem Image",
+        "assigned, but the box has rolled this image back, so it is offered only with \"Offer rolled-back image again\"": "Zugewiesen, aber die Box hat dieses Image zurückgerollt; es wird nur mit „Zurückgerolltes Image erneut anbieten“ angeboten"
     },
     "authErrors": {
         "2fa_required": "Für dieses Konto ist die Zwei-Faktor-Authentifizierung Pflicht.",

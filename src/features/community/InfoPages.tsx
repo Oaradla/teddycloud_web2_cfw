@@ -5,9 +5,8 @@ import { tc } from "../../api/tc";
 import { picUrl, tagInfo } from "../../lib/format";
 import { t } from "../../lib/i18n";
 import { useAllTags } from "../../lib/queries";
+import { buildUrl } from "../../lib/version";
 import { Page, Row, Section } from "../../ui/kit";
-
-const GITHUB = "https://github.com/toniebox-reverse-engineering/teddycloud/";
 
 const FEATURES = [
     [
@@ -75,9 +74,7 @@ export function FeaturesPage() {
         queryFn: () => tc.getSetting("internal.version.git_sha"),
     });
     const version = useQuery({ queryKey: ["version"], queryFn: tc.version });
-    const build = id.data?.endsWith("X.X.X")
-        ? GITHUB + "tree/" + sha.data
-        : GITHUB + "releases/tag/tc_" + id.data;
+    const build = buildUrl(id.data ?? "", sha.data ?? "");
     return (
         <Page
             title={t("community.features")}

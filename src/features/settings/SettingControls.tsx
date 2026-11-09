@@ -108,7 +108,7 @@ export function SettingRow({
     const disabled = opt.writable === false;
     const own = overlay && opt.overlayed;
     const resetBtn =
-        own && !noReset ? (
+        own && !noReset && !disabled ? (
             <button
                 className="icon-btn muted"
                 title={t("settings.useDefault")}
@@ -169,6 +169,7 @@ export function SettingRow({
                         value={String(opt.value)}
                         options={choices.map((c) => ({ value: String(c.value), label: c.label }))}
                         onChange={(v) => set(opt, Number(v))}
+                        disabled={disabled}
                     />
                 </div>
             </div>

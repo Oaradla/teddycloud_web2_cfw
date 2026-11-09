@@ -1,5 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
+import { withoutTemporary } from "../../api/types";
 import { t, type Key } from "../../lib/i18n";
+import { useCfwBoxes } from "../../lib/queries";
 import { Segmented, SwitchRow } from "../../ui/kit";
 
 /* the actions an event tag can carry (custom firmware); "figure" ones change the next figure,
@@ -21,6 +23,8 @@ export interface CfwAction {
 }
 export interface CfwEvent {
     tones: boolean;
+    /** global scope: the box settings hold only until the box switches off */
+    temporary?: boolean;
     actions: CfwAction[];
 }
 
@@ -55,11 +59,18 @@ const ACTIONS: ActionDef[] = [
     { action: 16, key: "bothEarsOff", scope: "global", modes: "all", value: "none" },
     { action: 17, key: "idleOffBattery", scope: "global", modes: "none", value: "idleMinutes" },
     { action: 18, key: "idleOffStation", scope: "global", modes: "none", value: "idleMinutes" },
+    {
+        action: 19,
+        key: "sleepTimerOnceGlobal",
+        scope: "global",
+        modes: "none",
+        value: "minutesOnce",
+    },
 ];
 const MODE_REMOVE = 3;
 const MAX_ACTIONS = 16;
-/** LED levels as the box numbers them: on, dimmed, off */
-const LED_LEVELS = [0, 2, 1];
+/** LED levels as the box numbers them: on, dimmed, off, dimmed and off permanently */
+const LED_LEVELS = [0, 2, 1, 6, 5];
 
 const def = (action: number) => ACTIONS.find((a) => a.action === action);
 const scopeOf = (actions: CfwAction[]): Scope =>
@@ -78,7 +89,8 @@ const tk = (key: string) => t(key as Key);
 
 export const EMPTY_EVENT: CfwEvent = { tones: true, actions: [fresh("figure")] };
 
-/** an event tag: what it changes, up to 16 actions and the feedback tones */
+/** an event tag: what it changes, up to 16 actions, the feedback tones and, for the box, until
+    switch-off */
 export function CfwEventFields({
     event,
     onChange,
@@ -88,6 +100,9 @@ export function CfwEventFields({
 }) {
     const actions = event.actions.length ? event.actions : [fresh("figure")];
     const scope = scopeOf(actions);
+    const boxes = useCfwBoxes();
+    const oldBoxes =
+        scope === "global" && event.temporary ? withoutTemporary(boxes.data ?? []) : [];
     const setActions = (list: CfwAction[]) => onChange({ ...event, actions: list });
     const update = (i: number, change: Partial<CfwAction>) =>
         setActions(actions.map((a, j) => (j === i ? { ...a, ...change } : a)));
@@ -107,7 +122,9 @@ export function CfwEventFields({
             <label className="small muted">{t("tonies.cfwEventScope")}</label>
             <Segmented
                 value={scope}
-                onChange={(s) => s !== scope && setActions([fresh(s)])}
+                onChange={(s) =>
+                    s !== scope && onChange({ ...event, temporary: false, actions: [fresh(s)] })
+                }
                 options={[
                     { value: "figure", label: t("tonies.cfwEventScopeFigure") },
                     { value: "global", label: t("tonies.cfwEventScopeGlobal") },
@@ -265,6 +282,24 @@ export function CfwEventFields({
                 {t("tonies.cfwAddAction")}
             </button>
             <div className="list mt">
+                {scope === "global" && (
+                    <SwitchRow
+                        title={t("tonies.cfwEventTemporary")}
+                        sub={
+                            t("tonies.cfwEventTemporaryHint") +
+                            (oldBoxes.length > 0
+                                ? " " +
+                                  t("tonies.cfwEventTemporaryOld", {
+                                      boxes: oldBoxes
+                                          .map((b) => b.boxName || b.commonName || b.id)
+                                          .join(", "),
+                                  })
+                                : "")
+                        }
+                        checked={event.temporary ?? false}
+                        onChange={(temporary) => onChange({ ...event, temporary })}
+                    />
+                )}
                 <SwitchRow
                     title={t("tonies.cfwEventTones")}
                     sub={t("tonies.cfwEventTonesHint")}

@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { ADMIN_MINE, AclScope, NO_RIGHTS, auth } from "../api/auth";
 import { folderEntry, mineAllows } from "./aclRights";
 import { tc } from "../api/tc";
@@ -64,5 +65,36 @@ export function useAccess() {
             m.admin ||
             Boolean(m.images?.[name]?.owner) ||
             Boolean(changeable.data?.images.includes(name)),
+    };
+}
+
+/** admins, when there are other users: the users to filter by, and whether an id belongs to one of `users` */
+export function useOwnerFilter(kind: "boxes" | "tonies", users: string[]) {
+    const access = useAccess();
+    const enabled = access.admin && access.loginActive;
+    const all = useQuery({ queryKey: ["aclUsers"], queryFn: auth.aclUsers, enabled });
+    const combine = useCallback(
+        (results: { data?: Awaited<ReturnType<typeof auth.owned>> }[]) =>
+            new Set(
+                results.flatMap(
+                    (r) =>
+                        r.data?.[kind].filter((x) => x.owner).map((x) => x.id.toUpperCase()) ?? [],
+                ),
+            ),
+        [kind],
+    );
+    const ids = useQueries({
+        queries: users.map((user) => ({
+            queryKey: ["aclOwned", user],
+            queryFn: () => auth.owned(user),
+            enabled,
+        })),
+        combine,
+    });
+    const names = (all.data ?? []).map((u) => u.username);
+    const filtered = enabled && users.length > 0;
+    return {
+        users: enabled && names.some((n) => n !== access.mine.username) ? names : [],
+        keep: useCallback((id: string) => !filtered || ids.has(id.toUpperCase()), [filtered, ids]),
     };
 }

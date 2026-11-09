@@ -156,6 +156,8 @@
         "led": "LED",
         "ledDimmed": "Przyciemniony",
         "ledOff": "Wył.",
+        "ledDimmedPermanent": "Stale przyciemniona",
+        "ledOffPermanent": "Stale wyłączona",
         "ledOn": "Wł.",
         "length": "Długość",
         "library": "Biblioteka",
@@ -204,7 +206,6 @@
         "setUp2fa": "Skonfiguruj logowanie dwuskładnikowe",
         "settings": "Ustawienia",
         "share": "Udostępnij",
-        "shareHint": "Właściciele i kto co może",
         "showExpert": "Pokaż pola eksperckie",
         "showN": "Pokaż {{n}}",
         "slapLock": "Zablokuj klepanie",
@@ -240,7 +241,9 @@
         "forward30": "30 sekund do przodu",
         "moveUp": "Przesuń w górę",
         "moveDown": "Przesuń w dół",
-        "networkError": "Błąd sieci"
+        "networkError": "Błąd sieci",
+        "owners": "Właściciele",
+        "ownersHint": "Do kogo należy; właściciele wyznaczają kolejnych"
     },
     "upload": {
         "addCover": "Dodaj okładkę",
@@ -278,6 +281,7 @@
         "tafNameHint": "Zapisany jako <nazwa>.taf w folderze docelowym",
         "tafNamePlaceholder": "np. Ulubione piosenki",
         "tapToChange": "Dotknij, aby zmienić",
+        "noWriteRight": "Nie możesz dodawać plików do tego folderu. Dotknij, aby wybrać inny.",
         "targetFolder": "Folder docelowy",
         "uploadDone": "Przesyłanie zakończone",
         "uploadFailed": "Przesyłanie nie powiodło się",
@@ -285,6 +289,7 @@
         "uploading": "Przesyłanie …",
         "uploadingN": "Przesyłanie utworu {{n}} z {{total}} …",
         "exists": "„{{name}}” już istnieje w tym folderze. Zastąpić? Tonie, które go odtwarzają, dostaną nową zawartość.",
+        "existsMany": "Te pliki już istnieją w tym folderze: {{names}}. Zastąpić je? Tonie, które je odtwarzają, dostaną nową zawartość.",
         "replace": "Zastąp"
     },
     "library": {
@@ -318,6 +323,7 @@
         "deleteModelsToo": "Usuń też własne tonies nieużywane nigdzie indziej ({{n}}) razem z obrazami",
         "deleteN": "Usunąć elementy ({{n}})?",
         "deleteNText": "Zaznaczone pliki i foldery zostaną trwale usunięte.",
+        "deleteUsedBy": "Te tonie to odtwarzają i stracą swoją zawartość: {{names}}.",
         "failedN_one": "Nie powiodło się dla jednego elementu",
         "failedN_few": "Nie powiodło się dla {{count}} elementów",
         "failedN_many": "Nie powiodło się dla {{count}} elementów",
@@ -381,6 +387,9 @@
         "splitTaf": "Podziel na rozdziały",
         "splitTafRun": "Podziel",
         "splitTafText": "Każdy z {{n}} rozdziałów staje się osobnym plikiem TAF, z playlistą, która ponownie składa album. Wszystko trafia do nowego folderu nazwanego jak TAF; sam TAF zostaje tam przeniesiony bez zmian, a powiązane tonies nadal go odtwarzają. Playlista tworzy własny TAF (z okładką i tytułami oryginału); aby tonie go odtwarzał, powiąż tonie z playlistą.",
+        "splitTafTextKeep": "Każdy z {{n}} rozdziałów staje się osobnym plikiem TAF, z playlistą, która ponownie składa album. Wszystko trafia do nowego folderu nazwanego jak TAF, wewnątrz folderu, który wybierzesz w następnym kroku; sam TAF pozostaje tam, gdzie jest, a powiązane tonies nadal go odtwarzają. Playlista tworzy własny TAF (z okładką i tytułami oryginału); aby tonie go odtwarzał, powiąż tonie z playlistą.",
+        "splitElsewhere": "Utwórz nowy folder gdzie indziej (TAF pozostaje tam, gdzie jest)",
+        "splitTafInto": "Folder na rozdziały",
         "splitting": "Dzielenie …",
         "tapAudioIdHint": "Box przechowuje utworzony plik pod tym ID audio",
         "tapTafPath": "Utworzony plik tonie",
@@ -498,9 +507,9 @@
         "firstUserHint": "Pierwszy użytkownik zostaje administratorem.",
         "flexTonie": "Flex tonie",
         "groupHint_admin": "Może wszystko, także użytkowników i ustawienia serwera",
-        "groupHint_guest": "Dostaje tylko to, co mu udostępniono – np. dla dzieci",
+        "groupHint_guest": "Dostaje tylko to, co do niego należy lub zostało mu udostępnione – np. dla dzieci",
         "groupHint_own": "Własna grupa z własnymi uprawnieniami",
-        "groupHint_user": "Posiada boxy i tonies i może je udostępniać innym",
+        "groupHint_user": "Posiada pudełka, tonies i foldery, wyznacza kolejnych właścicieli i udostępnia foldery",
         "groupKind": "Rodzaj",
         "groupNamePlaceholder": "np. Dziadkowie",
         "groupRights": "Uprawnienia",
@@ -537,6 +546,7 @@
         "ownerOne": "Właściciel",
         "owners": "Właściciele",
         "ownersAdminOnly": "Właścicieli ustala administrator.",
+        "ownerRequired": "Potrzebny jest co najmniej jeden właściciel; tylko administrator może usunąć ostatniego.",
         "ownersHint": "Właściciele mogą wszystko i mogą udostępniać dalej.",
         "passwordChangePending": "Oczekuje zmiana hasła",
         "require2fa": "Wymagaj logowania dwuskładnikowego",
@@ -547,7 +557,7 @@
         "right_box": {
             "cfw": "Pilot",
             "settings": "Wszystkie ustawienia",
-            "share": "Udostępnianie",
+            "share": "Wyznacz właścicieli",
             "update": "Aktualizacja oprogramowania",
             "view": "Wyświetlanie"
         },
@@ -562,7 +572,7 @@
         "right_tonie": {
             "assign": "Przypisywanie audio",
             "edit": "Edycja (na żywo, chmura, model)",
-            "share": "Udostępnianie",
+            "share": "Wyznacz właścicieli",
             "view": "Wyświetlanie i odtwarzanie"
         },
         "right_users": {
@@ -570,7 +580,7 @@
         },
         "rightsAll": "Wszystkie uprawnienia",
         "rightsAndGroups": "Uprawnienia i grupy",
-        "rightsAndGroupsHint": "Administratorzy mogą zawsze wszystko. Właściciele sami udostępniają poszczególne boxy, tonies i foldery.",
+        "rightsAndGroupsHint": "Administratorzy mogą zawsze wszystko. Właściciele wyznaczają kolejnych właścicieli swoich pudełek i tonies i sami udostępniają foldery.",
         "rightsAsText": "Edytuj jako tekst",
         "rightsAsTree": "Edytuj jako drzewo",
         "rightsExtra": "Dodatkowo (zachowane): {{v}}",
@@ -607,7 +617,9 @@
         "whatUsersMayHint": "Górna granica dla wszystkich w grupie „Użytkownik”",
         "withoutOwner": "Bez właściciela",
         "you": "Ty",
-        "yourAddress": "Twój adres widziany przez TeddyCloud"
+        "yourAddress": "Twój adres widziany przez TeddyCloud",
+        "ownersTitle": "Właściciele: {{name}}",
+        "ownersOnlyHint": "Właściciele mogą wszystko i wyznaczają kolejnych właścicieli. Tonie postawiony na pudełku innego użytkownika pojawia się u niego, nie należąc do niego; może go ukryć tylko dla siebie."
     },
     "boxupdate": {
         "added": "Dodano",
@@ -726,6 +738,7 @@
         "notInLibrary": "brak w bibliotece"
     },
     "boxes": {
+        "searchBoxes": "Szukaj boxów",
         "allBoxSettingsHint": "Każde ustawienie serwera, które ten box może nadpisać",
         "apiAccess": "Dostęp do TeddyCloud",
         "apiAccessHint": "Wyłączone: box nie dostaje już zawartości ani ustawień z TeddyCloud.",
@@ -802,7 +815,6 @@
         "remoteLast": "Ostatnie polecenie: {{command}} – {{result}}, {{when}}",
         "remoteQueued": "{{n}} polecenie/a oczekuje",
         "remoteRefresh": "Zapytaj o stan",
-        "remoteUpdateCheck": "Sprawdź aktualizację oprogramowania",
         "remoteVolume": "Poziom {{step}} z {{limit}} · {{output}}",
         "remoteWaiting": "Oczekiwanie na box …",
         "removeBox": "Usuń box",
@@ -846,6 +858,7 @@
         "cfwAction_bothEarsOff": "Wyłączanie obydwoma uszami",
         "cfwAction_idleOffBattery": "Czas wyłączenia na akumulatorze",
         "cfwAction_idleOffStation": "Czas wyłączenia na stacji ładującej",
+        "cfwAction_sleepTimerOnceGlobal": "Wyłącznik czasowy (jednorazowo, dla następnej figurki)",
         "cfwAction_ledLevelFigure": "Jasność diody figurki (uszami)",
         "cfwAction_ledLevelGlobal": "Jasność diody boxa (uszami)",
         "cfwAction_resetProfile": "Resetuj profil figurki",
@@ -868,6 +881,9 @@
         "cfwEventScopeGlobal": "Cały box",
         "cfwEventTones": "Dźwięki potwierdzenia",
         "cfwEventTonesHint": "Rosnące dla \"włączone\", opadające dla \"wyłączone\"; dioda zawsze potwierdza.",
+        "cfwEventTemporary": "Tylko do wyłączenia",
+        "cfwEventTemporaryHint": "Obowiązuje do wyłączenia pudełka i nie jest zapisywane; trwała zmiana tego samego ustawienia je kończy.",
+        "cfwEventTemporaryOld": "Te boxy mają starszy niestandardowy firmware: nie przyjmują tego tagu i zachowują jego wcześniejszą wersję, której ustawienia pozostają: {{boxes}}",
         "cfwIdleMinutesHint": "0 = 10 min jak w oryginale",
         "cfwKind": "Rodzaj",
         "cfwKindEvent": "Tag zdarzenia",
@@ -876,6 +892,8 @@
         "cfwLed0": "Włączona",
         "cfwLed1": "Wyłączona (po fazie jasnej)",
         "cfwLed2": "Przyciemniona",
+        "cfwLed5": "Stale wyłączona",
+        "cfwLed6": "Stale przyciemniona",
         "cfwLedHint": "Obowiązuje, dopóki tonie leży na boxie",
         "cfwLimitHint": "Może przekraczać limit boxa",
         "cfwLockHint": "„Domyślne”: obowiązuje ustawienie boxa",
@@ -908,6 +926,7 @@
         "cloudOffHint": "Nigdy nie pobieraj zawartości z chmury Tonie",
         "commandSent": "Wysłano do boxa",
         "contentHint": "Własna zawartość z biblioteki zastępuje oryginał, dopóki jest przypisana.",
+        "eventNoSource": "Tag zdarzenia nie odtwarza zawartości, dlatego zawartość jest ukryta. Przypisana zawartość pozostaje zapisana, aby można było szybko wrócić, ale nie jest dostarczana do żadnego boxa. Boxy bez niestandardowego firmware słyszą zamiast tego komunikat.",
         "contentRemoved": "Usunięto zawartość",
         "discard": "Odrzuć",
         "downloadTaf": "Pobierz TAF",
@@ -983,6 +1002,8 @@
         "radioSource": "Katalog stacji: radio-browser.info",
         "removeContent": "Usuń własną zawartość",
         "removeContentText": "Tonie znów odtwarza swoją oryginalną zawartość. Plik zostaje w bibliotece.",
+        "replaceContent": "Zastąpić zawartość?",
+        "replaceContentText": "{{tonie}} odtwarza „{{current}}”. Odtwarzać zamiast tego nową zawartość?",
         "resetFilters": "Resetuj",
         "saveFilter": "Zapisz filtr",
         "savedFilters": "Zapisane filtry",
@@ -1023,6 +1044,7 @@
         "newVersion": "Nowa wersja teddyCloud",
         "newVersionText": "Na GitHubie jest nowsza wersja teddyCloud.",
         "newVersionTextDevelop": "Na GitHubie jest nowszy stan gałęzi develop teddyCloud.",
+        "newVersionTextRc": "Na GitHubie jest nowsza wersja kandydująca teddyCloud.",
         "noNotifications": "Brak powiadomień",
         "notifications": "Powiadomienia",
         "notificationsHint": "Co aplikacja ostatnio zgłosiła, na tym urządzeniu",
@@ -1042,6 +1064,13 @@
         "statCloudOn": "Z chmurą Tonie",
         "statOther": "Inne",
         "statistics": "Statystyki",
+        "stats": {
+            "connections": "Połączenia nawiązane z tym serwerem",
+            "reverse_requests": "Wywołania reverse proxy wykonane przez klientów",
+            "cloud_requests": "Wykonane żądania do chmury",
+            "cloud_blocked": "Zablokowane żądania do chmury",
+            "cloud_failed": "Nieudane żądania do chmury"
+        },
         "systemHint": "Wersja, statystyki, restart",
         "systemSoundsHint": "Dźwięki boxa, np. przy włączeniu lub przy słabym akumulatorze",
         "tonieStats": "Tonies w skrócie",
@@ -1138,7 +1167,10 @@
         "could not store the page": "Nie udało się zapisać strony",
         "patches apply to a single original image, not to a release package": "Łatki dotyczą pojedynczego oryginalnego obrazu, a nie pakietu wydania",
         "release without a usable image": "Wydanie bez użytecznego obrazu",
-        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "Nie ustawiono repozytorium GitHub (cfw.firmware.github_repo, owner/name)"
+        "no GitHub repository set (cfw.firmware.github_repo, owner/name)": "Nie ustawiono repozytorium GitHub (cfw.firmware.github_repo, owner/name)",
+        "assigned, but \"Firmware update\" is off for this box, so it is not offered": "Przypisano, ale „Aktualizacja firmware” jest wyłączona dla tego boxa, więc nie jest oferowany",
+        "assigned; the box already runs this image": "Przypisano; box już działa na tym obrazie",
+        "assigned, but the box has rolled this image back, so it is offered only with \"Offer rolled-back image again\"": "Przypisano, ale box wycofał ten obraz; jest oferowany tylko z „Oferuj ponownie wycofany obraz”"
     },
     "account": {
         "codeFromApp": "6-cyfrowy kod z aplikacji",
@@ -1651,7 +1683,7 @@
             },
             "toniebox_led": {
                 "label": "Jasność LED",
-                "description": "LED, gdy box jest gotowy"
+                "description": "LED, gdy box jest gotowy; stale wyłączona i stale przyciemniona tylko z niestandardowym firmware (inne boxy: wyłączona lub przyciemniona)"
             },
             "toniebox_overrideFields": {
                 "label": "Nadpisz nieznane pola",
@@ -1751,7 +1783,7 @@
             },
             "cfw_update_channel": {
                 "label": "Kanał aktualizacji",
-                "description": "Które obrazy firmware box przyjmuje: tylko release lub także beta / alpha"
+                "description": "Tylko dla automatycznego dostarczania: które obrazy firmware box pobiera, tylko release czy też beta/alpha (Brak: żaden obraz). Przypisany obraz jest dostarczany niezależnie od kanału"
             },
             "cfw_update_mode": {
                 "label": "Dostarczanie aktualizacji",
@@ -2021,7 +2053,9 @@
             "toniebox_led": {
                 "0": "Włączona",
                 "1": "Wyłączona",
-                "2": "Przyciemniona"
+                "2": "Przyciemniona",
+                "5": "Stale wyłączona",
+                "6": "Stale przyciemniona"
             },
             "cfw_box_speaker_limit": {
                 "0": "Poziom 0",
@@ -2343,6 +2377,8 @@
         "cc3200BackupNotStored": "Kopia zapasowa nie została zapisana na serwerze: {{reason}}"
     },
     "studio": {
+        "studioClearList": "Wyczyścić listę?",
+        "studioClearListText": "Wszystkie tonie ({{n}}) wraz z tekstami i obrazami zostaną usunięte z listy.",
         "studioAdd": "Dodaj tonie",
         "studioAddFolder": "Dodaj folder z biblioteki",
         "studioAddImage": "Dodaj własny obraz",

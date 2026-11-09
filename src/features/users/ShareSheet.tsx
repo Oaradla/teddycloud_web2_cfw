@@ -3,9 +3,6 @@ import { Plus, Trash2, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { auth, type AclScope } from "../../api/auth";
 import { useAccess } from "../../lib/access";
-import { tc } from "../../api/tc";
-import { keys, useCfwBox } from "../../lib/queries";
-import { shownForBox } from "../settings/visibility";
 import { t } from "../../lib/i18n";
 import { buildRightsTree, leaves, listToChecked } from "../../lib/rightsTree";
 import { Sheet } from "../../ui/Sheet";
@@ -25,7 +22,7 @@ export function useCanShare() {
         (access.admin || (access.owns(type, id) && access.can(type, id, `${type}.share`)));
 }
 
-/** owners (admins only) and shares of a box, tonie or library folder */
+/** owners of a box or tonie (set by its owners and admins); owners (admins only) and shares of a library folder */
 export function ShareSheet({
     target,
     onClose,
@@ -37,6 +34,8 @@ export function ShareSheet({
     const ui = useUi();
     const qc = useQueryClient();
     const type = target?.type ?? "box";
+    const ownersOnly = type !== "folder";
+    const mayPickOwners = access.admin || ownersOnly;
     const entry = useQuery({
         queryKey: ["aclEntry", type, target?.id],
         queryFn: () => auth.entry(type, target!.id),
@@ -53,7 +52,6 @@ export function ShareSheet({
         queryFn: auth.aclUsers,
         enabled: target !== null,
     });
-    const shownOnBox = useShownOnBox(target?.type === "box" ? target.id : "");
     const [owners, setOwners] = useState<string[]>([]);
     const [shares, setShares] = useState<Record<string, string>>({});
     const [editing, setEditing] = useState<string | null>(null);
@@ -63,19 +61,16 @@ export function ShareSheet({
         setShares(entry.data?.shares ?? {});
     }, [entry.data]);
 
-    /* the rights one can share: those of the scope, without sharing itself */
+    /* the rights one can share: those of folders, without sharing itself */
     const tree = useMemo(
         () =>
             catalog.data &&
             buildRightsTree(
                 catalog.data.rights.filter((r) => !r.name.endsWith(".share")),
-                type === "box"
-                    ? (catalog.data.boxSettings ?? []).filter((s) => shownOnBox(s.id))
-                    : [],
-                [type],
-                catalog.data.boxSettingGroups ?? {},
+                [],
+                ["folder"],
             ),
-        [catalog.data, type, shownOnBox],
+        [catalog.data],
     );
     const summary = (list: string) => {
         if (!tree) return list;
@@ -95,6 +90,9 @@ export function ShareSheet({
             ? entry.data.inheritedFrom
             : undefined;
 
+    // the server refuses an owner list without owners from a non-admin
+    const ownerMissing = ownersOnly && !access.admin && owners.length === 0;
+
     const save = async () => {
         if (!target) return;
         const ok = await ui.run(
@@ -102,7 +100,7 @@ export function ShareSheet({
                 auth.saveEntry(
                     target.type,
                     target.id,
-                    access.admin ? { owners, shares } : { shares },
+                    ownersOnly ? { owners } : access.admin ? { owners, shares } : { shares },
                 ),
             t("common.saved"),
         );
@@ -123,7 +121,7 @@ export function ShareSheet({
             })),
         ]);
     const startShare = (user: string) => {
-        setShares((s) => ({ ...s, [user]: `${type}.${type === "folder" ? "read" : "view"}` }));
+        setShares((s) => ({ ...s, [user]: "folder.read" }));
         setEditing(user);
     };
 
@@ -133,7 +131,9 @@ export function ShareSheet({
         <Sheet
             open={target !== null}
             onClose={onClose}
-            title={t("users.shareTitle", { name: target?.title ?? "" })}
+            title={t(ownersOnly ? "users.ownersTitle" : "users.shareTitle", {
+                name: target?.title ?? "",
+            })}
             full
             footer={
                 <>
@@ -142,7 +142,7 @@ export function ShareSheet({
                     </button>
                     <button
                         className="btn primary"
-                        disabled={loading || Boolean(error)}
+                        disabled={loading || Boolean(error) || ownerMissing}
                         onClick={save}
                     >
                         {t("common.save")}
@@ -166,11 +166,19 @@ export function ShareSheet({
                     )}
                     <Section
                         title={t("users.owners")}
-                        footer={access.admin ? t("users.ownersHint") : t("users.ownersAdminOnly")}
+                        footer={
+                            ownerMissing
+                                ? t("users.ownerRequired")
+                                : ownersOnly
+                                  ? t("users.ownersOnlyHint")
+                                  : access.admin
+                                    ? t("users.ownersHint")
+                                    : t("users.ownersAdminOnly")
+                        }
                     >
-                        {access.admin
+                        {mayPickOwners
                             ? (users.data ?? [])
-                                  .filter((u) => u.level !== "guest")
+                                  .filter((u) => ownersOnly || u.level !== "guest")
                                   .map((u) => (
                                       <SwitchRow
                                           key={u.username}
@@ -189,29 +197,31 @@ export function ShareSheet({
                             : owners.map((o) => (
                                   <Row key={o} icon={<UserRound size={17} />} title={o} />
                               ))}
-                        {!access.admin && owners.length === 0 && (
+                        {!mayPickOwners && owners.length === 0 && (
                             <Row title={t("users.withoutOwner")} />
                         )}
                     </Section>
-                    <Section title={t("users.sharedWith")}>
-                        {Object.entries(shares).map(([user, list]) => (
+                    {!ownersOnly && (
+                        <Section title={t("users.sharedWith")}>
+                            {Object.entries(shares).map(([user, list]) => (
+                                <Row
+                                    key={user}
+                                    icon={<UserRound size={17} />}
+                                    title={userName(user)}
+                                    sub={summary(list)}
+                                    onClick={() => setEditing(user)}
+                                    chevron
+                                />
+                            ))}
                             <Row
-                                key={user}
-                                icon={<UserRound size={17} />}
-                                title={userName(user)}
-                                sub={summary(list)}
-                                onClick={() => setEditing(user)}
-                                chevron
+                                icon={<Plus size={17} />}
+                                title={t("users.shareAdd")}
+                                accent
+                                onClick={addShare}
+                                disabled={candidates.length === 0 && EVERYONE in shares}
                             />
-                        ))}
-                        <Row
-                            icon={<Plus size={17} />}
-                            title={t("users.shareAdd")}
-                            accent
-                            onClick={addShare}
-                            disabled={candidates.length === 0 && EVERYONE in shares}
-                        />
-                    </Section>
+                        </Section>
+                    )}
                 </>
             )}
             <Sheet
@@ -249,34 +259,4 @@ export function ShareSheet({
             </Sheet>
         </Sheet>
     );
-}
-
-/** the settings the page of this box shows (all levels), as it decides with the login off */
-function useShownOnBox(id: string) {
-    const on = Boolean(id);
-    const settings = useQuery({
-        queryKey: keys.settings(id),
-        queryFn: () => tc.settingsIndex(id),
-        enabled: on,
-    });
-    const enabled =
-        useQuery({
-            queryKey: [...keys.settings(id), "cfw.enabled"],
-            queryFn: () => tc.getSetting("cfw.enabled", id),
-            enabled: on,
-        }).data === "true";
-    const forced =
-        useQuery({
-            queryKey: [...keys.settings(id), "cfw.force_box_settings"],
-            queryFn: () => tc.getSetting("cfw.force_box_settings", id),
-            enabled: on,
-        }).data === "true";
-    const isCfwBox = Boolean(useCfwBox(id)?.isCfw);
-    return useMemo(() => {
-        const overlayed = new Set(
-            (settings.data ?? []).filter((o) => o.overlayed).map((o) => o.ID),
-        );
-        return (name: string) =>
-            shownForBox(name, { enabled, isCfwBox, forced }, overlayed.has(name));
-    }, [settings.data, enabled, forced, isCfwBox]);
 }

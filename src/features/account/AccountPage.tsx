@@ -327,6 +327,7 @@ export function PasswordSheet({
                         className="input"
                         type="password"
                         autoComplete="new-password"
+                        maxLength={128}
                         value={next}
                         onChange={(e) => setNext(e.target.value)}
                     />
@@ -338,6 +339,7 @@ export function PasswordSheet({
                         className="input"
                         type="password"
                         autoComplete="new-password"
+                        maxLength={128}
                         value={repeat}
                         onChange={(e) => setRepeat(e.target.value)}
                     />

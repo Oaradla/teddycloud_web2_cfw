@@ -27,6 +27,7 @@ import {
     lengthText,
     parentPath,
 } from "../../lib/format";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 import { filePlayItem } from "../../lib/play";
 import { useAllTags } from "../../lib/queries";
@@ -66,12 +67,16 @@ export function FileDetailsSheet({
     const ui = useUi();
     const navigate = useNavigate();
     const full = file ? `${path.replace(/\/$/, "")}/${file.name}` : "";
+    const access = useAccess();
+    const writable = access.can("folder", path, "folder.write");
+    // a guest marks files as listened in its own folder too
+    const markable = writable || access.owns("folder", path);
     const source = "lib://" + full.replace(/^\//, "");
     const usedBy = (tags.data ?? []).filter((x) => x.source === source);
     const info = file?.tonieInfo;
     const header = file?.tafHeader;
     const chapters = header?.trackSeconds ?? [];
-    const titles = info?.tracks ?? [];
+    const titles = info?.tracks?.length === chapters.length ? info.tracks : [];
     const playable = file ? isTaf(file.name) || isAudio(file.name) : false;
     const tonieFile = file ? isTaf(file.name) || isTap(file.name) : false;
     const isPlaying = player.item?.id === "lib:" + full;
@@ -281,12 +286,13 @@ export function FileDetailsSheet({
                                 sub={t("library.listenedHint")}
                                 checked={listened}
                                 onChange={setListened}
+                                disabled={!markable}
                             />
                         )}
                     </Section>
 
                     <Section title={t("common.actions")}>
-                        {isTap(file.name) && (
+                        {isTap(file.name) && writable && (
                             <Row
                                 icon={<ListMusic size={17} />}
                                 title={t("library.editPlaylist")}
@@ -304,18 +310,22 @@ export function FileDetailsSheet({
                                 chevron
                             />
                         )}
-                        <Row
-                            icon={<Pencil size={17} />}
-                            title={t("library.rename")}
-                            onClick={later(actions.rename)}
-                            chevron={false}
-                        />
-                        <Row
-                            icon={<ArrowRightLeft size={17} />}
-                            title={t("library.move")}
-                            onClick={later(actions.move)}
-                            chevron={false}
-                        />
+                        {writable && (
+                            <Row
+                                icon={<Pencil size={17} />}
+                                title={t("library.rename")}
+                                onClick={later(actions.rename)}
+                                chevron={false}
+                            />
+                        )}
+                        {writable && (
+                            <Row
+                                icon={<ArrowRightLeft size={17} />}
+                                title={t("library.move")}
+                                onClick={later(actions.move)}
+                                chevron={false}
+                            />
+                        )}
                         <Row
                             icon={<Download size={17} />}
                             title={t("common.download")}
@@ -331,13 +341,15 @@ export function FileDetailsSheet({
                                 chevron
                             />
                         )}
-                        <Row
-                            icon={<Trash2 size={17} />}
-                            title={t("common.delete")}
-                            danger
-                            onClick={later(actions.remove)}
-                            chevron={false}
-                        />
+                        {writable && (
+                            <Row
+                                icon={<Trash2 size={17} />}
+                                title={t("common.delete")}
+                                danger
+                                onClick={later(actions.remove)}
+                                chevron={false}
+                            />
+                        )}
                     </Section>
                 </>
             )}

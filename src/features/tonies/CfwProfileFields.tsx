@@ -22,6 +22,16 @@ export const EMPTY_PROFILE: CfwProfile = {
 
 export const PROFILE_KEYS = Object.keys(EMPTY_PROFILE) as (keyof CfwProfile)[];
 
+/** LED levels as the box numbers them */
+const LED_LEVELS = [
+    [null, "tonies.notSet"],
+    [0, "common.ledOn"],
+    [2, "common.ledDimmed"],
+    [1, "common.ledOff"],
+    [6, "common.ledDimmedPermanent"],
+    [5, "common.ledOffPermanent"],
+] as const;
+
 type Tri = "unset" | "on" | "off";
 const toTri = (v: boolean | null | Mixed): Tri | Mixed =>
     v === MIXED ? MIXED : v === null ? "unset" : v ? "on" : "off";
@@ -146,22 +156,17 @@ export function CfwProfileFields({
                 "ledLevel",
                 t("common.led"),
                 t("tonies.cfwLedHint"),
-                <Segmented
-                    value={
-                        values.ledLevel === MIXED
-                            ? MIXED
-                            : values.ledLevel === null
-                              ? "unset"
-                              : String(values.ledLevel)
-                    }
-                    onChange={(v) => onChange("ledLevel", v === "unset" ? null : Number(v))}
-                    options={[
-                        { value: "unset", label: t("tonies.notSet") },
-                        { value: "0", label: t("common.ledOn") },
-                        { value: "2", label: t("common.ledDimmed") },
-                        { value: "1", label: t("common.ledOff") },
-                    ]}
-                />,
+                <div className="chips" style={{ margin: 0, padding: 0, flexWrap: "wrap" }}>
+                    {LED_LEVELS.map(([level, label]) => (
+                        <button
+                            key={String(level)}
+                            className={`chip ${values.ledLevel === level ? "active" : ""}`}
+                            onClick={() => onChange("ledLevel", level)}
+                        >
+                            {t(label)}
+                        </button>
+                    ))}
+                </div>,
             )}
             {limit("speakerLimit", t("common.speakerLimit"))}
             {limit("headphoneLimit", t("common.headphoneLimit"))}

@@ -184,6 +184,10 @@ export function useLiveEvents() {
                 "keep-alive",
             ];
             for (const n of names) if (n !== "keep-alive") source.addEventListener(n, refresh);
+            // a tonie placed for the first time belongs to the owners of the box from now on
+            source.addEventListener("TagValid", () =>
+                qc.invalidateQueries({ queryKey: ["aclMine"] }),
+            );
             source.onerror = () => {
                 source?.close();
                 retry = window.setTimeout(connect, 10_000);

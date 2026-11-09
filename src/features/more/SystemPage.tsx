@@ -16,7 +16,7 @@ import {
     Server,
 } from "lucide-react";
 import { tc } from "../../api/tc";
-import { t } from "../../lib/i18n";
+import { lang, t, textsOf } from "../../lib/i18n";
 import { useNewVersion, useServerStatus } from "../../lib/serverInfo";
 import { useNotifications } from "../../lib/notifications";
 import { TonieStats } from "./TonieStats";
@@ -127,7 +127,13 @@ export function SystemPage() {
             <Section title={t("more.statistics")}>
                 {stats.isLoading && <Loading />}
                 {stats.data?.map((s) => (
-                    <Row key={s.ID} title={s.description} value={s.value.toLocaleString()} />
+                    <Row
+                        key={s.ID}
+                        title={
+                            textsOf<Record<string, string>>("more.stats")?.[s.ID] ?? s.description
+                        }
+                        value={s.value.toLocaleString(lang())}
+                    />
                 ))}
             </Section>
             <TonieStats />
@@ -210,7 +216,11 @@ export function NewVersionNotice() {
         <Notice info>
             <strong>{t("more.newVersion")}</strong>
             <br />
-            {t(newVersion.data.develop ? "more.newVersionTextDevelop" : "more.newVersionText")}{" "}
+            {newVersion.data.kind === "rc"
+                ? t("more.newVersionTextRc")
+                : newVersion.data.kind === "develop"
+                  ? t("more.newVersionTextDevelop")
+                  : t("more.newVersionText")}{" "}
             <a href={newVersion.data.url} target="_blank" rel="noopener noreferrer">
                 {t("more.openOnGithub")} <ExternalLink size={13} style={{ verticalAlign: -2 }} />
             </a>

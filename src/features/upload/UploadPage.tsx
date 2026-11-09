@@ -18,6 +18,7 @@ import { baseName, bytes, isAudio, joinPath, parentPath, stripExt } from "../../
 import { t } from "../../lib/i18n";
 import { shrinkImage } from "../../lib/image";
 import { newModelId } from "../models/ModelEditor";
+import { confirmReplace } from "./confirmReplace";
 import { BrowserEncodeError, uploadAudio, uploadEntry } from "./uploadAudio";
 import { useAccess } from "../../lib/access";
 import { useInvalidateTags, useSetting } from "../../lib/queries";
@@ -64,6 +65,7 @@ export function UploadPage() {
     const navigate = useNavigate();
     const invalidateTags = useInvalidateTags();
     const access = useAccess();
+    const writable = access.can("folder", folder, "folder.write");
 
     const audioCount = items.filter((i) => isAudio(i.file.name)).length;
     const canTaf = items.length > 0 && audioCount === items.length;
@@ -159,6 +161,14 @@ export function UploadPage() {
         setBusy({ step: t("upload.starting"), progress: 0 });
         try {
             if (plain) {
+                if (
+                    !(await confirmReplace(
+                        ui,
+                        folder,
+                        items.map((i) => i.file.name),
+                    ))
+                )
+                    return;
                 setBusy({ step: t("upload.uploading"), progress: 0 });
                 await tc.uploadFiles(
                     items.map((i) => i.file),
@@ -178,17 +188,7 @@ export function UploadPage() {
                     bitrate: Number(bitrate.data) || 96,
                 };
                 const entry = uploadEntry(job);
-                const existing = await tc.files(folder).catch(() => []);
-                if (
-                    existing.some((f) => f.name === entry) &&
-                    !(await ui.confirm({
-                        title: t("upload.replace"),
-                        text: t("upload.exists", { name: entry }),
-                        confirm: t("upload.replace"),
-                        danger: true,
-                    }))
-                )
-                    return;
+                if (!(await confirmReplace(ui, folder, [entry]))) return;
                 const step = (text: string, progress: number) => setBusy({ step: text, progress });
                 let result;
                 try {
@@ -278,7 +278,7 @@ export function UploadPage() {
                         </span>
                     }
                     title={folder === "/" ? t("common.library") : folder}
-                    sub={t("upload.tapToChange")}
+                    sub={writable ? t("upload.tapToChange") : t("upload.noWriteRight")}
                     onClick={() => setPickFolder(true)}
                     chevron
                 />
@@ -514,7 +514,7 @@ export function UploadPage() {
                         <button
                             className="btn primary block"
                             onClick={start}
-                            disabled={!plain && !name.trim()}
+                            disabled={!writable || (!plain && !name.trim())}
                         >
                             <UploadCloud size={19} />
                             {!plain ? t("upload.createTaf") : t("upload.uploadFiles")}
@@ -534,6 +534,7 @@ export function UploadPage() {
                 open={assign}
                 onClose={() => setAssign(false)}
                 title={t("common.assignToTonie")}
+                right="tonie.assign"
                 onPick={async (tag) => {
                     if (!done) return;
                     await ui.run(
@@ -542,6 +543,7 @@ export function UploadPage() {
                                 tag,
                                 "lib://" + done.replace(/^\//, ""),
                                 tag.overlay || undefined,
+                                access.can("tonie", tag.ruid, "tonie.edit"),
                             ),
                         t("common.contentAssigned"),
                     );

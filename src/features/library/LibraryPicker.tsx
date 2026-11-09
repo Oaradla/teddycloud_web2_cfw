@@ -29,6 +29,7 @@ export function LibraryPicker({
     startPath = "/",
     title,
     folderMode,
+    canPick,
     multi,
     onPickMany,
 }: {
@@ -37,6 +38,8 @@ export function LibraryPicker({
     onPickMany?: (files: { path: string; entry: FileEntry }[]) => void;
     /** picks a folder instead of a file (onPick gets the folder path) */
     folderMode?: boolean;
+    /** folders that may be picked, e.g. only writable ones */
+    canPick?: (folder: string) => boolean;
     open: boolean;
     onClose: () => void;
     onPick?: (source: string) => void;
@@ -91,14 +94,15 @@ export function LibraryPicker({
         onClose();
     };
     const f = filter.trim().toLowerCase();
+    // playlists first, as in the library, then folders, then files
+    const rank = (x: FileEntry) => (!x.isDir && isTap(x.name) ? 0 : x.isDir ? 1 : 2);
     const list = (files.data ?? [])
         .filter((x) => x.name !== "." && x.name !== "..")
         .filter(pickable)
         .filter((x) => !f || x.name.toLowerCase().includes(f))
         .sort(
             (a, b) =>
-                Number(b.isDir) - Number(a.isDir) ||
-                a.name.localeCompare(b.name, undefined, { numeric: true }),
+                rank(a) - rank(b) || a.name.localeCompare(b.name, undefined, { numeric: true }),
         );
 
     return (
@@ -124,6 +128,7 @@ export function LibraryPicker({
                 ) : folderMode ? (
                     <button
                         className="btn primary"
+                        disabled={canPick && !canPick(path)}
                         onClick={() => {
                             onPick?.(path);
                             onClose();
@@ -221,9 +226,20 @@ export function LibraryPicker({
                             >
                                 <Row
                                     leading={
-                                        <span className="file-icon folder">
-                                            <Folder size={20} />
-                                        </span>
+                                        x.folderPicture ? (
+                                            <span className="file-icon folder-pic">
+                                                <img
+                                                    src={backendUrl(x.folderPicture)}
+                                                    alt=""
+                                                    loading="lazy"
+                                                />
+                                                <Folder size={13} className="folder-badge" />
+                                            </span>
+                                        ) : (
+                                            <span className="file-icon folder">
+                                                <Folder size={20} />
+                                            </span>
+                                        )
                                     }
                                     title={x.name}
                                     onClick={() => {

@@ -425,7 +425,22 @@ export function StudioPage() {
                         title={t("studio.studioTonies", { n: items.length })}
                         right={
                             items.length > 0 && (
-                                <button className="btn ghost small" onClick={() => setItems([])}>
+                                <button
+                                    className="btn ghost small"
+                                    onClick={async () => {
+                                        if (
+                                            await ui.confirm({
+                                                title: t("studio.studioClearList"),
+                                                text: t("studio.studioClearListText", {
+                                                    n: items.length,
+                                                }),
+                                                confirm: t("common.clear"),
+                                                danger: true,
+                                            })
+                                        )
+                                            setItems([]);
+                                    }}
+                                >
                                     {t("common.clear")}
                                 </button>
                             )

@@ -267,10 +267,12 @@ export function Segmented<T extends string>({
     value,
     options,
     onChange,
+    disabled,
 }: {
     value: T;
     options: { value: T; label: ReactNode }[];
     onChange: (v: T) => void;
+    disabled?: boolean;
 }) {
     return (
         <div className="segmented" role="tablist">
@@ -280,6 +282,7 @@ export function Segmented<T extends string>({
                     role="tab"
                     aria-selected={o.value === value}
                     className={o.value === value ? "active" : ""}
+                    disabled={disabled}
                     onClick={() => onChange(o.value)}
                 >
                     {o.label}

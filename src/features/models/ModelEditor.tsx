@@ -639,6 +639,7 @@ export function ModelEditor({
                 open={assign}
                 onClose={() => setAssign(false)}
                 title={t("common.assignToTonie")}
+                right="tonie.edit"
                 onPick={async (tag) => {
                     if (!saved) return;
                     await ui.run(

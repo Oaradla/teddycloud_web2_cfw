@@ -13,11 +13,11 @@ import {
     SkipBack,
     SkipForward,
     Search,
-    Share2,
     Trash2,
     UserRound,
+    Users,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { backendUrl } from "../../api/client";
@@ -94,6 +94,7 @@ function TonieDetail({
     const navigate = useNavigate();
     const player = usePlayer();
     const invalidate = useInvalidateTags();
+    const qc = useQueryClient();
     const boxes = useBoxes();
     const cfwBoxes = useCfwBoxes();
     const showTagSettings = useSetting("cfw.show_tag_settings");
@@ -109,9 +110,21 @@ function TonieDetail({
     const playable = canPlayTag(tag);
     const isPlaying = player.item?.id === tag.ruid;
     const chapters = tag.trackSeconds ?? [];
-    const titles = info.tracks ?? [];
+    // the titles of a model name the chapters only when they fit
+    const titles = info.tracks?.length === chapters.length ? info.tracks : [];
     const showCfw = cfwBoxes.data != null && showTagSettings.data === "true";
+    const cfwTag = useQuery({
+        queryKey: ["cfwTag", tag.ruid],
+        queryFn: () => tc.cfwTag(tag.ruid),
+        retry: false,
+        enabled: showCfw,
+    });
+    // an event tag plays nothing, so its content's chapters do not apply
+    const isEvent = cfwTag.data?.kind === "event";
     const access = useAccess();
+    const canAssign = access.can("tonie", tag.ruid, "tonie.assign");
+    const canEdit = access.can("tonie", tag.ruid, "tonie.edit");
+    const borrowed = !!access.mine.tonies[tag.ruid.toUpperCase()]?.borrowed;
     const remoteBoxes = (cfwBoxes.data ?? []).filter(
         (b) => remoteAvailable(b) && b.online && access.can("box", b.id, "box.cfw"),
     );
@@ -124,9 +137,21 @@ function TonieDetail({
         invalidate();
     };
 
+    /* hides it only for this user: the tonie is gone from the own list */
+    const hideBorrowed = async () => {
+        const ok = await ui.run(async () => {
+            await tc.setContent(tag.ruid, "hide", true, overlay || undefined);
+            return true;
+        }, t("common.saved"));
+        if (!ok) return;
+        qc.invalidateQueries({ queryKey: ["aclMine"] });
+        invalidate();
+        navigate("/tonies");
+    };
+
     const assign = async (source: string) => {
         await ui.run(
-            () => tc.assignSource(tag, source, overlay || undefined),
+            () => tc.assignSource(tag, source, overlay || undefined, canEdit),
             t("common.contentAssigned"),
         );
         invalidate();
@@ -140,19 +165,15 @@ function TonieDetail({
             danger: true,
         });
         if (!ok) return;
-        await ui.run(async () => {
-            await tc.setContent(tag.ruid, "source", "", overlay || undefined);
-            if (tag.live) await tc.setContent(tag.ruid, "live", false, overlay || undefined);
-        }, t("tonies.contentRemoved"));
+        await ui.run(
+            () => tc.assignSource(tag, "", overlay || undefined, canEdit),
+            t("tonies.contentRemoved"),
+        );
         invalidate();
     };
 
     /** the original content from the Boxine cloud, as the box would load it; the server keeps it */
-    const canFetch =
-        !playable &&
-        !tag.source &&
-        Boolean(tag.downloadTriggerUrl) &&
-        access.can("tonie", tag.ruid, "tonie.edit");
+    const canFetch = !playable && !tag.source && Boolean(tag.downloadTriggerUrl) && canEdit;
     const fetchFromCloud = async () => {
         setFetching(true);
         const ok = await ui.run(async () => {
@@ -306,85 +327,95 @@ function TonieDetail({
                 </div>
             </div>
 
-            <Section title={t("common.content")} footer={t("tonies.contentHint")}>
-                <Row
-                    icon={linked?.picture ? undefined : <FileAudio size={17} />}
-                    leading={
-                        linked?.picture ? <TonieImage src={linked.picture} size={44} /> : undefined
-                    }
-                    title={
-                        linked
-                            ? contentTitle(linked)
-                            : tag.source
-                              ? sourceLabel(tag.source)
-                              : tag.valid
-                                ? t("tonies.originalContent")
-                                : t("tonies.noContentYet")
-                    }
-                    sub={
-                        tag.source
-                            ? lib
-                                ? `${t("common.library")}: ${parentPath("/" + lib)}`
-                                : t("tonies.stream")
-                            : t("tonies.tapToChoose")
-                    }
-                    onClick={() => setPickContent(true)}
-                    chevron
-                />
-                <Row
-                    icon={<Link2 size={17} />}
-                    title={t("tonies.assignStream")}
-                    sub={t("tonies.assignStreamHint")}
-                    onClick={() => setPickStream(true)}
-                    chevron
-                />
-                {nextEpisode && (
+            {isEvent ? (
+                <Section title={t("common.content")} plain>
+                    <p className="small muted">{t("tonies.eventNoSource")}</p>
+                </Section>
+            ) : (
+                <Section title={t("common.content")} footer={t("tonies.contentHint")}>
                     <Row
-                        icon={<SkipForward size={17} />}
-                        title={t("tonies.nextEpisode")}
-                        sub={nextEpisode.name}
-                        onClick={() => assign("lib:/" + joinPath(folder, nextEpisode.name))}
-                        chevron={false}
+                        icon={linked?.picture ? undefined : <FileAudio size={17} />}
+                        leading={
+                            linked?.picture ? (
+                                <TonieImage src={linked.picture} size={44} />
+                            ) : undefined
+                        }
+                        title={
+                            linked
+                                ? contentTitle(linked)
+                                : tag.source
+                                  ? sourceLabel(tag.source)
+                                  : tag.valid
+                                    ? t("tonies.originalContent")
+                                    : t("tonies.noContentYet")
+                        }
+                        sub={
+                            tag.source
+                                ? lib
+                                    ? `${t("common.library")}: ${parentPath("/" + lib)}`
+                                    : t("tonies.stream")
+                                : t("tonies.tapToChoose")
+                        }
+                        onClick={canAssign ? () => setPickContent(true) : undefined}
+                        chevron={canAssign}
                     />
-                )}
-                {prevEpisode && (
-                    <Row
-                        icon={<SkipBack size={17} />}
-                        title={t("tonies.prevEpisode")}
-                        sub={prevEpisode.name}
-                        onClick={() => assign("lib:/" + joinPath(folder, prevEpisode.name))}
-                        chevron={false}
-                    />
-                )}
-                {tag.tonieInfo?.model && (
-                    <Row
-                        icon={<Search size={17} />}
-                        title={t("tonies.findFigureContent")}
-                        sub={t("tonies.findFigureContentHint")}
-                        onClick={findFigureContent}
-                        chevron={false}
-                    />
-                )}
-                {tag.source && (
-                    <Row
-                        icon={<Trash2 size={17} />}
-                        title={t("tonies.removeContent")}
-                        danger
-                        onClick={removeContent}
-                        chevron={false}
-                    />
-                )}
-            </Section>
+                    {access.admin && (
+                        <Row
+                            icon={<Link2 size={17} />}
+                            title={t("tonies.assignStream")}
+                            sub={t("tonies.assignStreamHint")}
+                            onClick={() => setPickStream(true)}
+                            chevron
+                        />
+                    )}
+                    {canAssign && nextEpisode && (
+                        <Row
+                            icon={<SkipForward size={17} />}
+                            title={t("tonies.nextEpisode")}
+                            sub={nextEpisode.name}
+                            onClick={() => assign("lib:/" + joinPath(folder, nextEpisode.name))}
+                            chevron={false}
+                        />
+                    )}
+                    {canAssign && prevEpisode && (
+                        <Row
+                            icon={<SkipBack size={17} />}
+                            title={t("tonies.prevEpisode")}
+                            sub={prevEpisode.name}
+                            onClick={() => assign("lib:/" + joinPath(folder, prevEpisode.name))}
+                            chevron={false}
+                        />
+                    )}
+                    {canAssign && tag.tonieInfo?.model && (
+                        <Row
+                            icon={<Search size={17} />}
+                            title={t("tonies.findFigureContent")}
+                            sub={t("tonies.findFigureContentHint")}
+                            onClick={findFigureContent}
+                            chevron={false}
+                        />
+                    )}
+                    {canAssign && tag.source && (
+                        <Row
+                            icon={<Trash2 size={17} />}
+                            title={t("tonies.removeContent")}
+                            danger
+                            onClick={removeContent}
+                            chevron={false}
+                        />
+                    )}
+                </Section>
+            )}
 
             <Section title={t("common.figure")}>
                 <Row
                     leading={<TonieImage src={tag.tonieInfo?.picture} size={40} />}
                     title={tag.tonieInfo?.series || t("tonies.unknownFigure")}
                     sub={[tag.tonieInfo?.episode, tag.tonieInfo?.model].filter(Boolean).join(" · ")}
-                    onClick={() => setPickModel(true)}
-                    chevron
+                    onClick={canEdit ? () => setPickModel(true) : undefined}
+                    chevron={canEdit}
                 />
-                {contentModel && (
+                {canEdit && contentModel && (
                     <Row
                         icon={<Shapes size={17} />}
                         title={t("tonies.figureFromContent")}
@@ -397,7 +428,7 @@ function TonieDetail({
                 )}
             </Section>
 
-            {chapters.length > 0 && (
+            {chapters.length > 0 && !isEvent && (
                 <Section
                     title={t("common.chapters")}
                     right={<span className="small muted">{chapters.length}</span>}
@@ -439,6 +470,7 @@ function TonieDetail({
                     sub={t("tonies.liveHint")}
                     checked={tag.live}
                     onChange={(v) => change("live", v)}
+                    disabled={!canEdit}
                 />
                 <SwitchRow
                     icon={tag.nocloud ? <CloudOff size={17} /> : <Cloud size={17} />}
@@ -446,30 +478,26 @@ function TonieDetail({
                     sub={t("tonies.cloudOffHint")}
                     checked={tag.nocloud}
                     onChange={(v) => change("nocloud", v)}
+                    disabled={!canEdit}
                 />
                 <SwitchRow
                     icon={<EyeOff size={17} />}
                     title={t("tonies.hide")}
                     sub={t("tonies.hideHint")}
                     checked={tag.hide}
-                    onChange={(v) => change("hide", v)}
+                    onChange={(v) => (borrowed ? hideBorrowed() : change("hide", v))}
+                    disabled={!canEdit && !borrowed}
                 />
             </Section>
 
-            {showCfw && (
-                <CfwTagSettings
-                    key={tag.ruid}
-                    ruid={tag.ruid}
-                    canEdit={access.can("tonie", tag.ruid, "tonie.edit")}
-                />
-            )}
+            {showCfw && <CfwTagSettings key={tag.ruid} ruid={tag.ruid} canEdit={canEdit} />}
 
             {canShare("tonie", tag.ruid) && (
                 <Section>
                     <Row
-                        icon={<Share2 size={17} />}
-                        title={t("common.share")}
-                        sub={t("common.shareHint")}
+                        icon={<Users size={17} />}
+                        title={t("common.owners")}
+                        sub={t("common.ownersHint")}
                         onClick={() => setSharing(true)}
                         chevron
                     />

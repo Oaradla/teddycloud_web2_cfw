@@ -37,10 +37,6 @@ let tapBuildProbe: Promise<boolean> | null = null;
 export const NO_RUID = "ffffffffffffffff";
 
 /** a refused setting is answered with 200 "ERROR" */
-const settingTaken = async (answer: Promise<Response>) => {
-    if ((await (await answer).text()).trim() === "ERROR") throw new Error(t("common.saveFailed"));
-};
-
 /** the server reads at most 255 bytes of query; lists and uploads send "path=<path>&special=library" */
 const checkPath = (path: string) => {
     if (encodeURIComponent(path).length > 234) throw new Error(t("library.pathTooLong"));
@@ -75,8 +71,7 @@ export const tc = {
     },
     /** forgets a box: its settings (overlay); it comes back as new when it connects again */
     removeBox: (id: string) => postText(`/api/settings/removeOverlay${q({ overlay: id })}`, ""),
-    renameBox: (id: string, name: string) =>
-        postText(`/api/settings/set/boxName${q({ overlay: id })}`, name),
+    renameBox: (id: string, name: string) => tc.setSetting("boxName", name, id),
 
     /* ---------- tonies ---------- */
     tags: (overlay?: string) =>
@@ -89,12 +84,16 @@ export const tc = {
             `/content/json/set/${ruid}${q({ overlay })}`,
             `${key}=${typeof value === "string" ? encodeURIComponent(value) : value}`,
         ),
-    /** assigns a library file or a stream URL to a tag (like the classic UI: also sets nocloud and live) */
-    assignSource: async (tag: Tag, source: string, overlay?: string) => {
-        await tc.setContent(tag.ruid, "source", source, overlay);
-        if (source && !tag.nocloud) await tc.setContent(tag.ruid, "nocloud", true, overlay);
+    /**
+     * assigns a library file or a stream URL to a tag (like the classic UI: also sets nocloud and
+     * live, in the same request, when the user may edit the tag)
+     */
+    assignSource: (tag: Tag, source: string, overlay: string | undefined, canEdit: boolean) => {
         const live = source.startsWith("http");
-        if (live !== tag.live) await tc.setContent(tag.ruid, "live", live, overlay);
+        let body = `source=${encodeURIComponent(source)}`;
+        if (canEdit && source && !tag.nocloud) body += "&nocloud=true";
+        if (canEdit && live !== tag.live) body += `&live=${live}`;
+        return postText(`/content/json/set/${tag.ruid}${q({ overlay })}`, body);
     },
     searchTonies: (text: string) =>
         Promise.all([
@@ -313,11 +312,13 @@ export const tc = {
         })
             .then((r) => r.status !== 404 && r.status !== 405)
             .catch(() => false)),
-    /** every chapter of a TAF as a TAF of its own plus a playlist that builds the original again */
-    splitTaf: async (path: string, titles: string[]) => {
+    /** every chapter of a TAF as a TAF of its own plus a playlist that builds the original again;
+     *  with a target folder the new folder goes there and the TAF stays where it is */
+    splitTaf: async (path: string, titles: string[], target?: string) => {
         const body = [
             `path=${encodeURIComponent(path.replace(/^\/+/, ""))}`,
             ...titles.map((t) => `title=${encodeURIComponent(t)}`),
+            ...(target === undefined ? [] : [`target=${encodeURIComponent(target)}`]),
         ].join("&");
         const r = await request("/api/tafSplit?special=library", {
             method: "POST",
@@ -335,11 +336,12 @@ export const tc = {
             `/api/settings/getIndex${q({ groups: "true", overlay })}`,
         ).then((r) => r.options ?? []),
     setSetting: async (key: string, value: string | number | boolean, overlay?: string) => {
-        await settingTaken(postText(`/api/settings/set/${key}${q({ overlay })}`, String(value)));
+        // a text setting is emptied with an empty body; a refused value is answered with 4xx and its reason
+        await postText(`/api/settings/set/${key}${q({ overlay })}`, String(value));
         await getText("/api/triggerWriteConfig").catch(() => "");
     },
     resetSetting: async (key: string, overlay?: string) => {
-        await settingTaken(postText(`/api/settings/reset/${key}${q({ overlay })}`, ""));
+        await postText(`/api/settings/reset/${key}${q({ overlay })}`, "");
         await getText("/api/triggerWriteConfig").catch(() => "");
     },
 
@@ -392,6 +394,11 @@ export const tc = {
     latestVersion: (develop: boolean) =>
         getJson<{ sha?: string; tag_name?: string }>(
             develop ? "/reverseGeneric/teddycloud_develop" : "/reverseGeneric/teddycloud_release",
+        ),
+    /** GitHub's tag refs of the release candidates (rc_v...) */
+    releaseCandidates: () =>
+        getJson<{ ref: string; object?: { type?: string } }[]>(
+            "/reverseGeneric/teddycloud_release_candidate",
         ),
 
     /* ---------- login ---------- */

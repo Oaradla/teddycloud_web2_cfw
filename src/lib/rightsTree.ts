@@ -115,6 +115,24 @@ export function listToChecked(
     return { checked, extra };
 }
 
+/** the nodes a stored list names, to show it by name ("tonie.*" is the scope, "box.setting:x" a setting) */
+export function listToNodes(list: string | undefined): RightsNode[] {
+    return tokens(list).map((pattern) => {
+        const setting = pattern.startsWith("box.setting:");
+        const kind =
+            pattern === "*"
+                ? "all"
+                : pattern.endsWith(".*")
+                  ? setting
+                      ? "group"
+                      : "scope"
+                  : setting
+                    ? "setting"
+                    : "right";
+        return { key: pattern, pattern, kind, label: pattern.replace(/\.\*$/, "") };
+    });
+}
+
 /** shortest list for the ticked leaves: a fully ticked node is written as its pattern */
 export function checkedToList(tree: RightsNode, checked: string[], extra: string[] = []): string {
     const set = new Set(checked);

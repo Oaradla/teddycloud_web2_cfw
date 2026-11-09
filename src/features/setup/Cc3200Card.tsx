@@ -5,6 +5,7 @@ import { tc } from "../../api/tc";
 import { Notice } from "../../ui/kit";
 import { StatusLine, useBusyGuard } from "./parts";
 import { t } from "../../lib/i18n";
+import { validPort } from "./patches";
 
 export const saveZip = (data: Uint8Array, name: string) => {
     const a = document.createElement("a");
@@ -23,6 +24,14 @@ export const packageFiles = (pkg: Uint8Array, prefix: string) => {
 };
 
 /** the CC3200 release packages teddyCloud keeps, newest first */
+/** the host name or IP of an input, also of a pasted address like "https://teddycloud.local/" */
+const hostOnly = (input: string) =>
+    input
+        .trim()
+        .replace(/^[a-z]+:\/\//i, "")
+        .replace(/[/:].*$/, "")
+        .replace(/[^a-zA-Z0-9.-]/g, "");
+
 export const useCc3200Releases = () => {
     const firmware = useQuery({ queryKey: ["cfwFirmware"], queryFn: tc.cfwFirmware, retry: false });
     return {
@@ -60,12 +69,15 @@ export function Cc3200Card({
     const boxHost = useQuery({ queryKey: ["cfwBoxHost"], queryFn: tc.cfwBoxHost, retry: false });
     const seenHost = boxHost.data?.host.replace(/:\d+$/, "") ?? "";
     useEffect(() => {
-        if (seenHost && !hostEdited) setHost(seenHost);
+        if (seenHost && !hostEdited) setHost(hostOnly(seenHost));
     }, [seenHost, hostEdited]);
     const [port, setPort] = useState("");
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
     useBusyGuard(busy);
+
+    const boxPort = (port || apiPort.data || "443").trim();
+    const portInvalid = !validPort(Number(boxPort));
 
     const download = async () => {
         if (!release) return;
@@ -73,8 +85,7 @@ export function Cc3200Card({
         setResult(null);
         try {
             const files = packageFiles(await tc.cfwPackage(release.build), "cc3200/card/");
-            const lines = [`host=${host.trim()}`];
-            const boxPort = (port || apiPort.data || "443").trim();
+            const lines = [`host=${host}`];
             if (boxPort !== "443") lines.push(`port=${boxPort}`);
             lines.push("ca=c2.der");
             files["cfw/config.txt"] = new TextEncoder().encode(lines.join("\n") + "\n");
@@ -102,7 +113,8 @@ export function Cc3200Card({
                     >
                         {releases.map((r) => (
                             <option key={r.build} value={r.build}>
-                                {r.version || r.build} ({r.channel})
+                                {r.version || r.build} (
+                                {t(`boxupdate.channel_${r.channel}` as never)})
                             </option>
                         ))}
                     </select>
@@ -114,7 +126,7 @@ export function Cc3200Card({
                     className="input"
                     value={host}
                     onChange={(e) => {
-                        setHost(e.target.value);
+                        setHost(hostOnly(e.target.value));
                         setHostEdited(true);
                     }}
                 />
@@ -133,10 +145,15 @@ export function Cc3200Card({
                     onChange={(e) => setPort(e.target.value)}
                     style={{ maxWidth: 140 }}
                 />
+                {portInvalid && (
+                    <div className="hint" style={{ color: "var(--danger)" }}>
+                        {t("setup.portInvalid")}
+                    </div>
+                )}
             </div>
             <button
                 className="btn primary"
-                disabled={busy || !host.trim() || !release}
+                disabled={busy || !host || portInvalid || !release}
                 onClick={download}
             >
                 {t("setup.cc3200CardDownload")}

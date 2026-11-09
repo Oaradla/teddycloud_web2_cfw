@@ -18,11 +18,11 @@ import {
     Radio,
     RefreshCw,
     Settings2,
-    Share2,
     SlidersHorizontal,
     Speaker,
     Trash2,
     Volume2,
+    Users,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -52,6 +52,7 @@ import {
     useSettings,
 } from "../../lib/queries";
 import { BoxModelSheet } from "./BoxModelSheet";
+import { formatBuild } from "../boxupdate/BoxUpdatePage";
 import { usePlayer } from "../../player/Player";
 import { ErrorBox, Loading, Page, Row, Section, SwitchRow, useUi } from "../../ui/kit";
 import { certStatusText } from "../tools/CertificatesPage";
@@ -166,9 +167,11 @@ export function BoxPage() {
             back="/"
             compact
             right={
-                <button className="icon-btn" onClick={rename} aria-label={t("boxes.renameBox")}>
-                    <Pencil size={19} />
-                </button>
+                access.admin && (
+                    <button className="icon-btn" onClick={rename} aria-label={t("boxes.renameBox")}>
+                        <Pencil size={19} />
+                    </button>
+                )
             }
         >
             <div className="hero side">
@@ -306,6 +309,8 @@ export function BoxPage() {
                                       0: t("common.ledOn"),
                                       1: t("common.ledOff"),
                                       2: t("common.ledDimmed"),
+                                      5: t("common.ledOffPermanent"),
+                                      6: t("common.ledDimmedPermanent"),
                                   },
                               })}
                         {useCfwSettings ? (
@@ -385,9 +390,9 @@ export function BoxPage() {
                 />
                 {canShare("box", id) && (
                     <Row
-                        icon={<Share2 size={17} />}
-                        title={t("common.share")}
-                        sub={t("common.shareHint")}
+                        icon={<Users size={17} />}
+                        title={t("common.owners")}
+                        sub={t("common.ownersHint")}
                         onClick={() => setSharing(true)}
                         chevron
                     />
@@ -499,8 +504,8 @@ export function BoxPage() {
                         models.data?.find((m) => m.id === box.boxModel)?.name ??
                         t("boxes.boxModelNone")
                     }
-                    onClick={() => setModelOpen(true)}
-                    chevron
+                    onClick={access.admin ? () => setModelOpen(true) : undefined}
+                    chevron={access.admin}
                 />
                 {s?.ip && (
                     <Row
@@ -522,7 +527,7 @@ export function BoxPage() {
                     <Row
                         icon={<Cpu size={17} />}
                         title={t("boxes.cfwBuild")}
-                        value={`${cfw.platform ?? "cc3200"} · ${dateTime(cfw.version * 1000)}`}
+                        value={`${cfw.platform === "esp32" ? "ESP32" : "CC3200"} · ${formatBuild(cfw.version)}`}
                     />
                 )}
                 {s?.lastSeen ? (

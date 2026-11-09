@@ -52,6 +52,8 @@ export interface AuthEvent {
 export interface AclMineEntry {
     owner?: boolean;
     granted?: string;
+    /** a tonie of others placed on a box of the user: seen until the user hides it */
+    borrowed?: boolean;
     rights?: string[];
 }
 

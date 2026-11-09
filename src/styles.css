@@ -776,6 +776,9 @@ a.row:active,
     padding: 0 10px;
     white-space: nowrap;
 }
+.segmented button:disabled {
+    opacity: 0.45;
+}
 .segmented button.active {
     background: var(--bg-elev);
     color: var(--fg);

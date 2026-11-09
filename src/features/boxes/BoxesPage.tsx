@@ -9,16 +9,18 @@ import {
     Info,
     Radio,
     Settings2,
+    SlidersHorizontal,
+    X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { tc } from "../../api/tc";
 import type { Box, CfwBox } from "../../api/types";
 import { CFW_CAP } from "../../api/types";
 import { ago, contentTitle, figureSubtitle, figureTitle, linkedContent } from "../../lib/format";
-import { useAccess } from "../../lib/access";
-import { t } from "../../lib/i18n";
+import { useAccess, useOwnerFilter } from "../../lib/access";
+import { lang, t } from "../../lib/i18n";
 import {
     keys,
     useAllTags,
@@ -28,7 +30,8 @@ import {
     useCfwBox,
     useSetting,
 } from "../../lib/queries";
-import { Empty, ErrorBox, Notice, Page } from "../../ui/kit";
+import { Empty, ErrorBox, Notice, Page, SearchField } from "../../ui/kit";
+import { Popover } from "../../ui/Popover";
 import { NewVersionNotice } from "../more/SystemPage";
 import { FigurePic } from "../../ui/FigurePic";
 import { TonieImage } from "../../ui/TonieImage";
@@ -37,6 +40,25 @@ export function BoxesPage() {
     const boxes = useBoxes();
     const cfwEnabled = useQuery({ queryKey: ["cfwEnabled"], queryFn: tc.cfwEnabled });
     const access = useAccess();
+    const [params, setParams] = useSearchParams();
+    const owners = params.getAll("owner");
+    const ownerFilter = useOwnerFilter("boxes", owners);
+    const [query, setQuery] = useState("");
+    const [menu, setMenu] = useState(false);
+    const menuBtn = useRef<HTMLButtonElement>(null);
+    const toggleOwner = (user: string) => {
+        const rest = owners.filter((u) => u !== user);
+        setParams(
+            { owner: rest.length < owners.length ? rest : [...owners, user] },
+            { replace: true },
+        );
+    };
+    const q = query.trim().toLowerCase();
+    const list = (boxes.data ?? []).filter(
+        (box) =>
+            ownerFilter.keep(box.ID) &&
+            (!q || `${box.boxName} ${box.ID}`.toLowerCase().includes(q)),
+    );
     return (
         <Page title={t("common.boxes")}>
             {access.admin && <AdminNotices boxes={boxes.data ?? []} />}
@@ -54,8 +76,79 @@ export function BoxesPage() {
                     }
                 />
             )}
+            {Boolean(boxes.data?.length) && (
+                <div className="sticky-tools">
+                    <div className="toolbar">
+                        <SearchField
+                            value={query}
+                            onChange={setQuery}
+                            placeholder={t("boxes.searchBoxes")}
+                        />
+                        {ownerFilter.users.length > 0 && (
+                            <button
+                                ref={menuBtn}
+                                className={`icon-btn filled filter-btn ${menu ? "active" : ""}`}
+                                onClick={() => setMenu((v) => !v)}
+                                aria-label={t("common.filterAndView")}
+                            >
+                                <SlidersHorizontal size={19} />
+                                {owners.length > 0 && (
+                                    <span className="count">{owners.length}</span>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                    {owners.length > 0 && (
+                        <div className="active-filters">
+                            {owners.map((u) => (
+                                <button key={u} className="chip" onClick={() => toggleOwner(u)}>
+                                    {u}
+                                    <X size={14} />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+            <Popover
+                open={menu}
+                onClose={() => setMenu(false)}
+                anchor={menuBtn}
+                title={t("common.filterAndView")}
+                footer={
+                    <>
+                        <button
+                            className="btn"
+                            disabled={!owners.length}
+                            onClick={() => setParams({}, { replace: true })}
+                        >
+                            {t("tonies.resetFilters")}
+                        </button>
+                        <button className="btn primary" onClick={() => setMenu(false)}>
+                            {t("common.showN", { n: list.length })}
+                        </button>
+                    </>
+                }
+            >
+                <div className="choice-group">
+                    <div className="choice-label">{t("users.owners")}</div>
+                    <div className="choice-options">
+                        {ownerFilter.users.map((u) => (
+                            <button
+                                key={u}
+                                type="button"
+                                className={`chip ${owners.includes(u) ? "active" : ""}`}
+                                aria-pressed={owners.includes(u)}
+                                onClick={() => toggleOwner(u)}
+                            >
+                                {u}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </Popover>
             <div className="grid-boxes">
-                {boxes.data?.map((box) => (
+                {list.map((box) => (
                     <BoxCard key={box.ID} box={box} />
                 ))}
             </div>
@@ -153,7 +246,7 @@ export const batteryInfo = (cfw?: CfwBox) => {
     if (!cfw?.showBattery || !cfw.battery || !(cfw.capabilities & CFW_CAP.battery)) return null;
     const b = cfw.battery;
     if (b.implausible) return null;
-    const volts = `${(b.mv / 1000).toFixed(2).replace(".", ",")} V`;
+    const volts = `${(b.mv / 1000).toLocaleString(lang(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} V`;
     // on the charger the box measures the charger, not the battery: no charge then
     const percent = b.station ? undefined : b.percent;
     const icon = b.station ? (

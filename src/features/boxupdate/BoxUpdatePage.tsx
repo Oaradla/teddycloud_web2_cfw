@@ -145,7 +145,12 @@ export function BoxUpdatePage() {
     };
     const notify = async (r: CfwResult, ok: string) => {
         if (r.ok)
-            ui.toast("ok", ok, r.message && r.message !== "OK" ? cfwMessage(r.message) : undefined);
+            // "assigned, but ...": the box will not get it (update off, rolled back)
+            ui.toast(
+                r.message?.startsWith("assigned, but") ? "info" : "ok",
+                ok,
+                r.message && r.message !== "OK" ? cfwMessage(r.message) : undefined,
+            );
         else ui.toast("error", t("common.actionFailed"), cfwMessage(r.message));
         await refresh();
     };

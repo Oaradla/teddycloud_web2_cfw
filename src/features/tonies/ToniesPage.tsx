@@ -27,6 +27,7 @@ import { exportCsv, exportHtml, exportJson } from "../../lib/exportTags";
 import { lang, t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
+import { useOwnerFilter } from "../../lib/access";
 import { TagWithBox, useAllTags, useBoxes, useTagsPlaced } from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { FigurePic } from "../../ui/FigurePic";
@@ -87,6 +88,8 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
     const hidden = params.get("hidden") === "1";
     const language = params.get("lang") ?? "";
     const expert = params.get("x") ?? "";
+    const owners = params.getAll("owner");
+    const ownerFilter = useOwnerFilter("tonies", owners);
     const [expertDraft, setExpertDraft] = useState(expert);
     const [help, setHelp] = useState(false);
     const [profiles, setProfiles] = useState(loadProfiles);
@@ -106,6 +109,14 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
         const next = new URLSearchParams(params);
         if (v) next.set(k, v);
         else next.delete(k);
+        setParams(next, { replace: true });
+    };
+    const toggleOwner = (user: string) => {
+        const next = new URLSearchParams(params);
+        next.delete("owner");
+        const rest = owners.filter((u) => u !== user);
+        for (const u of rest.length < owners.length ? rest : [...owners, user])
+            next.append("owner", u);
         setParams(next, { replace: true });
     };
     const setSort = (v: Sort) => {
@@ -148,6 +159,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             .filter((x) => matches(x, content))
             .filter((x) => !box || x.placedOn.includes(box))
             .filter((x) => !series || figureInfo(x).series === series)
+            .filter((x) => ownerFilter.keep(x.ruid))
             .filter((x) => {
                 if (!f) return true;
                 const i = figureInfo(x);
@@ -165,7 +177,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             return cmp(title(a), title(b));
         });
         return result;
-    }, [base, query, content, box, series, hidden, sort, language, expertFilter]);
+    }, [base, query, content, box, series, hidden, sort, language, expertFilter, ownerFilter.keep]);
 
     const contentLabels: Record<Content, string> = {
         all: t("common.all"),
@@ -182,6 +194,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
             ? [{ label: contentLabels[content], clear: () => setParam("f", "") }]
             : []),
         ...(series ? [{ label: series, clear: () => setParam("series", "") }] : []),
+        ...owners.map((u) => ({ label: u, clear: () => toggleOwner(u) })),
         ...(hidden ? [{ label: t("tonies.showHidden"), clear: () => setParam("hidden", "") }] : []),
         ...(language ? [{ label: languageName(language), clear: () => setParam("lang", "") }] : []),
         ...(expert
@@ -393,6 +406,24 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                 </option>
                             ))}
                         </select>
+                    </div>
+                )}
+                {!system && ownerFilter.users.length > 0 && (
+                    <div className="choice-group">
+                        <div className="choice-label">{t("users.owners")}</div>
+                        <div className="choice-options">
+                            {ownerFilter.users.map((u) => (
+                                <button
+                                    key={u}
+                                    type="button"
+                                    className={`chip ${owners.includes(u) ? "active" : ""}`}
+                                    aria-pressed={owners.includes(u)}
+                                    onClick={() => toggleOwner(u)}
+                                >
+                                    {u}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
                 <ChoiceGroup

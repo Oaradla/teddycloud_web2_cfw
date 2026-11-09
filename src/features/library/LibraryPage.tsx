@@ -41,12 +41,14 @@ import {
     ago,
     baseName,
     bytes,
+    figureTitle,
     isAudio,
     isImage,
     isTaf,
     isTap,
     joinPath,
     lengthText,
+    libPath,
     parentPath,
     stripExt,
 } from "../../lib/format";
@@ -55,7 +57,13 @@ import { t } from "../../lib/i18n";
 import { filePlayItem, libraryFileUrl } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
 import { useAccess } from "../../lib/access";
-import { keys, useFiles, useInvalidateTags, usePrefetchSubfolders } from "../../lib/queries";
+import {
+    keys,
+    useAllTags,
+    useFiles,
+    useInvalidateTags,
+    usePrefetchSubfolders,
+} from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { Empty, ErrorBox, Loading, Page, Row, SearchField, Spinner, useUi } from "../../ui/kit";
 import { ChoiceGroup, Popover } from "../../ui/Popover";
@@ -66,6 +74,7 @@ import { FileDetailsSheet } from "./FileDetailsSheet";
 import { PlaylistEditor, PlaylistStart } from "./PlaylistEditor";
 import { Lightbox, LightboxItem } from "../../ui/Lightbox";
 import { useSelection } from "../../ui/useSelection";
+import { confirmReplace } from "../upload/confirmReplace";
 import { LibraryPicker } from "./LibraryPicker";
 import { UnusedTafsSheet } from "./UnusedTafsSheet";
 import { useDeepSearch } from "../../lib/deepSearch";
@@ -131,6 +140,7 @@ export function LibraryPage() {
     const menuBtn = useRef<HTMLButtonElement>(null);
     const [assignFor, setAssignFor] = useState<string | null>(null);
     const [moveFor, setMoveFor] = useState<FileEntry[] | null>(null);
+    const [splitFor, setSplitFor] = useState<FileEntry | null>(null);
     const [coverFor, setCoverFor] = useState<ModelEditorStart | null>(null);
     const [details, setDetails] = useState<FileEntry | null>(null);
     /** the search a hit was opened from, to return to when its details are closed */
@@ -149,6 +159,14 @@ export function LibraryPage() {
     const player = usePlayer();
     const navigate = useNavigate();
     const invalidateTags = useInvalidateTags();
+    const allTags = useAllTags();
+    const writable = access.can("folder", path, "folder.write");
+    const mayWrite = (folder: string) => access.can("folder", folder, "folder.write");
+    const trimSlashes = (folder: string) => folder.replace(/^\/+|\/+$/g, "");
+    // a TAF is split into any folder the user may write
+    const anyFolderWritable =
+        access.admin ||
+        Object.values(access.mine.folders).some((f) => f.rights?.includes("folder.write"));
 
     const pref =
         <T extends string>(key: string, set: (v: T) => void) =>
@@ -248,17 +266,30 @@ export function LibraryPage() {
             .orphanModels(xs.map((x) => joinPath(path, x.name)))
             .catch(() => [] as string[]);
         const one = xs.length === 1 ? xs[0] : null;
+        const gone = xs.map((x) => joinPath(path, x.name).replace(/^\//, ""));
+        const users = new Set(
+            (allTags.data ?? [])
+                .filter((x) => {
+                    const lib = libPath(x.source);
+                    return gone.some((g) => lib === g || lib.startsWith(g + "/"));
+                })
+                .map(figureTitle),
+        );
         const { ok, checked } = await ui.confirmCheck({
             title: one
                 ? one.isDir
                     ? t("library.deleteFolder")
                     : t("library.deleteFile")
                 : t("library.deleteN", { n: xs.length }),
-            text: one
-                ? count
-                    ? t("library.deleteFolderText", { name: one.name, n: count })
-                    : t("common.deleteText", { name: one.name })
-                : t("library.deleteNText"),
+            text:
+                (one
+                    ? count
+                        ? t("library.deleteFolderText", { name: one.name, n: count })
+                        : t("common.deleteText", { name: one.name })
+                    : t("library.deleteNText")) +
+                (users.size
+                    ? " " + t("library.deleteUsedBy", { names: [...users].join(", ") })
+                    : ""),
             confirm: t("common.delete"),
             danger: true,
             check: models.length
@@ -280,8 +311,8 @@ export function LibraryPage() {
         if (checked && models.length) {
             qc.invalidateQueries({ queryKey: ["customModels"] });
             qc.invalidateQueries({ queryKey: ["aclMine"] });
-            invalidateTags();
         }
+        invalidateTags();
         if (failed) ui.toast("error", t("library.failedN", { count: failed }));
         else ui.toast("ok", t("common.deleted"));
         refresh();
@@ -357,17 +388,30 @@ export function LibraryPage() {
         setDetails(x);
     };
 
-    /** every chapter as a TAF of its own and a playlist, in a folder named like the TAF; the TAF moves there too */
+    /** every chapter as a TAF of its own and a playlist, in a folder named like the TAF: next to
+     *  the TAF, which moves there too, or in a chosen folder, and the TAF stays where it is */
     const split = async (x: FileEntry) => {
-        const ok = await ui.confirm({
-            title: t("library.splitTaf"),
-            text: t("library.splitTafText", { n: x.tafHeader?.trackSeconds?.length ?? 0 }),
-            confirm: t("library.splitTafRun"),
-        });
+        const n = x.tafHeader?.trackSeconds?.length ?? 0;
+        const dialog = { title: t("library.splitTaf"), confirm: t("library.splitTafRun") };
+        const { ok, checked: elsewhere } = writable
+            ? await ui.confirmCheck({
+                  ...dialog,
+                  text: t("library.splitTafText", { n }),
+                  check: { label: t("library.splitElsewhere"), value: false },
+              })
+            : {
+                  ok: await ui.confirm({ ...dialog, text: t("library.splitTafTextKeep", { n }) }),
+                  checked: true,
+              };
         if (!ok) return;
+        if (elsewhere) setSplitFor(x);
+        else runSplit(x);
+    };
+
+    const runSplit = async (x: FileEntry, target?: string) => {
         ui.toast("info", t("library.splitting"));
         const r = await ui.run(
-            () => tc.splitTaf(joinPath(path, x.name), []),
+            () => tc.splitTaf(joinPath(path, x.name), [], target),
             t("library.splitDone"),
         );
         refresh();
@@ -388,6 +432,7 @@ export function LibraryPage() {
         });
         if (!name) return;
         const fileName = name.endsWith(".tap") ? name : name + ".tap";
+        if (!(await confirmReplace(ui, path, [fileName]))) return;
         await ui.run(async () => {
             const tap = await tc.readTap(joinPath(path, x.name));
             const copy = {
@@ -434,13 +479,13 @@ export function LibraryPage() {
                 label: t("library.editPlaylist"),
                 icon: <ListMusic size={17} />,
                 onSelect: () => setPlaylist({ edit: p }),
-                hidden: !isTap(x.name),
+                hidden: !isTap(x.name) || !writable,
             },
             {
                 label: t("library.duplicatePlaylist"),
                 icon: <Copy size={17} />,
                 onSelect: () => duplicateTap(x),
-                hidden: !isTap(x.name),
+                hidden: !isTap(x.name) || !writable,
             },
             {
                 label: t("library.showJson"),
@@ -460,6 +505,7 @@ export function LibraryPage() {
                 icon: <Scissors size={17} />,
                 onSelect: () => split(x),
                 hidden:
+                    !anyFolderWritable ||
                     !isTaf(x.name) ||
                     !canSplit.data ||
                     (x.tafHeader?.trackSeconds?.length ?? 0) < 2,
@@ -474,7 +520,7 @@ export function LibraryPage() {
                 label: t("library.convertToTaf"),
                 icon: <Wand2 size={17} />,
                 onSelect: () => encode(x),
-                hidden: !isAudio(x.name),
+                hidden: !isAudio(x.name) || !writable,
             },
             {
                 label: t("common.share"),
@@ -483,11 +529,17 @@ export function LibraryPage() {
                     setShareFor({ type: "folder", id: p.replace(/^\/+/, ""), title: x.name }),
                 hidden: !x.isDir || !canShare("folder", p.replace(/^\/+/, "")),
             },
-            { label: t("library.rename"), icon: <Pencil size={17} />, onSelect: () => rename(x) },
+            {
+                label: t("library.rename"),
+                icon: <Pencil size={17} />,
+                onSelect: () => rename(x),
+                hidden: !writable,
+            },
             {
                 label: t("library.move"),
                 icon: <ArrowRightLeft size={17} />,
                 onSelect: () => setMoveFor([x]),
+                hidden: !writable,
             },
             {
                 label: t("common.download"),
@@ -506,6 +558,7 @@ export function LibraryPage() {
                 icon: <Trash2 size={17} />,
                 danger: true,
                 onSelect: () => remove(x),
+                hidden: !writable,
             },
         ]);
     };
@@ -617,26 +670,28 @@ export function LibraryPage() {
                             >
                                 <CheckSquare size={20} />
                             </button>
-                            <button
-                                className="icon-btn"
-                                aria-label={t("library.create")}
-                                onClick={() =>
-                                    ui.actions(t("library.create"), [
-                                        {
-                                            label: t("library.newFolder"),
-                                            icon: <FolderPlus size={17} />,
-                                            onSelect: newFolder,
-                                        },
-                                        {
-                                            label: t("library.newPlaylist"),
-                                            icon: <ListMusic size={17} />,
-                                            onSelect: () => setPlaylist({ dir: path }),
-                                        },
-                                    ])
-                                }
-                            >
-                                <Plus size={22} />
-                            </button>
+                            {writable && (
+                                <button
+                                    className="icon-btn"
+                                    aria-label={t("library.create")}
+                                    onClick={() =>
+                                        ui.actions(t("library.create"), [
+                                            {
+                                                label: t("library.newFolder"),
+                                                icon: <FolderPlus size={17} />,
+                                                onSelect: newFolder,
+                                            },
+                                            {
+                                                label: t("library.newPlaylist"),
+                                                icon: <ListMusic size={17} />,
+                                                onSelect: () => setPlaylist({ dir: path }),
+                                            },
+                                        ])
+                                    }
+                                >
+                                    <Plus size={22} />
+                                </button>
+                            )}
                         </>
                     )}
                     <button
@@ -669,13 +724,15 @@ export function LibraryPage() {
                     >
                         <Wrench size={20} />
                     </button>
-                    <button
-                        className="icon-btn"
-                        onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}
-                        aria-label={t("common.upload")}
-                    >
-                        <Upload size={21} />
-                    </button>
+                    {writable && (
+                        <button
+                            className="icon-btn"
+                            onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}
+                            aria-label={t("common.upload")}
+                        >
+                            <Upload size={21} />
+                        </button>
+                    )}
                 </>
             }
         >
@@ -851,7 +908,8 @@ export function LibraryPage() {
                     }
                     action={
                         !filter &&
-                        show === "all" && (
+                        show === "all" &&
+                        writable && (
                             <button
                                 className="btn primary"
                                 onClick={() => navigate(`/upload?path=${encodeURIComponent(path)}`)}
@@ -976,7 +1034,7 @@ export function LibraryPage() {
                     </span>
                     <button
                         className="icon-btn"
-                        disabled={!selectedFiles.length || busy}
+                        disabled={!selectedFiles.length || busy || !writable}
                         onClick={deleteSelected}
                         aria-label={t("common.delete")}
                     >
@@ -984,7 +1042,7 @@ export function LibraryPage() {
                     </button>
                     <button
                         className="icon-btn"
-                        disabled={!selectedFiles.length || busy}
+                        disabled={!selectedFiles.length || busy || !writable}
                         onClick={() => setMoveFor(selectedFiles)}
                         aria-label={t("library.move")}
                     >
@@ -992,7 +1050,7 @@ export function LibraryPage() {
                     </button>
                     <button
                         className="btn primary small"
-                        disabled={!playlistFiles.length}
+                        disabled={!playlistFiles.length || !writable}
                         onClick={() => {
                             setPlaylist({
                                 dir: path,
@@ -1022,10 +1080,17 @@ export function LibraryPage() {
                 open={assignFor !== null}
                 onClose={() => setAssignFor(null)}
                 title={t("common.assignToTonie")}
+                right="tonie.assign"
                 onPick={async (tag) => {
                     const source = "lib://" + (assignFor ?? "").replace(/^\//, "");
                     await ui.run(
-                        () => tc.assignSource(tag, source, tag.overlay || undefined),
+                        () =>
+                            tc.assignSource(
+                                tag,
+                                source,
+                                tag.overlay || undefined,
+                                access.can("tonie", tag.ruid, "tonie.edit"),
+                            ),
                         t("common.contentAssigned"),
                     );
                     invalidateTags();
@@ -1039,6 +1104,16 @@ export function LibraryPage() {
                 startPath={path}
                 title={t("library.moveTo")}
                 onPick={move}
+            />
+            <LibraryPicker
+                open={splitFor !== null}
+                onClose={() => setSplitFor(null)}
+                folderMode
+                // "elsewhere" keeps the TAF; its own folder is the split without that choice
+                canPick={(folder) => mayWrite(folder) && trimSlashes(folder) !== trimSlashes(path)}
+                startPath={path}
+                title={t("library.splitTafInto")}
+                onPick={(folder) => splitFor && runSplit(splitFor, folder)}
             />
             <ModelEditor start={coverFor} onClose={() => setCoverFor(null)} onSaved={refresh} />
             <DownloadSheet

@@ -161,6 +161,7 @@ export const CFW_CAP = {
     eventTagExt: 1 << 9,
     remote: 1 << 10,
     battery: 1 << 11,
+    temporary: 1 << 13,
 };
 
 export interface CfwBattery {
@@ -219,6 +220,14 @@ export interface CfwBox {
     };
 }
 
+/** boxes with the custom firmware whose build cannot hold box settings only until switch-off:
+ * they do not take such an event tag and keep its earlier version */
+export const withoutTemporary = (boxes: CfwBox[]) =>
+    boxes.filter(
+        (b) =>
+            b.isCfw && b.helloValid && b.settings.enabled && !(b.capabilities & CFW_CAP.temporary),
+    );
+
 export interface CfwStatus {
     helloValid?: boolean;
     online?: boolean;
@@ -260,7 +269,11 @@ export interface CfwTag {
     origin?: string;
     timestamp?: number;
     profile?: CfwProfile;
-    event?: { tones: boolean; actions: { action: number; mode: number; value: number }[] };
+    event?: {
+        tones: boolean;
+        temporary?: boolean;
+        actions: { action: number; mode: number; value: number }[];
+    };
 }
 
 /** a playlist of the library: its files are put together into the TAF at filepath */
