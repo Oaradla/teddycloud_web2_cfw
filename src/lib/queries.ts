@@ -9,6 +9,7 @@ export const keys = {
     boxModels: ["boxModels"] as const,
     boxState: (id: string) => ["boxState", id] as const,
     cfwBoxes: ["cfwBoxes"] as const,
+    cfwResume: ["cfwResume"] as const,
     cfwStatus: (id: string) => ["cfwStatus", id] as const,
     tags: (overlay: string) => ["tags", overlay] as const,
     allTags: ["allTags"] as const,
@@ -46,6 +47,19 @@ export const useCfwBoxes = () =>
         staleTime: 15_000,
         refetchInterval: 30_000,
     });
+
+/** the tonies (ruid, lower case) whose global resume waits for a user to choose a position */
+export const useResumeConflicts = () => {
+    const { data } = useQuery({
+        queryKey: keys.cfwResume,
+        queryFn: tc.cfwResume,
+        staleTime: 15_000,
+        // a refused request (CFW support off) is not repeated
+        refetchInterval: (query) => (query.state.status === "error" ? false : 60_000),
+        retry: false,
+    });
+    return new Set(data?.filter((r) => r.conflict).map((r) => r.ruid.toLowerCase()));
+};
 
 export const useCfwBox = (id: string): CfwBox | undefined => {
     const { data } = useCfwBoxes();
@@ -168,6 +182,7 @@ export function useLiveEvents() {
                 qc.invalidateQueries({ queryKey: ["boxState"] });
                 qc.invalidateQueries({ queryKey: ["cfwStatus"] });
                 qc.invalidateQueries({ queryKey: keys.cfwBoxes });
+                qc.invalidateQueries({ queryKey: keys.cfwResume });
             }, 700);
         };
         const connect = () => {
@@ -180,10 +195,15 @@ export function useLiveEvents() {
                 "ContentTitle",
                 "charger",
                 "cfw-battery",
+                "cfw-resume",
+                "cfw-resume-conflict",
                 "VolumeLevel",
                 "keep-alive",
             ];
             for (const n of names) if (n !== "keep-alive") source.addEventListener(n, refresh);
+            // an open tonie shows its positions and conflict
+            for (const n of ["cfw-resume", "cfw-resume-conflict"])
+                source.addEventListener(n, () => qc.invalidateQueries({ queryKey: ["cfwTag"] }));
             // a tonie placed for the first time belongs to the owners of the box from now on
             source.addEventListener("TagValid", () =>
                 qc.invalidateQueries({ queryKey: ["aclMine"] }),

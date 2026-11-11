@@ -178,8 +178,8 @@ export function BulkEditSheet({
                         value={v === MIXED ? MIXED : v ? "on" : "off"}
                         onChange={(n) => setOptions((o) => ({ ...o, [k]: n === "on" }))}
                         options={[
-                            { value: "on", label: t("tonies.on") },
                             { value: "off", label: t("tonies.off") },
+                            { value: "on", label: t("tonies.on") },
                         ]}
                     />
                 </div>

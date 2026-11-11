@@ -11,6 +11,7 @@ import type {
     CfwFirmware,
     CfwImage,
     CfwResult,
+    CfwResume,
     CfwStatus,
     CfwTag,
     CustomModel,
@@ -501,7 +502,13 @@ export const tc = {
         postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { build, now }),
     cfwCheckNow: (id: string) =>
         postJson<CfwResult>(`/api/cfw/deliver${q({ overlay: id })}`, { now: true }),
+    cfwResume: () => getJson<(CfwResume & { ruid: string })[]>("/api/cfw/resume"),
     cfwTag: (ruid: string) => getJson<CfwTag>(`/api/cfw/tag${q({ ruid })}`),
+    cfwChooseResume: (ruid: string, branch: number) =>
+        postJson<{ ok: boolean; message: string }>(
+            `/api/cfw/resume/choose${q({ ruid, branch: String(branch) })}`,
+            {},
+        ),
     cfwSetTag: (ruid: string, tag: Omit<CfwTag, "ruid">) =>
         postJson<{ ok: boolean; message: string }>(`/api/cfw/tag${q({ ruid })}`, tag),
 };

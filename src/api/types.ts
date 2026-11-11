@@ -162,6 +162,7 @@ export const CFW_CAP = {
     remote: 1 << 10,
     battery: 1 << 11,
     temporary: 1 << 13,
+    globalResume: 1 << 14,
 };
 
 export interface CfwBattery {
@@ -220,13 +221,15 @@ export interface CfwBox {
     };
 }
 
+/** boxes with the custom firmware whose build lacks the capability */
+export const withoutCapability = (boxes: CfwBox[], capability: number) =>
+    boxes.filter(
+        (b) => b.isCfw && b.helloValid && b.settings.enabled && !(b.capabilities & capability),
+    );
+
 /** boxes with the custom firmware whose build cannot hold box settings only until switch-off:
  * they do not take such an event tag and keep its earlier version */
-export const withoutTemporary = (boxes: CfwBox[]) =>
-    boxes.filter(
-        (b) =>
-            b.isCfw && b.helloValid && b.settings.enabled && !(b.capabilities & CFW_CAP.temporary),
-    );
+export const withoutTemporary = (boxes: CfwBox[]) => withoutCapability(boxes, CFW_CAP.temporary);
 
 export interface CfwStatus {
     helloValid?: boolean;
@@ -261,6 +264,30 @@ export interface CfwProfile {
     slapLock: boolean | null;
     tiltLock: boolean | null;
     volumeLock: boolean | null;
+    /** continues on every box where it stopped on another one; implies resume */
+    globalResume: boolean | null;
+}
+
+/** a position of a figure as a box reported it (global resume) */
+export interface CfwPosition {
+    box: string;
+    base: number;
+    /** seconds heard since base */
+    listened: number;
+    audioId: number;
+    /** the next block (4096 bytes) to read */
+    position: number;
+    time: number;
+}
+
+export interface CfwResume {
+    global: boolean;
+    revision: number;
+    last: CfwPosition;
+    current?: CfwPosition;
+    conflict: boolean;
+    branches: CfwPosition[];
+    onBox: string;
 }
 
 export interface CfwTag {
@@ -268,6 +295,8 @@ export interface CfwTag {
     kind: "none" | "profile" | "event";
     origin?: string;
     timestamp?: number;
+    /** the positions the boxes reported for it */
+    resume?: CfwResume;
     profile?: CfwProfile;
     event?: {
         tones: boolean;

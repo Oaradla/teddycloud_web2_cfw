@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tc } from "../../api/tc";
 import type { CfwProfile, CfwTag } from "../../api/types";
 import { cfwMessage, cfwThrow } from "../boxupdate/cfwMessages";
@@ -8,6 +8,8 @@ import { t } from "../../lib/i18n";
 import { Row, Section, Segmented, useUi } from "../../ui/kit";
 import { CfwEventFields, EMPTY_EVENT } from "./CfwEventFields";
 import { CfwProfileFields, EMPTY_PROFILE } from "./CfwProfileFields";
+import { CfwResumeInfo } from "./CfwResumeInfo";
+import { nextDraft, settingsOf } from "./cfwDraft";
 
 /** settings of the custom firmware for a tag: the profile that travels with the figure, or an event tag */
 export function CfwTagSettings({ ruid, canEdit }: { ruid: string; canEdit: boolean }) {
@@ -20,15 +22,20 @@ export function CfwTagSettings({ ruid, canEdit }: { ruid: string; canEdit: boole
     });
     const [draft, setDraft] = useState<CfwTag | null>(null);
     const [saving, setSaving] = useState(false);
+    const shown = useRef<CfwTag>(undefined);
     useEffect(() => {
-        if (tag.data) setDraft(tag.data);
+        const read = tag.data;
+        if (!read) return;
+        const before = shown.current;
+        shown.current = read;
+        setDraft((d) => nextDraft(d, before, read));
     }, [tag.data]);
     if (tag.isError || !draft) return null;
 
     const profile = draft.profile ?? EMPTY_PROFILE;
     const setP = <K extends keyof CfwProfile>(k: K, v: CfwProfile[K]) =>
         setDraft({ ...draft, kind: "profile", profile: { ...profile, [k]: v } });
-    const dirty = JSON.stringify(draft) !== JSON.stringify(tag.data);
+    const dirty = settingsOf(draft) !== settingsOf(tag.data!);
 
     const save = async () => {
         setSaving(true);
@@ -75,6 +82,9 @@ export function CfwTagSettings({ ruid, canEdit }: { ruid: string; canEdit: boole
                     </div>
                 </div>
                 {draft.kind === "profile" && <CfwProfileFields values={profile} onChange={setP} />}
+                {tag.data?.resume && (
+                    <CfwResumeInfo ruid={ruid} resume={tag.data.resume} canEdit={canEdit} />
+                )}
             </div>
             {draft.kind === "event" && (
                 <div className="list mt" style={{ padding: "12px 16px" }}>

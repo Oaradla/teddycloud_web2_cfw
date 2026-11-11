@@ -28,7 +28,13 @@ import { lang, t } from "../../lib/i18n";
 import { canPlayTag, tagPlayItem } from "../../lib/play";
 import { getPref, setPref } from "../../lib/prefs";
 import { useOwnerFilter } from "../../lib/access";
-import { TagWithBox, useAllTags, useBoxes, useTagsPlaced } from "../../lib/queries";
+import {
+    TagWithBox,
+    useAllTags,
+    useBoxes,
+    useResumeConflicts,
+    useTagsPlaced,
+} from "../../lib/queries";
 import { usePlayer } from "../../player/Player";
 import { FigurePic } from "../../ui/FigurePic";
 import { Empty, ErrorBox, Page, SearchField, useUi } from "../../ui/kit";
@@ -103,6 +109,7 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
     const tags = useAllTags();
     const player = usePlayer();
     const tagsPlaced = useTagsPlaced();
+    const conflicts = useResumeConflicts();
     const navigate = useNavigate();
 
     const setParam = (k: string, v: string) => {
@@ -589,6 +596,11 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                         {tag.live && (
                                             <span className="badge accent">{t("common.live")}</span>
                                         )}
+                                        {conflicts.has(tag.ruid.toLowerCase()) && (
+                                            <span className="badge warn">
+                                                {t("tonies.resumeConflictBadge")}
+                                            </span>
+                                        )}
                                     </span>
                                     <span>
                                         {tag.source ? (
@@ -636,6 +648,13 @@ export function ToniesPage({ system = false }: { system?: boolean }) {
                                                 style={{ display: "block", color: "var(--accent)" }}
                                             >
                                                 → {contentTitle(linked)}
+                                            </span>
+                                        )}
+                                        {conflicts.has(tag.ruid.toLowerCase()) && (
+                                            <span
+                                                style={{ display: "block", color: "var(--warn)" }}
+                                            >
+                                                {t("tonies.resumeConflictBadge")}
                                             </span>
                                         )}
                                         {!linked && !tag.valid && !tag.live && !tag.source && (
