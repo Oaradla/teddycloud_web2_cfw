@@ -7,6 +7,7 @@
 // Servers without the playlist building get the old way: one TAF in one go.
 import { tc } from "../../api/tc";
 import type { Tap } from "../../api/types";
+import { newAudioIds } from "../../lib/audioId";
 import { encodeFilesParallel } from "../../lib/encodePool";
 import { joinPath } from "../../lib/format";
 import { t } from "../../lib/i18n";
@@ -45,7 +46,6 @@ const safe = (s: string) =>
         .replace(/[. ]+$/g, "")
         .trim() || "Titel";
 const lib = (path: string) => "lib://" + path.replace(/^\/+/, "");
-const audioIdNow = () => Math.floor(Date.now() / 1000) - 0x50000000;
 
 /** a folder may exist already */
 const ensureDir = (path: string) => tc.dirCreate(path).catch(() => undefined);
@@ -83,7 +83,7 @@ async function makeParts(job: UploadJob, dir: string, partName: (i: number) => s
     const n = job.files.length;
     if (job.encoder === "browser") {
         const parts = await inBrowser(
-            encodeFilesParallel(job.files, audioIdNow(), job.bitrate, (f, done) =>
+            encodeFilesParallel(job.files, newAudioIds(n), job.bitrate, (f, done) =>
                 step(t("upload.encodingProgress", { done, total: n }), f * 0.8),
             ),
         );
@@ -114,7 +114,7 @@ const writeTap = async (
 ) => {
     const tap: Tap = {
         type: "tap",
-        audio_id: Math.floor(Date.now() / 1000),
+        audio_id: newAudioIds(),
         filepath: lib(out),
         name,
         files: files.map((f) => ({ filepath: lib(f.path), name: f.title })),
@@ -122,6 +122,10 @@ const writeTap = async (
     await tc.saveTap(tap, dir, fileName);
     return joinPath(dir, fileName);
 };
+
+/** the TAFs of a folder that are not among the ones kept */
+export const oldParts = (names: string[], keep: string[]) =>
+    names.filter((n) => /\.taf$/i.test(n) && !keep.includes(n));
 
 /** the entry an upload creates in its folder: the TAF, or the folder of a split upload */
 export const uploadEntry = (job: UploadJob) =>
@@ -152,6 +156,13 @@ export async function uploadAudio(job: UploadJob, step: Step): Promise<UploadRes
             if (r && !r.built) throw new Error(r.error || t("upload.joinFailed"));
             header = r?.tafHeader;
         }
+        // a folder replaced (asked before): the parts of the old upload go
+        const names = (await tc.files(dir)).filter((f) => !f.isDir).map((f) => f.name);
+        for (const old of oldParts(names, [
+            ...job.files.map((_, i) => partName(i)),
+            `${name}.tap.taf`,
+        ]))
+            await tc.fileDelete(joinPath(dir, old), false);
         return { source: tap, taf: out, folder: dir, header };
     }
 
@@ -189,10 +200,10 @@ export async function uploadAudio(job: UploadJob, step: Step): Promise<UploadRes
     if (job.encoder === "browser") {
         const taf = await inBrowser(
             n === 1
-                ? encodeFilesParallel(job.files, audioIdNow(), job.bitrate, (f) =>
+                ? encodeFilesParallel(job.files, newAudioIds(), job.bitrate, (f) =>
                       step(t("upload.encodingProgress", { done: 0, total: 1 }), f * 0.8),
                   ).then((parts) => parts[0])
-                : encodeTafInBrowser(job.files, audioIdNow(), job.bitrate, (i, total) =>
+                : encodeTafInBrowser(job.files, newAudioIds(), job.bitrate, (i, total) =>
                       step(
                           t("upload.encodingN", { n: Math.min(i + 1, total), total }),
                           (i / total) * 0.8,

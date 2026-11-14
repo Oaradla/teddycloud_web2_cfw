@@ -290,6 +290,7 @@
         "uploadingN": "Téléversement du titre {{n}} sur {{total}} …",
         "exists": "« {{name}} » existe déjà dans ce dossier. Le remplacer ? Les tonies qui le lisent recevront le nouveau contenu.",
         "existsMany": "Ces fichiers existent déjà dans ce dossier : {{names}}. Les remplacer ? Les tonies qui les lisent recevront le nouveau contenu.",
+        "existsFolder": "Le dossier « {{name}} » existe déjà ici. Le remplacer ? Ses anciennes parties que le nouvel envoi n'a pas sont supprimées après l'envoi. Les tonies qui le lisent recevront le nouveau contenu.",
         "replace": "Remplacer"
     },
     "library": {
@@ -617,7 +618,8 @@
         "you": "Toi",
         "yourAddress": "Ton adresse vue par TeddyCloud",
         "ownersTitle": "Propriétaires : {{name}}",
-        "ownersOnlyHint": "Les propriétaires peuvent tout faire et désignent d'autres propriétaires. Un tonie posé sur la box d'un autre utilisateur apparaît chez celui-ci sans lui appartenir ; il peut le masquer pour lui seul."
+        "ownersOnlyHint": "Les propriétaires peuvent tout faire et désignent d'autres propriétaires. Un tonie posé sur la box d'un autre utilisateur apparaît chez celui-ci sans lui appartenir ; il peut le masquer pour lui seul.",
+        "ownersRemoveAdminOnly": "Seul un administrateur retire d'autres propriétaires."
     },
     "boxupdate": {
         "added": "Ajoutée",
@@ -673,6 +675,8 @@
         "guideCardZipLink": "Créer le zip de la carte SD",
         "guideCc3200": "Toniebox avec puce CC3200 (carte SD)",
         "guideEsp32": "Toniebox avec puce ESP32 (via teddyCloud)",
+        "guideEsp32Flasher": "Si la box est de toute façon ouverte pour le flashage, le flasher ESP32 écrit aussi le firmware personnalisé (choix à l'étape de flashage) ; les étapes 2 à 5 ne sont alors plus nécessaires.",
+        "guideEsp32FlasherLink": "Flasher ESP32",
         "guideHide": "Masquer le guide",
         "guideIntro": "Pour une boîte qui a encore le firmware d'origine ; la méthode dépend de la puce de la boîte.",
         "guideShow": "Afficher le guide",
@@ -898,6 +902,8 @@
         "cfwFromBox": "Comme la boîte",
         "cfwOwnValue": "Valeur propre de ce tonie",
         "cfwUseBox": "Utiliser la valeur de la boîte",
+        "cfwFromSettings": "Comme dans les paramètres",
+        "cfwUseSettings": "Utiliser la valeur des paramètres",
         "cfwMode0": "Basculer",
         "cfwMode1": "Activer",
         "cfwMode2": "Désactiver",
@@ -1748,6 +1754,10 @@
                 "label": "Mettre à jour la page de configuration",
                 "description": "Livrer aux box avec firmware personnalisé la page de configuration du firmware qu'exécute la box, ou la page de configuration par défaut ; désactivé : la page sur la carte de la box reste telle quelle"
             },
+            "cfw_global_resume": {
+                "label": "Reprise globale pour tous les tonies",
+                "description": "Chaque tonie reprend sur n'importe quelle box là où il s'est arrêté sur une autre, comme si la reprise globale était activée pour chacun ; un tonie garde la valeur définie dans ses propres paramètres. Le contenu en direct et les streams sont exclus"
+            },
             "cfw_event_image": {
                 "label": "Image des tags événement",
                 "description": "Image affichée pour un Tonie qui est un tag événement, à la place de l'image de son contenu"
@@ -1976,6 +1986,10 @@
                 "label": "Déconnexion après inactivité (heures)",
                 "description": "Sans utilisation, la session se termine après ce délai"
             },
+            "web_auth_frame_ancestors": {
+                "label": "Pages autorisées à intégrer",
+                "description": "Origines (p. ex. https://ha.example.org) qui peuvent afficher l'interface web dans un cadre, séparées par des espaces. Vide : uniquement teddyCloud lui-même."
+            },
             "web_auth_lockout_attempts": {
                 "label": "Échecs avant blocage",
                 "description": "Après autant de connexions erronées, l'accès est bloqué"
@@ -2181,7 +2195,6 @@
         "cc3200Cons": "La plus ancienne version",
         "cc3200Disconnect": "Déconnecter",
         "cc3200DownloadBackup": "Télécharger la sauvegarde",
-        "cc3200HasHackiebox": "HackieboxNG est déjà installé (/sys/pre-img.bin présent).",
         "cc3200HostHint": "Nom ou IP sous lequel la boîte joint directement teddyCloud, sur le port des boîtes. Pas l'adresse d'un proxy inverse : la boîte vérifie le certificat de teddyCloud.",
         "cc3200HostSeen": "Suggestion : {{host}}, les autres boîtes joignent teddyCloud par là. Pas l'adresse d'un proxy inverse.",
         "cc3200Mac": "MAC de la boîte",
@@ -2245,6 +2258,12 @@
         "esp32Connect": "Débranche la boîte de l'alimentation. Connecte l'UART (3,3 V) à J103 (une pince ou une pince à linge suffit), relie J100 (boot), puis rallume. En mode téléchargement, la LED reste éteinte et aucun son ne retentit.",
         "esp32Cons": "Changer le nom d'hôte ou revenir au firmware d'origine impose de flasher à nouveau (sauf avec le firmware personnalisé)",
         "esp32DoneText": "Débranche l'UART, retire le pont J100, redémarre la boîte. Elle se connecte maintenant à teddyCloud. Conserve l'image d'origine à plusieurs endroits !",
+        "esp32Firmware": "Firmware",
+        "esp32FirmwareOriginal": "Firmware d'origine (patché pour teddyCloud)",
+        "esp32FirmwareCustom": "Firmware personnalisé",
+        "esp32CfwHint": "Le firmware personnalisé est écrit dans un emplacement d'application libre à côté du firmware d'origine et démarre juste après le flashage. S'il ne se confirme pas trois fois de suite, la box redémarre le firmware d'origine. Si la box reste bloquée avant cela dans une boucle de démarrage, seule la réécriture du dump de la flash aide : conserve-le bien.",
+        "esp32CfwSupportOff": "Pour le firmware personnalisé, active la prise en charge CFW (Paramètres → Custom Firmware) et charge une version dans Box Update → Bibliothèque.",
+        "esp32CfwNoImage": "Pour le firmware personnalisé, charge une version avec une image ESP32 dans Box Update → Bibliothèque.",
         "esp32FlashText": "« Flasher l'ESP32 » écrit l'image corrigée ; choisis le port si demandé et attends.",
         "esp32Https": "Le navigateur n'autorise le port série qu'en HTTPS (Chrome ou Edge sur un ordinateur).",
         "esp32NoSerial": "Ce navigateur ne peut pas ouvrir de port série ; utilise Chrome ou Edge sur un ordinateur, ou la méthode manuelle ci-dessous.",
@@ -2384,6 +2403,7 @@
             "certsMissing": "Manquant sur la boîte : {{names}}",
             "noPreloader": "Le paquet ne contient pas de preloader.",
             "noMcuimg": "/sys/mcuimg.bin n'était pas dans la sauvegarde.",
+            "noOriginal": "Une écriture précédente du bootloader s'est interrompue et /sys/pre-img.bin manque ou n'est pas le bootloader d'origine : l'original n'est pas sur la box. Restaurez-le d'abord depuis la sauvegarde.",
             "unnamedFiles_one": "Un fichier n'a ni nom dans la table des fichiers ni nom connu.",
             "unnamedFiles_other": "{{count}} fichiers n'ont ni nom dans la table des fichiers ni nom connu."
         },

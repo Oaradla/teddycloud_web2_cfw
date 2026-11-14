@@ -103,6 +103,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             a.removeEventListener("waiting", waiting);
             a.removeEventListener("playing", playing);
             a.removeEventListener("canplay", playing);
+            // logged out: stop playing and streaming
+            a.pause();
+            a.removeAttribute("src");
+            a.load();
         };
     }, []);
 

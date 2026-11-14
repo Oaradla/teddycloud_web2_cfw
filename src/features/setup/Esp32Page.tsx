@@ -1,4 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { tc } from "../../api/tc";
+import { esp32Releases } from "./esp32/cfwInstall";
 import { Notice, Page, useUi } from "../../ui/kit";
 import { Fold } from "../../ui/Fold";
 import j100 from "./img/esp32-j100.webp";
@@ -18,6 +21,7 @@ import {
     Warnings,
     useBusyGuard,
 } from "./parts";
+import { useAccess } from "../../lib/access";
 import { t } from "../../lib/i18n";
 
 /**
@@ -32,6 +36,17 @@ export function Esp32Page() {
     const f = useESP32Flasher(anchor.current, log, setLog);
     const { state, setState, currentStep: step } = f;
     const [acks, setAcks] = useState({ risk: false, fw: false, backup: false, uart: false });
+    // the custom firmware image is the admin's
+    const admin = useAccess().admin;
+    const firmware = useQuery({
+        queryKey: ["cfwFirmware"],
+        queryFn: tc.cfwFirmware,
+        retry: false,
+        enabled: admin,
+    });
+    const releases = esp32Releases(firmware.data?.images);
+    // the library answers only with CFW support on
+    const cfwOff = firmware.isError;
 
     // the hook asks with its own dialog state; answered here with web2's dialog
     useEffect(() => {
@@ -349,6 +364,38 @@ esptool.py -b 921600 write_flash 0x0 tb.esp32.fakeca.bin`}</Code>
         body = (
             <>
                 <p>{t("setup.esp32FlashText")}</p>
+                {admin && !state.resetBox && !state.proceed && (
+                    <div className="field">
+                        <label>{t("setup.esp32Firmware")}</label>
+                        <select
+                            className="select"
+                            value={state.cfwBuild}
+                            disabled={busy}
+                            onChange={(e) =>
+                                setState((p) => ({ ...p, cfwBuild: Number(e.target.value) }))
+                            }
+                        >
+                            <option value={0}>{t("setup.esp32FirmwareOriginal")}</option>
+                            {releases.length === 0 && (
+                                <option value={-1} disabled>
+                                    {t("setup.esp32FirmwareCustom")}
+                                </option>
+                            )}
+                            {releases.map((r) => (
+                                <option key={r.build} value={r.build}>
+                                    {t("setup.esp32FirmwareCustom")} {r.version || r.build} (
+                                    {t(`boxupdate.channel_${r.channel}` as never)})
+                                </option>
+                            ))}
+                        </select>
+                        {releases.length === 0 && !firmware.isLoading && (
+                            <div className="hint">
+                                {t(cfwOff ? "setup.esp32CfwSupportOff" : "setup.esp32CfwNoImage")}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {state.cfwBuild !== 0 && <Notice>{t("setup.esp32CfwHint")}</Notice>}
                 <button className="btn primary" disabled={busy} onClick={flash}>
                     {t("setup.flashEsp32")}
                 </button>

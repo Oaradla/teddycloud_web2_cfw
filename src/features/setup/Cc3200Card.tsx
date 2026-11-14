@@ -59,10 +59,6 @@ export function Cc3200Card({
     const { releases, loading } = useCc3200Releases();
     const [chosen, setChosen] = useState<number | null>(null);
     const release = releases.find((r) => r.build === (build ?? chosen)) ?? releases[0];
-    const apiPort = useQuery({
-        queryKey: ["setting", "core.server.https_api_port"],
-        queryFn: () => tc.getSetting("core.server.https_api_port"),
-    });
     const [host, setHost] = useState(window.location.hostname);
     const [hostEdited, setHostEdited] = useState(false);
     // the address the other boxes use: the web address may be a reverse proxy the box cannot use
@@ -76,7 +72,8 @@ export function Cc3200Card({
     const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
     useBusyGuard(busy);
 
-    const boxPort = (port || apiPort.data || "443").trim();
+    const apiPort = String(boxHost.data?.apiPort || 443);
+    const boxPort = (port || apiPort).trim();
     const portInvalid = !validPort(Number(boxPort));
 
     const download = async () => {
@@ -141,7 +138,7 @@ export function Cc3200Card({
                 <input
                     className="input"
                     inputMode="numeric"
-                    value={port || apiPort.data || "443"}
+                    value={port || apiPort}
                     onChange={(e) => setPort(e.target.value)}
                     style={{ maxWidth: 140 }}
                 />

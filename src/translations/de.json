@@ -216,6 +216,8 @@
         "cfwFromBox": "Wie die Box",
         "cfwOwnValue": "Eigener Wert dieses Tonies",
         "cfwUseBox": "Wert der Box verwenden",
+        "cfwFromSettings": "Wie in den Einstellungen",
+        "cfwUseSettings": "Wert der Einstellungen verwenden",
         "series": "Serie",
         "cloudDownload": "Von Boxine laden",
         "cloudDownloading": "Lädt von Boxine …",
@@ -927,6 +929,10 @@
                 "label": "Setup-Seite aktualisieren",
                 "description": "Die Setup-Seite der Firmware, die eine Box gerade ausführt, oder die Standard-Setup-Seite an Boxen mit Custom Firmware ausliefern; aus: die Seite auf der Karte der Box bleibt, wie sie ist"
             },
+            "cfw_global_resume": {
+                "label": "Globales Fortsetzen für alle Tonies",
+                "description": "Jeder Tonie spielt auf jeder Box dort weiter, wo er auf einer anderen gestoppt wurde, als wäre „Globales Fortsetzen“ bei jedem eingeschaltet; ein Tonie behält den Wert, der in seinen eigenen Einstellungen gesetzt ist. Live-Inhalte und Streams sind ausgenommen"
+            },
             "cfw_event_image": {
                 "label": "Bild für Event-Tags",
                 "description": "Bild, das bei einem Tonie, der ein Event-Tag ist, statt des Bilds seines Inhalts erscheint"
@@ -1155,6 +1161,10 @@
                 "label": "Abmeldung bei Inaktivität (Stunden)",
                 "description": "Ohne Nutzung endet die Sitzung nach dieser Zeit"
             },
+            "web_auth_frame_ancestors": {
+                "label": "Erlaubte einbettende Seiten",
+                "description": "Adressen (z. B. https://ha.example.org), die die Weboberfläche in einem Frame zeigen dürfen, durch Leerzeichen getrennt. Leer: nur teddyCloud selbst."
+            },
             "web_auth_lockout_attempts": {
                 "label": "Fehlversuche bis zur Sperre",
                 "description": "Nach so vielen falschen Anmeldungen wird gesperrt"
@@ -1359,6 +1369,7 @@
         "coverNotSaved": "Cover-Bild nicht gespeichert",
         "exists": "„{{name}}“ gibt es in diesem Ordner schon. Ersetzen? Tonies, die es abspielen, bekommen den neuen Inhalt.",
         "existsMany": "Diese Dateien gibt es in diesem Ordner schon: {{names}}. Ersetzen? Tonies, die sie abspielen, bekommen den neuen Inhalt.",
+        "existsFolder": "Den Ordner „{{name}}“ gibt es hier schon. Ersetzen? Seine alten Teile, die der neue Upload nicht hat, werden nach dem Upload entfernt. Tonies, die ihn abspielen, bekommen den neuen Inhalt.",
         "replace": "Ersetzen"
     },
     "boxes": {
@@ -1542,6 +1553,8 @@
         "guideIntro": "Für eine Box, die noch die Original-Firmware hat; der Weg hängt vom Chip der Box ab.",
         "guideCc3200": "Toniebox mit CC3200-Chip (SD-Karte)",
         "guideEsp32": "Toniebox mit ESP32-Chip (über teddyCloud)",
+        "guideEsp32Flasher": "Ist die Box ohnehin zum Flashen offen, schreibt der ESP32-Flasher die Custom-Firmware gleich mit (Auswahl im Schritt „Flashen“); die Schritte 2 bis 5 entfallen dann.",
+        "guideEsp32FlasherLink": "ESP32-Flasher",
         "guideBoxSetupHint": "Anleitungen zum Einrichten und Flashen, auch zum Bestimmen des Chips",
         "guide_cc3200_1": "Die Box muss bereits mit teddyCloud laufen und den HackieboxNG-SD-Bootloader haben (siehe „Box einrichten“, CC3200).",
         "guide_cc3200_2": "Nimm das Release-Paket der Custom-Firmware (`toniebox-cfw-….zip`), also dasselbe, das du in die Bibliothek lädst, und entpacke es auf deinem Rechner.",
@@ -1790,7 +1803,8 @@
         "event_user_deleted": "Nutzer gelöscht",
         "event_user_updated": "Nutzer geändert",
         "ownersTitle": "Besitzer: {{name}}",
-        "ownersOnlyHint": "Besitzer dürfen alles damit und legen weitere Besitzer fest. Steht ein Tonie auf der Box eines anderen Nutzers, sieht dieser ihn, ohne dass er ihm gehört, und kann ihn für sich ausblenden."
+        "ownersOnlyHint": "Besitzer dürfen alles damit und legen weitere Besitzer fest. Steht ein Tonie auf der Box eines anderen Nutzers, sieht dieser ihn, ohne dass er ihm gehört, und kann ihn für sich ausblenden.",
+        "ownersRemoveAdminOnly": "Andere Besitzer entfernt nur ein Admin."
     },
     "more": {
         "serverSettingsHint": "Alle Optionen, durchsuchbar",
@@ -2250,6 +2264,12 @@
         "wifiSsid": "WLAN-Name (optional)",
         "wifiPass": "WLAN-Passwort",
         "patch": "Patchen",
+        "esp32Firmware": "Firmware",
+        "esp32FirmwareOriginal": "Original-Firmware (für teddyCloud gepatcht)",
+        "esp32FirmwareCustom": "Custom-Firmware",
+        "esp32CfwHint": "Die Custom-Firmware kommt in einen freien App-Slot neben die Original-Firmware und startet gleich nach dem Flashen. Bestätigt sie sich dreimal hintereinander nicht, startet die Box wieder die Original-Firmware. Hängt die Box schon vorher in einer Startschleife, hilft nur das Zurückschreiben des Flash-Dumps: bewahre ihn gut auf.",
+        "esp32CfwSupportOff": "Für die Custom-Firmware muss die CFW-Unterstützung an sein (Einstellungen → Custom Firmware) und ein Release in Box Update → Bibliothek liegen.",
+        "esp32CfwNoImage": "Für die Custom-Firmware lade ein Release mit ESP32-Image in Box Update → Bibliothek.",
         "esp32FlashText": "„ESP32 flashen“ schreibt das gepatchte Image; ggf. den Port wählen und warten.",
         "flashEsp32": "ESP32 flashen",
         "confirmFlash": "Jetzt flashen?",
@@ -2319,7 +2339,6 @@
         "cc3200BootloaderConfirmText": "Danach startet die Box über die SD-Karte. Ohne passende Karte startet sie nicht, bis die Karte bereit ist.",
         "cc3200BootloaderDone": "Bootloader installiert",
         "cc3200BootloaderUpToDate": "Preloader ist schon aktuell",
-        "cc3200HasHackiebox": "HackieboxNG ist schon installiert (/sys/pre-img.bin vorhanden).",
         "cc3200Card": "SD-Karte",
         "cc3200CardText": "Lade den Karteninhalt herunter und entpacke ihn ins Hauptverzeichnis der SD-Karte (vorhandene Inhalte bleiben, ngCfg.json wird ersetzt). Karte einsetzen, Box zusammenbauen und starten: Sie startet die Custom-Firmware und meldet sich bei teddyCloud.",
         "cc3200CardDownload": "Karteninhalt herunterladen",
@@ -2360,6 +2379,7 @@
             "certsMissing": "Fehlt auf der Box: {{names}}",
             "noPreloader": "Das Paket enthält keinen Preloader.",
             "noMcuimg": "/sys/mcuimg.bin war nicht in der Sicherung.",
+            "noOriginal": "Ein früheres Schreiben des Bootloaders brach ab und /sys/pre-img.bin fehlt oder ist kein Original-Bootloader: Das Original ist nicht auf der Box. Zuerst aus dem Backup zurückschreiben.",
             "unnamedFiles_one": "Eine Datei hat keinen Namen in der Dateitabelle und keinen bekannten Namen.",
             "unnamedFiles_other": "{{count}} Dateien haben keinen Namen in der Dateitabelle und keinen bekannten Namen."
         },

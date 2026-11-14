@@ -34,7 +34,9 @@ class SimulatedBootloader implements Link {
     private expectAck = false;
     private sram = new Uint8Array(0x10000);
     private status = 0x40;
-    private open: { name: string; write: boolean; data: number[] } | null = null;
+    open: { name: string; write: boolean; data: number[] } | null = null;
+    /** a file whose chunks the box refuses */
+    failWrite: string | null = null;
     readonly packets: number[] = [];
 
     constructor(
@@ -151,7 +153,7 @@ class SimulatedBootloader implements Link {
             case 0x24: {
                 const pos = this.u32(b, 1);
                 b.slice(5).forEach((x, i) => (this.open!.data[pos + i] = x));
-                this.status = 0x40;
+                this.status = this.failWrite === this.open!.name ? 0x01 : 0x40;
                 break;
             }
             case 0x22:
@@ -238,5 +240,47 @@ const preloader = Uint8Array.from({ length: 15783 }, (_, i) => (i * 3) & 0xff);
 await cc.writeFile("/sys/mcuimg.bin", preloader);
 assert(equal(sim.files.get("/sys/mcuimg.bin")!, preloader), "existing file replaced");
 assert(await cc.exists("/cert/ca.der"), "file info");
+sim.failWrite = "/sys/pre-img.bin";
+const failed = await cc.writeFile("/sys/pre-img.bin", preImg).then(
+    () => false,
+    () => true,
+);
+sim.failWrite = null;
+assert(failed && sim.open === null, "a failed write closes the file");
+await cc.writeFile("/sys/pre-img.bin", preImg);
+assert(equal(sim.files.get("/sys/pre-img.bin")!, preImg), "written again after a failed write");
+
+// a preloader write breaks off; the backup of the next connect holds the broken mcuimg.bin
+const original = files.get("/sys/mcuimg.bin")!;
+const ngPreloader = new TextEncoder().encode("preloader /revvox/boot/ngbootloader.bin");
+sim.files.set("/sys/mcuimg.bin", original);
+sim.files.delete("/sys/pre-img.bin");
+sim.failWrite = "/sys/mcuimg.bin";
+const broke = await cc.installPreloader(ngPreloader, original).then(
+    () => false,
+    () => true,
+);
+sim.failWrite = null;
+assert(broke && sim.files.has("/sys/cfw-preloader.pending"), "a broken preloader write is marked");
+await cc.installPreloader(ngPreloader, sim.files.get("/sys/mcuimg.bin"));
+assert(
+    equal(sim.files.get("/sys/pre-img.bin")!, original) &&
+        equal(sim.files.get("/sys/mcuimg.bin")!, ngPreloader) &&
+        !sim.files.has("/sys/cfw-preloader.pending"),
+    "after a broken write the original stays and the preloader is written again",
+);
+sim.files.delete("/sys/pre-img.bin");
+sim.files.set("/sys/cfw-preloader.pending", Uint8Array.of(0x31));
+const refused = await cc.installPreloader(ngPreloader, original).then(
+    () => "",
+    (e) => e.key,
+);
+assert(refused === "noOriginal", "marked without pre-img.bin: refused");
+sim.files.set("/sys/pre-img.bin", ngPreloader);
+const refusedPreloader = await cc.installPreloader(ngPreloader, original).then(
+    () => "",
+    (e) => e.key,
+);
+assert(refusedPreloader === "noOriginal", "marked with a preloader in pre-img.bin: refused");
 await cc.close();
 console.log("all passed");

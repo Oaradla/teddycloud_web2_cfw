@@ -216,6 +216,8 @@
         "cfwFromBox": "As the box",
         "cfwOwnValue": "This tonie's own value",
         "cfwUseBox": "Use the box's value",
+        "cfwFromSettings": "As in the settings",
+        "cfwUseSettings": "Use the settings' value",
         "series": "Series",
         "cloudDownload": "Load from Boxine",
         "cloudDownloading": "Loading from Boxine …",
@@ -516,6 +518,7 @@
         "coverNotSaved": "Cover picture not saved",
         "exists": "“{{name}}” already exists in this folder. Replace it? Tonies that play it get the new content.",
         "existsMany": "These files already exist in this folder: {{names}}. Replace them? Tonies that play them get the new content.",
+        "existsFolder": "The folder “{{name}}” already exists here. Replace it? Its old parts that the new upload does not have are removed after the upload. Tonies that play it get the new content.",
         "replace": "Replace"
     },
     "boxes": {
@@ -699,6 +702,8 @@
         "guideIntro": "For a box that still runs the original firmware; the way depends on the chip of the box.",
         "guideCc3200": "Toniebox with CC3200 chip (SD card)",
         "guideEsp32": "Toniebox with ESP32 chip (through teddyCloud)",
+        "guideEsp32Flasher": "If the box is open for flashing anyway, the ESP32 flasher writes the custom firmware along with it (choice in the flashing step); steps 2 to 5 are then not needed.",
+        "guideEsp32FlasherLink": "ESP32 flasher",
         "guideBoxSetupHint": "Guides for setting up and flashing, also for finding out the chip",
         "guide_cc3200_1": "The box must already run with teddyCloud and have the HackieboxNG SD bootloader (see \"Set up a box\", CC3200).",
         "guide_cc3200_2": "Take the release package of the custom firmware (`toniebox-cfw-….zip`), the same one you load into the library, and unpack it on your computer.",
@@ -947,7 +952,8 @@
         "event_user_deleted": "User deleted",
         "event_user_updated": "User changed",
         "ownersTitle": "Owners: {{name}}",
-        "ownersOnlyHint": "Owners may do everything with it and assign further owners. A tonie placed on another user's box shows up for that user without belonging to them; they can hide it for themselves."
+        "ownersOnlyHint": "Owners may do everything with it and assign further owners. A tonie placed on another user's box shows up for that user without belonging to them; they can hide it for themselves.",
+        "ownersRemoveAdminOnly": "Only an admin removes other owners."
     },
     "more": {
         "serverSettingsHint": "All options, searchable",
@@ -1407,6 +1413,12 @@
         "wifiSsid": "Wi-Fi name (optional)",
         "wifiPass": "Wi-Fi password",
         "patch": "Patch",
+        "esp32Firmware": "Firmware",
+        "esp32FirmwareOriginal": "Original firmware (patched for teddyCloud)",
+        "esp32FirmwareCustom": "Custom firmware",
+        "esp32CfwHint": "The custom firmware goes into a free app slot beside the original firmware and starts right after flashing. If it does not confirm itself three times in a row, the box starts the original firmware again. If the box gets stuck in a start loop before that, only writing back the flash dump helps: keep it safe.",
+        "esp32CfwSupportOff": "For the custom firmware, switch on CFW support (Settings → Custom Firmware) and load a release into Box Update → Library.",
+        "esp32CfwNoImage": "For the custom firmware, load a release with an ESP32 image into Box Update → Library.",
         "esp32FlashText": "\"Flash ESP32\" writes the patched image; choose the port if asked and wait.",
         "flashEsp32": "Flash ESP32",
         "confirmFlash": "Flash now?",
@@ -1476,7 +1488,6 @@
         "cc3200BootloaderConfirmText": "Afterwards the box starts from the SD card. Without a matching card it does not start until the card is ready.",
         "cc3200BootloaderDone": "Bootloader installed",
         "cc3200BootloaderUpToDate": "The preloader is up to date already",
-        "cc3200HasHackiebox": "HackieboxNG is installed already (/sys/pre-img.bin present).",
         "cc3200Card": "SD card",
         "cc3200CardText": "Download the card content and unpack it into the root of the SD card (existing content stays, ngCfg.json is replaced). Put the card in, assemble the box and start it: it starts the custom firmware and reports to teddyCloud.",
         "cc3200CardDownload": "Download the card content",
@@ -1517,6 +1528,7 @@
             "certsMissing": "Missing on the box: {{names}}",
             "noPreloader": "The package has no preloader.",
             "noMcuimg": "/sys/mcuimg.bin was not in the backup.",
+            "noOriginal": "An earlier bootloader write broke off and /sys/pre-img.bin is missing or no original bootloader: the original is not on the box. Write it back from the backup first.",
             "unnamedFiles_one": "One file has no name in the file table and no known name.",
             "unnamedFiles_other": "{{count}} files have no name in the file table and no known name."
         },

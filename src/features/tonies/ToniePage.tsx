@@ -59,6 +59,7 @@ import { cfwThrow } from "../boxupdate/cfwMessages";
 import { DownloadSheet } from "../library/DownloadSheet";
 import { LibraryPicker } from "../library/LibraryPicker";
 import { CfwTagSettings } from "./CfwTagSettings";
+import { siblingEpisodes } from "./episodes";
 import { ModelPicker } from "./ModelPicker";
 import { StreamPicker } from "./StreamPicker";
 import { ShareSheet, useCanShare } from "../users/ShareSheet";
@@ -225,15 +226,7 @@ function TonieDetail({
                 f.name !== `${f.tafHeader?.audioId}.taf`,
         )
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    const at = episodes.findIndex((f) => f.name === baseName(lib));
-    const nextEpisode = episodes.slice(at + 1).find((f) => !f.listened);
-    const prevEpisode =
-        at > 0
-            ? episodes
-                  .slice(0, at)
-                  .reverse()
-                  .find((f) => !f.listened)
-            : undefined;
+    const { next: nextEpisode, prev: prevEpisode } = siblingEpisodes(episodes, baseName(lib));
 
     const contentModel = linked?.model && linked.model !== tag.tonieInfo?.model ? linked.model : "";
     /** the content tonies.json names for the figure, when a TAF of the library has it */
@@ -485,8 +478,8 @@ function TonieDetail({
                     title={t("tonies.hide")}
                     sub={t("tonies.hideHint")}
                     checked={tag.hide}
-                    onChange={(v) => (borrowed ? hideBorrowed() : change("hide", v))}
-                    disabled={!canEdit && !borrowed}
+                    onChange={(v) => (borrowed && v ? hideBorrowed() : change("hide", v))}
+                    disabled={!canEdit && !(borrowed && !tag.hide)}
                 />
             </Section>
 

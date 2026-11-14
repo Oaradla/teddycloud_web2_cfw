@@ -50,6 +50,7 @@ export function CfwTagSettings({ ruid, canEdit }: { ruid: string; canEdit: boole
         if (r && r.ok === false) ui.toast("error", t("common.saveFailed"), cfwMessage(r.message));
         else if (r) {
             ui.toast("ok", t("common.saved"));
+            shown.current = draft;
             qc.invalidateQueries({ queryKey: ["cfwTag", ruid] });
         }
     };

@@ -647,8 +647,9 @@ function ImageSheet({
             danger: true,
         });
         if (!ok) return;
-        await notify(await result(() => tc.cfwDeleteFirmware(image)), t("common.deleted"));
-        onClose();
+        const r = await result(() => tc.cfwDeleteFirmware(image));
+        await notify(r, t("common.deleted"));
+        if (r.ok) onClose();
     };
 
     return (
@@ -673,11 +674,9 @@ function ImageSheet({
                         <button
                             className="btn primary"
                             onClick={async () => {
-                                await notify(
-                                    await result(() => tc.cfwEditFirmware(image, { notes })),
-                                    t("common.saved"),
-                                );
-                                onClose();
+                                const r = await result(() => tc.cfwEditFirmware(image, { notes }));
+                                await notify(r, t("common.saved"));
+                                if (r.ok) onClose();
                             }}
                         >
                             {t("common.save")}

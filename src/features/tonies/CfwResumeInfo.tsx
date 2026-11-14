@@ -1,15 +1,17 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { History } from "lucide-react";
 import { useState } from "react";
 import { tc } from "../../api/tc";
 import type { CfwPosition, CfwResume } from "../../api/types";
+import { dateTime } from "../../lib/format";
 import { t } from "../../lib/i18n";
+import { useCfwBoxes } from "../../lib/queries";
 import { Row, useUi } from "../../ui/kit";
 import { cfwThrow } from "../boxupdate/cfwMessages";
 
 const minutes = (seconds: number) =>
     seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
-const when = (seconds: number) => (seconds ? new Date(seconds * 1000).toLocaleString() : "-");
+const when = (seconds: number) => dateTime(seconds * 1000) || "-";
 
 /** where the figure was heard last and, for global resume, its position or the conflict to decide */
 export function CfwResumeInfo({
@@ -23,7 +25,7 @@ export function CfwResumeInfo({
 }) {
     const ui = useUi();
     const qc = useQueryClient();
-    const boxes = useQuery({ queryKey: ["cfwBoxes"], queryFn: tc.cfwBoxes, retry: false });
+    const boxes = useCfwBoxes();
     const box = (id: string) => {
         const b = boxes.data?.find((x) => x.id === id);
         return b ? b.boxName || b.commonName : id;

@@ -10,13 +10,6 @@ import { Cc3200Card, packageFiles, saveZip } from "./Cc3200Card";
 import { StatusLine, Steps, UartHint, Warnings, useBusyGuard } from "./parts";
 import { t, type Key } from "../../lib/i18n";
 
-const equal = (a: Uint8Array, b: Uint8Array) =>
-    a.length === b.length && a.every((x, i) => x === b[i]);
-
-/** a HackieboxNG preloader names the SD bootloader it starts; the box's original bootloader does not */
-const isPreloader = (image: Uint8Array) =>
-    new TextDecoder("latin1").decode(image).includes("/revvox/boot/ngbootloader.bin");
-
 /** the 12 hex digits of the box ID in the common name of its client certificate */
 const macOfCertificate = (der: Uint8Array): string => {
     for (let i = 0; i + 7 < der.length; i++) {
@@ -100,6 +93,16 @@ export function Cc3200Browser() {
     const connectAndBackUp = () =>
         run(async () => {
             const port = await navigator.serial.requestPort();
+            // nothing of the box before counts until this one is read
+            const before = backup.current;
+            const beforeMac = mac;
+            backup.current = null;
+            setFailed([]);
+            setMac("");
+            setBackupSaved(false);
+            setBackupStored("");
+            setCertsDone(false);
+            setBootloaderDone(false);
             setStatus(t("setup.cc3200Connecting"));
             const cc = await Cc3200.connect(port, {
                 gateway,
@@ -132,11 +135,15 @@ export function Cc3200Browser() {
                     setProgress((i + 1) / n);
                 })
                 .catch(closeOnError);
-            backup.current = { flash, files: all.files };
             setFailed(all.failed);
             const client = all.files.get("/cert/client.der");
             const found = client ? macOfCertificate(client) : "";
             setMac(found);
+            // the same box again: a broken write since then is not taken for its original
+            if (before && found && found === beforeMac) {
+                backup.current = before;
+                addLog("same box as before: its first backup is kept");
+            } else backup.current = { flash, files: all.files };
             const done = t("setup.cc3200BackupDone", {
                 files: all.files.size,
                 kb: Math.round(flash.length / 1024),
@@ -145,7 +152,7 @@ export function Cc3200Browser() {
             addLog(done);
             // the flash dump also stays on the server, as with the ESP32 box
             const stored = await tc
-                .storeFlashDump(`CC3200_${found || "unknown"}`, flash)
+                .storeFlashDump(`CC3200_${found || "unknown"}`, backup.current.flash)
                 .catch((e) => {
                     addLog(t("setup.cc3200BackupNotStored", { reason: String(e?.message ?? e) }));
                     return "";
@@ -204,23 +211,12 @@ export function Cc3200Browser() {
                 "sys/mcuimg.bin"
             ];
             if (!preloader) throw new Error(t("setup.cc3200Errors.noPreloader"));
-            const current = backup.current!.files.get("/sys/mcuimg.bin");
-            if (!current) throw new Error(t("setup.cc3200Errors.noMcuimg"));
-            if (isPreloader(current)) {
-                // HackieboxNG is there: the original stays in pre-img.bin
-                addLog(t("setup.cc3200HasHackiebox"));
-                if (equal(current, preloader)) {
-                    ui.toast("ok", t("setup.cc3200BootloaderUpToDate"));
-                    setBootloaderDone(true);
-                    return t("setup.cc3200BootloaderUpToDate");
-                }
-            } else {
-                // also over a pre-img.bin an earlier, failed run left behind
-                await cc.writeFile("/sys/pre-img.bin", current);
-                addLog("original bootloader moved to /sys/pre-img.bin");
+            const image = backup.current!.files.get("/sys/mcuimg.bin");
+            if (!(await cc.installPreloader(preloader, image))) {
+                ui.toast("ok", t("setup.cc3200BootloaderUpToDate"));
+                setBootloaderDone(true);
+                return t("setup.cc3200BootloaderUpToDate");
             }
-            await cc.writeFile("/sys/mcuimg.bin", preloader);
-            addLog("preloader written to /sys/mcuimg.bin");
             setBootloaderDone(true);
             ui.toast("ok", t("setup.cc3200BootloaderDone"));
             return t("setup.cc3200BootloaderDone");

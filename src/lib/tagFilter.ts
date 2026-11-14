@@ -28,6 +28,7 @@ const FIELDS: Record<string, (tag: Tag) => Value> = {
     tracksecondscount: (x) => (x.trackSeconds ?? []).length,
 };
 export const FILTER_FIELDS = Object.keys(FIELDS);
+const fieldOf = (name: string) => (Object.hasOwn(FIELDS, name) ? FIELDS[name] : undefined);
 
 export class FilterError extends Error {}
 
@@ -64,8 +65,8 @@ export function compileFilter(query: string, all: Tag[]): Pred {
     const field = () => {
         const name = next();
         const f =
-            FIELDS[name] ??
-            FIELDS[Object.keys(FIELDS).find((k) => k.toLowerCase() === name.toLowerCase()) ?? ""];
+            fieldOf(name) ??
+            fieldOf(FILTER_FIELDS.find((k) => k.toLowerCase() === name.toLowerCase()) ?? "");
         if (!f) throw new FilterError(name);
         return f;
     };
@@ -130,7 +131,7 @@ export function compileFilter(query: string, all: Tag[]): Pred {
                 };
             }
             // tracksecondscount = trackcount compares two fields
-            const other = FIELDS[raw];
+            const other = fieldOf(raw);
             const value = (x: Tag) => (other ? other(x) : unquote(raw));
             if (op === "=" || op === "==" || op === "!=") {
                 const eq = (x: Tag) => {

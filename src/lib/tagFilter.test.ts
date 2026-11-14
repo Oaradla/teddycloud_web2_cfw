@@ -43,5 +43,7 @@ describe("compileFilter", () => {
     it("names the token that does not fit", () => {
         expect(() => match("colour = red")).toThrow(FilterError);
         expect(() => match("series = Pixi )")).toThrow(")");
+        expect(() => match("constructor = x")).toThrow(FilterError);
+        expect(match("series = toString")).toEqual([]);
     });
 });

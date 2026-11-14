@@ -82,6 +82,9 @@ export function ShareSheet({
     };
     const userName = (u: string) => (u === EVERYONE ? t("users.everyone") : u);
     const me = access.mine.username.toLowerCase();
+    /* a non-admin adds owners and may leave; removing the others is the admin's */
+    const keptOwner = (u: string) =>
+        !access.admin && u.toLowerCase() !== me && (entry.data?.owners ?? []).includes(u);
     const candidates = (users.data ?? []).filter(
         (u) => u.username.toLowerCase() !== me && !(u.username in shares),
     );
@@ -170,7 +173,9 @@ export function ShareSheet({
                             ownerMissing
                                 ? t("users.ownerRequired")
                                 : ownersOnly
-                                  ? t("users.ownersOnlyHint")
+                                  ? access.admin
+                                      ? t("users.ownersOnlyHint")
+                                      : `${t("users.ownersOnlyHint")} ${t("users.ownersRemoveAdminOnly")}`
                                   : access.admin
                                     ? t("users.ownersHint")
                                     : t("users.ownersAdminOnly")
@@ -185,6 +190,7 @@ export function ShareSheet({
                                           title={u.username}
                                           sub={levelName(u.level)}
                                           checked={owners.includes(u.username)}
+                                          disabled={keptOwner(u.username)}
                                           onChange={(on) =>
                                               setOwners((o) =>
                                                   on

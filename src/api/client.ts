@@ -70,7 +70,11 @@ export const AUTH_REQUIRED_EVENT = "tc-auth-required";
 
 export async function request(path: string, init: RequestInit = {}): Promise<Response> {
     const url = backendUrl(path);
-    const send = () => fetch(url, { credentials: "same-origin", ...init });
+    return withAuth(path, () => fetch(url, { credentials: "same-origin", ...init }));
+}
+
+/** sends, asks for the password and sends again when needed, reports a lost login */
+async function withAuth(path: string, send: () => Promise<Response>): Promise<Response> {
     let response = await send();
     if ((await forbiddenCode(response)) === "reauth_required") {
         if (await askReauth()) response = await send();
@@ -143,28 +147,32 @@ export async function postJson<T = any>(path: string, body: unknown): Promise<T>
 }
 
 /** POST of form data with upload progress (fetch can not report it) */
-export function postForm(
+export async function postForm(
     path: string,
     form: FormData,
     onProgress?: (fraction: number) => void,
 ): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", backendUrl(path));
-        xhr.withCredentials = true;
-        xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
-        };
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.responseText);
-            else {
-                if (xhr.status === 401) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
-                reject(new ApiError(xhr.responseText || `HTTP ${xhr.status}`, xhr.status));
-            }
-        };
-        xhr.onerror = () => reject(new ApiError(t("common.networkError"), 0));
-        xhr.send(form);
-    });
+    const send = () =>
+        new Promise<Response>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", backendUrl(path));
+            xhr.withCredentials = true;
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+            };
+            xhr.onload = () =>
+                resolve(
+                    new Response(xhr.responseText, {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                    }),
+                );
+            xhr.onerror = () => reject(new ApiError(t("common.networkError"), 0));
+            xhr.send(form);
+        });
+    const response = await withAuth(path, send);
+    if (!response.ok) throw await errorFrom(response);
+    return response.text();
 }
 
 export const q = (params: Record<string, string | number | boolean | undefined | null>) => {

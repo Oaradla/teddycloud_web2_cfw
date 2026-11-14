@@ -1,5 +1,5 @@
 import { tc } from "../../api/tc";
-import { t } from "../../lib/i18n";
+import { t, type Key } from "../../lib/i18n";
 import type { useUi } from "../../ui/kit";
 
 /** asks before files of these names in the folder are replaced; true: go on */
@@ -7,6 +7,7 @@ export async function confirmReplace(
     ui: ReturnType<typeof useUi>,
     folder: string,
     names: string[],
+    exists: Key = "upload.exists",
 ): Promise<boolean> {
     const existing = new Set((await tc.files(folder).catch(() => [])).map((f) => f.name));
     const found = names.filter((n) => existing.has(n));
@@ -15,7 +16,7 @@ export async function confirmReplace(
         title: t("upload.replace"),
         text:
             found.length === 1
-                ? t("upload.exists", { name: found[0] })
+                ? t(exists, { name: found[0] })
                 : t("upload.existsMany", { names: found.join(", ") }),
         confirm: t("upload.replace"),
         danger: true,

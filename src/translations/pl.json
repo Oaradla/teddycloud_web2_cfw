@@ -290,6 +290,7 @@
         "uploadingN": "Przesyłanie utworu {{n}} z {{total}} …",
         "exists": "„{{name}}” już istnieje w tym folderze. Zastąpić? Tonie, które go odtwarzają, dostaną nową zawartość.",
         "existsMany": "Te pliki już istnieją w tym folderze: {{names}}. Zastąpić je? Tonie, które je odtwarzają, dostaną nową zawartość.",
+        "existsFolder": "Folder „{{name}}” już tu istnieje. Zastąpić? Jego stare części, których nie ma nowe przesłanie, zostaną usunięte po przesłaniu. Tonie, które go odtwarzają, dostaną nową zawartość.",
         "replace": "Zastąp"
     },
     "library": {
@@ -619,7 +620,8 @@
         "you": "Ty",
         "yourAddress": "Twój adres widziany przez TeddyCloud",
         "ownersTitle": "Właściciele: {{name}}",
-        "ownersOnlyHint": "Właściciele mogą wszystko i wyznaczają kolejnych właścicieli. Tonie postawiony na pudełku innego użytkownika pojawia się u niego, nie należąc do niego; może go ukryć tylko dla siebie."
+        "ownersOnlyHint": "Właściciele mogą wszystko i wyznaczają kolejnych właścicieli. Tonie postawiony na pudełku innego użytkownika pojawia się u niego, nie należąc do niego; może go ukryć tylko dla siebie.",
+        "ownersRemoveAdminOnly": "Innych właścicieli usuwa tylko administrator."
     },
     "boxupdate": {
         "added": "Dodano",
@@ -675,6 +677,8 @@
         "guideCardZipLink": "Utwórz plik zip karty SD",
         "guideCc3200": "Toniebox z układem CC3200 (karta SD)",
         "guideEsp32": "Toniebox z układem ESP32 (przez teddyCloud)",
+        "guideEsp32Flasher": "Jeśli pudełko i tak jest otwarte do flashowania, flasher ESP32 od razu zapisze także własny firmware (wybór w kroku flashowania); kroki 2 do 5 są wtedy zbędne.",
+        "guideEsp32FlasherLink": "Flasher ESP32",
         "guideHide": "Ukryj instrukcję",
         "guideIntro": "Dla boxa, który ma jeszcze oryginalne oprogramowanie; sposób zależy od układu boxa.",
         "guideShow": "Pokaż instrukcję",
@@ -900,6 +904,8 @@
         "cfwFromBox": "Jak box",
         "cfwOwnValue": "Własna wartość tego tonie",
         "cfwUseBox": "Użyj wartości boxa",
+        "cfwFromSettings": "Jak w ustawieniach",
+        "cfwUseSettings": "Użyj wartości z ustawień",
         "cfwMode0": "Przełącz",
         "cfwMode1": "Włącz",
         "cfwMode2": "Wyłącz",
@@ -1750,6 +1756,10 @@
                 "label": "Aktualizuj stronę konfiguracji",
                 "description": "Dostarczaj pudełkom z niestandardowym firmware stronę konfiguracji firmware, który pudełko uruchamia, lub domyślną stronę konfiguracji; wyłączone: strona na karcie pudełka pozostaje bez zmian"
             },
+            "cfw_global_resume": {
+                "label": "Globalne wznawianie dla wszystkich tonie",
+                "description": "Każdy tonie gra dalej na każdym boxie od miejsca, w którym zatrzymał się na innym, tak jakby globalne wznawianie było włączone dla każdego; tonie zachowuje wartość ustawioną w jego własnych ustawieniach. Treści na żywo i streamy są pominięte"
+            },
             "cfw_event_image": {
                 "label": "Obraz tagów zdarzeń",
                 "description": "Obraz wyświetlany dla Toniego będącego tagiem zdarzenia zamiast obrazu jego zawartości"
@@ -1978,6 +1988,10 @@
                 "label": "Wylogowanie po bezczynności (godziny)",
                 "description": "Bez używania sesja kończy się po tym czasie"
             },
+            "web_auth_frame_ancestors": {
+                "label": "Strony mogące osadzać",
+                "description": "Adresy (np. https://ha.example.org), które mogą wyświetlać interfejs WWW w ramce, oddzielone spacjami. Puste: tylko sam teddyCloud."
+            },
             "web_auth_lockout_attempts": {
                 "label": "Nieudane próby do blokady",
                 "description": "Po tylu błędnych logowaniach następuje blokada"
@@ -2183,7 +2197,6 @@
         "cc3200Cons": "Najstarsza wersja",
         "cc3200Disconnect": "Rozłącz",
         "cc3200DownloadBackup": "Pobierz kopię",
-        "cc3200HasHackiebox": "HackieboxNG jest już zainstalowany (/sys/pre-img.bin istnieje).",
         "cc3200HostHint": "Nazwa lub IP, pod którą box łączy się bezpośrednio z teddyCloud na porcie boxów. Nie adres odwrotnego proxy: box sprawdza certyfikat teddyCloud.",
         "cc3200HostSeen": "Proponowane: {{host}}, przez nie inne boxy łączą się z teddyCloud. Nie adres odwrotnego proxy.",
         "cc3200Mac": "MAC boxa",
@@ -2247,6 +2260,12 @@
         "esp32Connect": "Odłącz box od zasilania. Podłącz UART (3,3 V) do J103 (wystarczy klips lub spinacz do bielizny), zmostkuj J100 (boot) i włącz ponownie. W trybie pobierania dioda nie świeci i nie ma dźwięku.",
         "esp32Cons": "Zmiana nazwy hosta lub powrót do oryginalnego oprogramowania wymaga ponownego flashowania (poza własnym oprogramowaniem)",
         "esp32DoneText": "Odłącz UART, usuń mostek J100, uruchom box ponownie. Teraz łączy się z teddyCloud. Przechowuj oryginalny obraz w kilku miejscach!",
+        "esp32Firmware": "Firmware",
+        "esp32FirmwareOriginal": "Oryginalny firmware (spatchowany dla teddyCloud)",
+        "esp32FirmwareCustom": "Własny firmware",
+        "esp32CfwHint": "Własny firmware trafia do wolnego slotu aplikacji obok oryginalnego firmware'u i uruchamia się zaraz po flashowaniu. Jeśli trzy razy z rzędu się nie potwierdzi, pudełko znów uruchamia oryginalny firmware. Jeśli pudełko utknie wcześniej w pętli startowej, pomoże tylko ponowne zapisanie zrzutu pamięci flash: przechowuj go starannie.",
+        "esp32CfwSupportOff": "Aby użyć własnego firmware'u, włącz obsługę CFW (Ustawienia → Custom Firmware) i wgraj wydanie do Box Update → Biblioteka.",
+        "esp32CfwNoImage": "Aby użyć własnego firmware'u, wgraj wydanie z obrazem ESP32 do Box Update → Biblioteka.",
         "esp32FlashText": "\"Flashuj ESP32\" zapisuje załatany obraz; wybierz port, jeśli zostaniesz poproszony, i poczekaj.",
         "esp32Https": "Przeglądarka pozwala na port szeregowy tylko przez HTTPS (Chrome lub Edge na komputerze).",
         "esp32NoSerial": "Ta przeglądarka nie potrafi otworzyć portu szeregowego; użyj Chrome lub Edge na komputerze albo sposobu ręcznego poniżej.",
@@ -2386,6 +2405,7 @@
             "certsMissing": "Brak na boxie: {{names}}",
             "noPreloader": "Pakiet nie zawiera preloadera.",
             "noMcuimg": "/sys/mcuimg.bin nie było w kopii zapasowej.",
+            "noOriginal": "Wcześniejszy zapis bootloadera został przerwany, a /sys/pre-img.bin brakuje lub nie jest oryginalnym bootloaderem: oryginału nie ma na pudełku. Najpierw przywróć go z kopii zapasowej.",
             "unnamedFiles_one": "Jeden plik nie ma nazwy w tabeli plików ani znanej nazwy.",
             "unnamedFiles_few": "{{count}} pliki nie mają nazwy w tabeli plików ani znanej nazwy.",
             "unnamedFiles_many": "{{count}} plików nie ma nazwy w tabeli plików ani znanej nazwy.",

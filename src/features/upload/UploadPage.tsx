@@ -176,6 +176,7 @@ export function UploadPage() {
                     (p) => setBusy({ step: t("upload.uploading"), progress: p }),
                 );
                 setDone(items.length === 1 ? joinPath(folder, items[0].file.name) : "");
+                setDoneFolder(folder);
             } else {
                 const titles = items.map((i) => i.title.trim() || stripExt(i.file.name));
                 const job = {
@@ -188,7 +189,16 @@ export function UploadPage() {
                     bitrate: Number(bitrate.data) || 96,
                 };
                 const entry = uploadEntry(job);
-                if (!(await confirmReplace(ui, folder, [entry]))) return;
+                const folderEntry = !entry.endsWith(".taf");
+                if (
+                    !(await confirmReplace(
+                        ui,
+                        folder,
+                        [entry],
+                        folderEntry ? "upload.existsFolder" : undefined,
+                    ))
+                )
+                    return;
                 const step = (text: string, progress: number) => setBusy({ step: text, progress });
                 let result;
                 try {

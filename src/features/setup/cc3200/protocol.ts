@@ -95,8 +95,15 @@ const writerOf = (port: SerialPort) => {
 };
 
 const ascii = (s: string) => [...s].map((c) => c.charCodeAt(0));
-const equal = (a: Uint8Array, b: Uint8Array) =>
+export const equal = (a: Uint8Array, b: Uint8Array) =>
     a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** a HackieboxNG preloader names the SD bootloader it starts; the box's original bootloader does not */
+const isPreloader = (image: Uint8Array) =>
+    new TextDecoder("latin1").decode(image).includes("/revvox/boot/ngbootloader.bin");
+
+/** on the box while the preloader is written: mcuimg.bin may be a broken write, not the original */
+const PRELOADER_PENDING = "/sys/cfw-preloader.pending";
 
 export type Log = (line: string) => void;
 
@@ -223,19 +230,28 @@ class GatewayLink implements Link {
     }
 
     static async open(port: SerialPort, log: Log) {
-        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
         const link = new GatewayLink(port, log);
-        // extended mode: length 12, type 0x0A, "UARTGWEX"
-        await link.raw(Uint8Array.from([0x0c, 0x00, 0x0a, 0x00, ...ascii("UARTGWEX")]));
-        await sleep(500);
-        await link.raw(GatewayLink.packet(new Uint8Array(12), 1)); // ask for the configuration
-        await sleep(100);
-        const config = new Uint8Array(12);
-        config.set([BAUD & 0xff, (BAUD >> 8) & 0xff, (BAUD >> 16) & 0xff, (BAUD >>> 24) & 0xff], 0);
-        config[11] = 1; // extended mode
-        await link.raw(GatewayLink.packet(config, 1));
-        await sleep(100);
-        return link;
+        try {
+            await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+            // extended mode: length 12, type 0x0A, "UARTGWEX"
+            await link.raw(Uint8Array.from([0x0c, 0x00, 0x0a, 0x00, ...ascii("UARTGWEX")]));
+            await sleep(500);
+            await link.raw(GatewayLink.packet(new Uint8Array(12), 1)); // ask for the configuration
+            await sleep(100);
+            const config = new Uint8Array(12);
+            config.set(
+                [BAUD & 0xff, (BAUD >> 8) & 0xff, (BAUD >> 16) & 0xff, (BAUD >>> 24) & 0xff],
+                0,
+            );
+            config[11] = 1; // extended mode
+            await link.raw(GatewayLink.packet(config, 1));
+            await sleep(100);
+            return link;
+        } catch (e) {
+            // left open, the next Connect would find the port in use
+            await link.close();
+            throw e;
+        }
     }
 
     private static packet(payload: Uint8Array, type: number) {
@@ -703,7 +719,7 @@ export class Cc3200 {
         for (const [i, name] of files.entries()) {
             progress?.(name, i, files.length);
             try {
-                out.set(name, await this.readFile(name));
+                out.set(slash(name), await this.readFile(name));
             } catch (e) {
                 failed.push({ name, error: e });
                 this.log(`${name}: ${(e as Error).message}`);
@@ -712,16 +728,52 @@ export class Cc3200 {
         return { files: out, failed };
     }
 
+    /** removes a file of the box */
+    async deleteFile(name: string) {
+        await this.sendPacket([OP.eraseFile, ...be32(0), ...ascii(name), 0]);
+        const status = await this.lastStatus();
+        if (status !== STATUS_OK)
+            throw new Cc3200Error("eraseFailed", { name, status: status.toString(16) });
+    }
+
+    /**
+     * The preloader into /sys/mcuimg.bin, the original bootloader (image, from the backup) into
+     * /sys/pre-img.bin unless HackieboxNG is there already. False: the preloader is up to date.
+     */
+    async installPreloader(preloader: Uint8Array, image: Uint8Array | undefined) {
+        if (await this.exists(PRELOADER_PENDING)) {
+            // an earlier write broke off: mcuimg.bin is no original, pre-img.bin holds it
+            const saved = (await this.exists("/sys/pre-img.bin"))
+                ? await this.readFile("/sys/pre-img.bin")
+                : undefined;
+            if (!saved || isPreloader(saved)) throw new Cc3200Error("noOriginal");
+            this.log(
+                "an earlier preloader write broke off: the original stays in /sys/pre-img.bin",
+            );
+        } else if (!image) {
+            if (!(await this.exists("/sys/pre-img.bin"))) throw new Cc3200Error("noMcuimg");
+            this.log("no /sys/mcuimg.bin: the original stays in /sys/pre-img.bin");
+        } else if (isPreloader(image)) {
+            this.log("HackieboxNG is installed already (/sys/pre-img.bin present)");
+            if (equal(image, preloader)) return false;
+        } else {
+            await this.writeFile("/sys/pre-img.bin", image);
+            this.log("original bootloader moved to /sys/pre-img.bin");
+        }
+        await this.writeFile(PRELOADER_PENDING, Uint8Array.from(ascii("1")));
+        await this.writeFile("/sys/mcuimg.bin", preloader);
+        await this.deleteFile(PRELOADER_PENDING);
+        this.log("preloader written to /sys/mcuimg.bin");
+        return true;
+    }
+
     /** writes a file (an existing one is erased first) and reads it back to compare */
     async writeFile(name: string, data: Uint8Array) {
         if (!data.length) throw new Cc3200Error("nothingToWrite", { name });
         if ((await this.fileInfo(name)).exists) {
             // asked once more before erasing, as cc3200tool does
             await this.fileInfo(name);
-            await this.sendPacket([OP.eraseFile, ...be32(0), ...ascii(name), 0]);
-            const status = await this.lastStatus();
-            if (status !== STATUS_OK)
-                throw new Cc3200Error("eraseFailed", { name, status: status.toString(16) });
+            await this.deleteFile(name);
         }
         const index = FLASH_BLOCK_SIZES.findIndex((b) => b * 255 >= data.length);
         if (index < 0) throw new Cc3200Error("tooBig", { name });
@@ -733,14 +785,20 @@ export class Cc3200 {
         const timeout =
             data.length > 200000 ? Math.max(TIMEOUT, 5000 * (data.length / 200000 + 1)) : TIMEOUT;
         await this.openFile(name, flags, timeout);
-        for (let pos = 0; pos < data.length; pos += SLFS_BLOCK_SIZE) {
-            await this.sendPacket([
-                OP.fileChunk,
-                ...be32(pos),
-                ...data.subarray(pos, pos + SLFS_BLOCK_SIZE),
-            ]);
-            const status = await this.lastStatus();
-            if (status !== STATUS_OK) throw new Cc3200Error("writeFailed", { name, pos });
+        try {
+            for (let pos = 0; pos < data.length; pos += SLFS_BLOCK_SIZE) {
+                await this.sendPacket([
+                    OP.fileChunk,
+                    ...be32(pos),
+                    ...data.subarray(pos, pos + SLFS_BLOCK_SIZE),
+                ]);
+                const status = await this.lastStatus();
+                if (status !== STATUS_OK) throw new Cc3200Error("writeFailed", { name, pos });
+            }
+        } catch (e) {
+            // left open, a second try could not open it
+            await this.closeFile().catch(() => undefined);
+            throw e;
         }
         await this.closeFile();
         if (!equal(await this.readFileOnce(name), data))

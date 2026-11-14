@@ -42,6 +42,7 @@ const BOX_SETTING = {
     slapLock: "cfw.box.slap_lock",
     tiltLock: "cfw.box.tilt_lock",
     volumeLock: "cfw.box.volume_lock",
+    globalResume: "cfw.global_resume",
 } as const;
 type BoxKey = keyof typeof BOX_SETTING;
 
@@ -68,10 +69,6 @@ export function CfwProfileFields({
     changed?: Set<keyof CfwProfile>;
 }) {
     const boxes = useCfwBoxes();
-    const oldBoxes =
-        values.globalResume === true
-            ? withoutCapability(boxes.data ?? [], CFW_CAP.globalResume)
-            : [];
     const state = (k: keyof CfwProfile) => (
         <FieldState mixed={values[k] === MIXED} changed={changed?.has(k)} />
     );
@@ -96,14 +93,19 @@ export function CfwProfileFields({
         slapLock: useSetting(BOX_SETTING.slapLock).data,
         tiltLock: useSetting(BOX_SETTING.tiltLock).data,
         volumeLock: useSetting(BOX_SETTING.volumeLock).data,
+        globalResume: useSetting(BOX_SETTING.globalResume).data,
     };
     const inherited = (k: BoxKey) => values[k] === null;
     const effective = (k: BoxKey) => {
         const v = values[k];
         if (v !== null) return v;
         const b = box[k];
-        return b === undefined ? MIXED : k.endsWith("Lock") ? b === "true" : Number(b);
+        return b === undefined ? MIXED : b === "true" || b === "false" ? b === "true" : Number(b);
     };
+    const globalResume = effective("globalResume") === true;
+    const oldBoxes = globalResume ? withoutCapability(boxes.data ?? [], CFW_CAP.globalResume) : [];
+    // global resume falls back to the server's setting, the others to the box's
+    const fromServer = (k: BoxKey) => k === "globalResume";
     const inheritable = (
         k: BoxKey,
         title: string,
@@ -124,7 +126,11 @@ export function CfwProfileFields({
                                     color: inherited(k) ? "var(--fg-3)" : "var(--accent)",
                                 }}
                             >
-                                {inherited(k) ? t("tonies.cfwFromBox") : t("tonies.cfwOwnValue")}
+                                {!inherited(k)
+                                    ? t("tonies.cfwOwnValue")
+                                    : fromServer(k)
+                                      ? t("tonies.cfwFromSettings")
+                                      : t("tonies.cfwFromBox")}
                             </span>
                         )}
                     </>
@@ -136,8 +142,12 @@ export function CfwProfileFields({
                         {values[k] !== null && (
                             <button
                                 className="icon-btn muted"
-                                title={t("tonies.cfwUseBox")}
-                                aria-label={t("tonies.cfwUseBox")}
+                                title={t(
+                                    fromServer(k) ? "tonies.cfwUseSettings" : "tonies.cfwUseBox",
+                                )}
+                                aria-label={t(
+                                    fromServer(k) ? "tonies.cfwUseSettings" : "tonies.cfwUseBox",
+                                )}
                                 onClick={() => onChange(k, null)}
                             >
                                 <RotateCcw size={17} />
@@ -151,9 +161,9 @@ export function CfwProfileFields({
     );
 
     /** a function the box does not know: off is the same as no value */
-    const toggle = (k: "resume" | "globalResume" | "shuffle", title: string, sub: string) => {
+    const toggle = (k: "resume" | "shuffle", title: string, sub: string) => {
         // global resume includes resume: shown as on and locked
-        const implied = k === "resume" && values.globalResume === true;
+        const implied = k === "resume" && globalResume;
         const v = values[k];
         return block(
             k,
@@ -171,11 +181,15 @@ export function CfwProfileFields({
         );
     };
 
-    const lock = (k: "slapLock" | "tiltLock" | "volumeLock", title: string) =>
+    const onOffInherited = (
+        k: "slapLock" | "tiltLock" | "volumeLock" | "globalResume",
+        title: string,
+        sub: string,
+    ) =>
         inheritable(
             k,
             title,
-            t("tonies.cfwLockHint"),
+            sub,
             <Segmented
                 value={onOff(effective(k) as boolean | Mixed)}
                 onChange={(n) => onChange(k, n === "on")}
@@ -207,7 +221,7 @@ export function CfwProfileFields({
     return (
         <>
             {toggle("resume", t("tonies.cfwResume"), t("tonies.cfwResumeHint"))}
-            {toggle(
+            {onOffInherited(
                 "globalResume",
                 t("tonies.cfwGlobalResume"),
                 t("tonies.cfwGlobalResumeHint") +
@@ -256,9 +270,9 @@ export function CfwProfileFields({
             )}
             {limit("speakerLimit", t("common.speakerLimit"))}
             {limit("headphoneLimit", t("common.headphoneLimit"))}
-            {lock("slapLock", t("common.slapLock"))}
-            {lock("tiltLock", t("common.tiltLock"))}
-            {lock("volumeLock", t("common.volumeLock"))}
+            {onOffInherited("slapLock", t("common.slapLock"), t("tonies.cfwLockHint"))}
+            {onOffInherited("tiltLock", t("common.tiltLock"), t("tonies.cfwLockHint"))}
+            {onOffInherited("volumeLock", t("common.volumeLock"), t("tonies.cfwLockHint"))}
         </>
     );
 }

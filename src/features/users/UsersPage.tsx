@@ -684,7 +684,8 @@ function UserSheet({
                                     () => auth.deleteUser(u.username),
                                     t("common.deleted"),
                                 );
-                                if (r?.authDisabled) ui.toast("info", t("users.loginOffDone"));
+                                if (!r) return;
+                                if (r.authDisabled) ui.toast("info", t("users.loginOffDone"));
                                 onChanged();
                                 onClose();
                             }}

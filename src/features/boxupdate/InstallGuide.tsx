@@ -62,6 +62,13 @@ export function InstallGuide({ open: initiallyOpen }: { open: boolean }) {
                     </p>
                     <h3 className="guide-chip">{t("boxupdate.guideEsp32")}</h3>
                     <Steps chip="esp32" />
+                    <p className="small">
+                        {t("boxupdate.guideEsp32Flasher")}{" "}
+                        <a className="btn small" href="#/setup/esp32">
+                            <Wrench size={15} />
+                            {t("boxupdate.guideEsp32FlasherLink")}
+                        </a>
+                    </p>
                 </div>
             )}
             {open && (

@@ -1,4 +1,5 @@
 // teddyCloud endpoints used by the app
+import { newAudioIds } from "../lib/audioId";
 import { t } from "../lib/i18n";
 import { ApiError, getJson, getText, postForm, postJson, postText, q, request } from "./client";
 import type {
@@ -209,13 +210,16 @@ export const tc = {
         )
             return;
         // older ones remove empty folders only
-        for (const f of await tc.files(path, special)) {
-            if (f.name === "." || f.name === "..") continue;
-            const p = `${path.replace(/\/$/, "")}/${f.name}`;
-            if (f.isDir) await tc.deleteTree(p, special);
-            else await tc.fileDelete(p, false, special);
-        }
-        await tc.fileDelete(path, true, special);
+        const emptyAndDelete = async (dir: string): Promise<void> => {
+            for (const f of await tc.files(dir, special)) {
+                if (f.name === "." || f.name === "..") continue;
+                const p = `${dir.replace(/\/$/, "")}/${f.name}`;
+                if (f.isDir) await emptyAndDelete(p);
+                else await tc.fileDelete(p, false, special, undefined, models);
+            }
+            await tc.fileDelete(dir, true, special, undefined, models);
+        };
+        await emptyAndDelete(path);
     },
     /** moves the content TAF of a tag into the library (by/audioId/ or its root) and assigns it there */
     migrateToLibrary: async (ruid: string, root: boolean, overlay?: string) => {
@@ -250,7 +254,7 @@ export const tc = {
     ) => {
         const form = new FormData();
         chunks.forEach((c, i) => form.append(c.title, c.pcm, `pcmData.${i}.pcm`));
-        const audioId = Math.floor(Date.now() / 1000) - 0x50000000;
+        const audioId = newAudioIds();
         return postForm(
             `/api/pcmUpload${q({ name, audioId, path, special: "library" })}`,
             form,
@@ -311,8 +315,14 @@ export const tc = {
             headers: { "Content-Type": "text/plain" },
             body: "",
         })
-            .then((r) => r.status !== 404 && r.status !== 405)
-            .catch(() => false)),
+            // no answer (network): ask again next time
+            .then(
+                (r) => r.status !== 404 && r.status !== 405,
+                (e) => {
+                    tapBuildProbe = null;
+                    throw e;
+                },
+            )),
     /** every chapter of a TAF as a TAF of its own plus a playlist that builds the original again;
      *  with a target folder the new folder goes there and the TAF stays where it is */
     splitTaf: async (path: string, titles: string[], target?: string) => {
@@ -444,6 +454,12 @@ export const tc = {
     /** the release package kept with a CC3200 image, for setting up a box in the browser */
     cfwPackage: async (build: number): Promise<Uint8Array> => {
         const r = await request(`/api/cfw/firmware/package${q({ build })}`);
+        if (!r.ok) throw new Error(await r.text());
+        return new Uint8Array(await r.arrayBuffer());
+    },
+    /** an ESP32 image as it goes into an app slot, its server block holding host (host[:port]) */
+    cfwEsp32Image: async (build: number, host: string): Promise<Uint8Array> => {
+        const r = await request(`/api/cfw/firmware/esp32Image${q({ build, host })}`);
         if (!r.ok) throw new Error(await r.text());
         return new Uint8Array(await r.arrayBuffer());
     },
